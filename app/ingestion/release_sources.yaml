@@ -1,0 +1,12 @@
+# Releases P2 elegibles como fuente de datos de P3 (D01-02).
+# Un release solo se resuelve si está aquí Y en reports/versions.json Y no está `failed`
+# (ver presentation/release_resolver.py). Los md5 fijan la identidad DVC autorizada: si
+# `data/raw/*.dvc` cambia sin actualizar este archivo, el resolvedor rechaza el release.
+#
+# v0.1.0 no está: su reporte de calidad es `failed`. Agregar un release aquí es una decisión
+# de protocolo (D01-03), no un cambio de código.
+allowed_releases:
+  v0.1.1:
+    dataset_dir: data/raw
+    annotations_md5: c7cb86ae7ece94ef7b853620e464a4d7.dir
+    images_md5: 951150dd4fb053f4665089fcb37a1c87.dir
