@@ -104,6 +104,19 @@ con forma de clave (AWS, llave privada, Anthropic, GitHub); o si un workflow usa
 `continue-on-error`, `|| true` o `CI OK` deja de esperar a todos los jobs. Los pesos van a
 MLflow/S3 y los datos por DVC.
 
+`.gitignore` no impide `git add -f`, así que `app/tests/test_tracked_files.py` revisa el
+índice real (`git ls-files`) con las reglas de `app/tests/_repo_hygiene_rules.py`: falla si
+se versiona `.env`, `.aws/`, `.dvc/config.local`, contenido de `mlruns/`, `mlartifacts/`,
+`data/crops/` o de `data/raw/images|annotations/`, entornos o estado de Terraform. Siguen
+permitidos `.env.example`, lockfiles y punteros `.dvc`.
+
+### Mutation test del quality gate
+
+`.github/scripts/run_gate_mutation.py` sale con `0` solo si, con el mutante, pytest termina
+con tests **fallidos** (exit 1, sin errores). Sale con `1` si la mutación sobrevive y con `2`
+ante cualquier error: objetivo no encontrado, tests en rojo sin mutar, o un error de pytest
+(colección, import, fixture). Un error de pytest nunca cuenta como mutación detectada.
+
 ### Ruff
 
 La configuración vive en `app/pyproject.toml`. Reglas activas: `E`, `F` (errores y
