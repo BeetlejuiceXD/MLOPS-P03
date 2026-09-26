@@ -7,11 +7,11 @@ corregir.
 ## Flujo en cinco pasos
 
 1. **Un ticket = una rama = un PR.** No mezcles tickets en una misma rama salvo que el
-   propio ticket los agrupe (por ejemplo `P2-26 P2-27`).
+   propio ticket los agrupe (por ejemplo `D02-03 D02-04`).
 2. **Parte de `main` actualizado:**
    ```bash
    git fetch origin
-   git checkout -b p2-NN-descripcion origin/main
+   git checkout -b dNN-NN-descripcion origin/main
    ```
 3. **Haz commits pequeños** con el formato de abajo.
 4. **Corre en local lo mismo que el CI** (tabla más abajo) antes de subir.
@@ -20,12 +20,13 @@ corregir.
 
 ## Ramas
 
-`p2-NN-descripcion`, todo en minúsculas y con guiones.
+`dNN-NN-descripcion` (día y ticket del issue diario, p. ej. `D01-06` → `d01-06-...`),
+todo en minúsculas y con guiones.
 
 | Caso | Ejemplo |
 |---|---|
-| Un ticket | `p2-52-copilot-llm-client` |
-| Varios tickets | `p2-22-23-24-quality-gate-e2e`, `p2-26-p2-27-anotacion-lotes-7-8` |
+| Un ticket | `d01-06-ci-exclusions` |
+| Varios tickets | `d02-03-d02-04-trainer-mlflow` |
 | Sin ticket | `fix/annotation-id-collisions`, `chore/gitignore-node-modules` |
 
 Los prefijos válidos para ramas sin ticket son `feat`, `fix`, `test`, `chore`, `docs`,
@@ -34,11 +35,11 @@ Los prefijos válidos para ramas sin ticket son `feat`, `fix`, `test`, `chore`, 
 ## Commits
 
 ```
-P2-NN: qué cambia, en una línea
+D01-06: qué cambia, en una línea
 fix: qué se arregla, en una línea
 ```
 
-- Formato `P2-NN: descripción` cuando hay ticket, o `tipo: descripción` cuando no
+- Formato `DNN-NN: descripción` cuando hay ticket, o `tipo: descripción` cuando no
   (mismos tipos que en las ramas).
 - Primera línea de unos 72 caracteres, sin punto final. Español o inglés, como prefieras.
 - Si hace falta, deja una línea en blanco y explica **por qué** en el cuerpo: el qué ya
@@ -52,10 +53,9 @@ del PR (siguiente sección).
 
 ## Pull requests
 
-- **Título** con el mismo formato que un commit: `P2-52: Copilot con cliente LLM`,
-  `P2-22/23/24: compuerta de calidad`, `P2-26 P2-27: lotes 7 y 8` o
-  `fix: main tiene un test roto`. Ojo con `P2-52 - texto`, `P2 52 texto` o `P2-52 texto`:
-  no cumplen.
+- **Título** con el mismo formato que un commit: `D01-06: CI efectiva y exclusiones`,
+  `D02-03 D02-04: trainer y MLflow` o `fix: main tiene un test roto`. Ojo con
+  `D01-06 - texto`, `D01 06 texto` o `D01-06 texto`: no cumplen.
 - **Descripción:** completa la plantilla. Di qué probaste **y qué no pudiste probar**.
 - **Cierra el issue** con `Cierra #NN` en la descripción.
 - Si tu PR **depende de otro sin mergear**, apúntalo a la rama de ese ticket en vez de
@@ -69,7 +69,7 @@ título basta editarlo en GitHub: el job se vuelve a correr solo. Para comprobar
 abrir el PR:
 
 ```bash
-bash .github/scripts/check-naming.sh "$(git branch --show-current)" "P2-NN: mi título"
+bash .github/scripts/check-naming.sh "$(git branch --show-current)" "DNN-NN: mi título"
 ```
 
 ## Qué corre el CI
@@ -79,7 +79,7 @@ mismos comandos que puedes correr en tu máquina:
 
 | Paquete | Comandos (desde su carpeta) |
 |---|---|
-| `app/` (Python) | `uv sync --locked --no-build` · `uv run --locked --no-build ruff check .` · `uv run --locked --no-build ruff format --check .` · `uv run --locked --no-build pytest -q` |
+| `app/` (Python) | `uv sync --locked --no-build` · `uv run --locked --no-build ruff check .` · `uv run --locked --no-build ruff format --check .` · `uv run --locked --no-build pytest -q` · `uv run --locked --no-build python ../.github/scripts/run_gate_mutation.py` |
 | `backend/` | `npm ci --ignore-scripts` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` |
 | `frontend/` | `npm ci --ignore-scripts` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run build` |
 | `docker-compose.yml` | `docker compose config --quiet` (con `MINIO_ROOT_USER` y `MINIO_ROOT_PASSWORD` definidas) |
@@ -93,6 +93,16 @@ Para arreglar de golpe lo que Ruff o Biome pueden corregir solos: `uv run ruff c
 y `uv run ruff format .` en `app/`; `npm run lint:fix` en `backend/` y `frontend/`.
 
 `CI OK` es el check que resume a todos los demás. Si un job falla, `CI OK` también falla.
+
+### Higiene del repositorio
+
+`app/tests/test_repo_hygiene.py` corre dentro de `pytest` y falla si `.gitignore` deja de
+excluir secretos (`.env`, `.aws/`, `.dvc/config.local`), stores de MLflow (`mlruns/`,
+`mlartifacts/`), pesos (`*.pt`, `*.pth`, `*.ckpt`, `*.onnx`, `*.h5`, `*.keras`,
+`*.safetensors`) o `data/crops/`; si se versiona un peso, un archivo de más de 1 MiB o algo
+con forma de clave (AWS, llave privada, Anthropic, GitHub); o si un workflow usa
+`continue-on-error`, `|| true` o `CI OK` deja de esperar a todos los jobs. Los pesos van a
+MLflow/S3 y los datos por DVC.
 
 ### Ruff
 
