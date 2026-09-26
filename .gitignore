@@ -18,3 +18,28 @@
 
 # Marcador interno de la compuerta DVC; se recrea en cada repro aprobado.
 reports/.quality_gate.passed
+
+# D01-06 (P3): credenciales de AWS que alguien copie dentro del repo por error.
+# El acceso usa SSO con el perfil de ~/.aws, fuera del repositorio.
+.aws/
+
+# Stores locales de MLflow: runs, métricas y checkpoints viven en el servidor
+# MLflow y en su artifact store, nunca en Git.
+mlruns/
+mlartifacts/
+
+# Pesos y checkpoints de modelos, en cualquier carpeta. El modelo publicado se
+# guarda en AWS S3 y los checkpoints de cada run en MLflow.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+*.keras
+*.safetensors
+
+# Crops derivados del release COCO: se regeneran o se versionan con DVC.
+data/crops/
+
+# Bytecode de Python en cualquier carpeta (p. ej. .github/scripts al importarse en tests).
+__pycache__/
