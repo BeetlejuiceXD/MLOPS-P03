@@ -10,6 +10,7 @@ Cada caso monta un proyecto mínimo en `tmp_path` y ejecuta pytest de verdad.
 from __future__ import annotations
 
 import importlib.util
+import sys
 import textwrap
 from pathlib import Path
 from types import ModuleType
@@ -29,6 +30,8 @@ def _load_script() -> ModuleType:
     spec = importlib.util.spec_from_file_location("run_gate_mutation", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    # dataclasses resuelve el módulo por nombre: debe estar registrado antes de ejecutarlo.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
