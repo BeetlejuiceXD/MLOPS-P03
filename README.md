@@ -1093,3 +1093,37 @@ Se añadió `yaml` como dependencia directa del backend para leer/escribir
 YAML sin un parser artesanal. El backend actual no tiene autenticación ni
 autorización: esta edición está destinada al despliegue controlado existente,
 no constituye un panel administrativo protegido para exposición pública.
+
+## D01-02 — Resolvedor de release (fuente de datos de P3)
+
+`presentation.release_resolver` convierte una versión de release en una fuente de
+datos verificada, o la rechaza con un motivo estable. P3 solo consume releases que
+pasen por aquí; no usa una carpeta fija.
+
+```bash
+# Con los datos recuperados (dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc)
+cd app
+uv run python -m presentation.release_resolver v0.1.1
+```
+
+Un release es elegible solo si cumple todo lo siguiente (en este orden):
+
+| Motivo (`reason`) | Regla |
+|---|---|
+| `invalid_version` | Tiene forma `vMAJOR.MINOR.PATCH`. |
+| `not_in_catalog` | Está en `reports/versions.json`. |
+| `not_allowed` | Está en la allowlist `app/ingestion/release_sources.yaml`. |
+| `quality_failed` / `quality_mismatch` | Su `quality.json` describe esa versión, no está `failed` y ningún check con `action: fail` está reprobado. Un `warning` se acepta. |
+| `identity_mismatch` | `data/raw/*.dvc` declaran exactamente los md5 fijados en la allowlist. |
+| `data_missing` | Los datos existen y su cantidad de archivos coincide con `nfiles` de DVC. |
+| `insufficient_classes` | Al menos 2 clases con ≥ `min_images_per_class` (300) originales distintos, contados desde el COCO real. |
+
+- El descriptor devuelto incluye hashes DVC, `quality_sha256`, `policy_sha256` (hash de la
+  política *aplicada*, no del archivo) y `originals_per_class`. Las rutas son relativas a la
+  raíz del repo.
+- No recalcula el md5 de los directorios: eso lo garantiza `dvc status` (`-c -r prod` tras
+  `dvc pull`). El resolvedor solo comprueba que lo declarado en git es lo autorizado.
+- Agregar un release nuevo a la allowlist es una decisión de protocolo, no de código. `v0.1.0`
+  no está porque su reporte de calidad es `failed`.
+- Los tests `real_data` de `app/tests/test_release_resolver.py` se omiten si `data/raw` no está
+  recuperado; en un clon sin `dvc pull` solo corren los de componente.
