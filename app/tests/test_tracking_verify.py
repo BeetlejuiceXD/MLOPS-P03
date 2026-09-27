@@ -177,3 +177,19 @@ def test_check_reports_the_real_download_error(file_store, tmp_path, monkeypatch
 
     assert verify.main(["check", "--evidence", str(evidence_path)]) == verify.MISMATCH
     assert "NoSuchKey en mlflow-artifacts" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD", "MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD"],
+)
+def test_client_streams_artifacts_through_the_server(monkeypatch, name):
+    """CI PR #52: con S3, MLflow 3.16 da al cliente URLs prefirmadas hacia `minio:9000`,
+    que el host no resuelve. Los artefactos deben pasar por el servidor MLflow."""
+    from tracking.settings import configure_client_env
+
+    monkeypatch.delenv(name, raising=False)
+    configure_client_env()
+    import os
+
+    assert os.environ[name] == "false"
