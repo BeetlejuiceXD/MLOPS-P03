@@ -46,28 +46,25 @@ const close = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= to
 // TrainingConfig (#33). Sin defaults en el esquema: lo validado es exactamente lo
 // que se registra en MLflow. Los defaults para el formulario viven aparte.
 // ---------------------------------------------------------------------------
-export const trainingConfigSchema = z
-  .strictObject({
-    architecture: z.literal("resnet18"),
-    pretrained: z.boolean(),
-    trainable_layers: z.enum(["head_only", "last_block", "full"]),
-    image_size: z.number().int().min(128).max(256),
-    batch_size: z.number().int().min(8).max(64),
-    learning_rate: z.number().finite().gt(1e-5).lte(1e-2),
-    weight_decay: z.number().finite().min(0).max(1e-2),
-    optimizer: z.enum(["adam", "sgd"]),
-    max_epochs: z.number().int().min(10).max(100),
-    patience: z.number().int().min(3).max(15),
-    augmentation: z.boolean(),
-    seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
-    hidden_layers: z.union([z.literal(0), z.literal(1)]),
-    hidden_dim: z.literal(128),
-    dropout: z.number().finite().min(0).max(0.5),
-  })
-  .refine((config) => config.patience <= config.max_epochs, {
-    message: "patience no puede superar max_epochs",
-    path: ["patience"],
-  });
+export const trainingConfigSchema = z.strictObject({
+  architecture: z.literal("resnet18"),
+  pretrained: z.boolean(),
+  trainable_layers: z.enum(["head_only", "last_block", "full"]),
+  image_size: z.number().int().min(128).max(256),
+  batch_size: z.number().int().min(8).max(64),
+  learning_rate: z.number().finite().gt(1e-5).lte(1e-2),
+  weight_decay: z.number().finite().min(0).max(1e-2),
+  optimizer: z.enum(["adam", "sgd"]),
+  max_epochs: z.number().int().min(10).max(100),
+  patience: z.number().int().min(3).max(15),
+  augmentation: z.boolean(),
+  // #33: seed es un entero cualquiera (obligatoria, sin rango adicional).
+  seed: z.number().int(),
+  hidden_layers: z.union([z.literal(0), z.literal(1)]),
+  hidden_dim: z.literal(128),
+  dropout: z.number().finite().min(0).max(0.5),
+});
+// #33 fija rangos independientes para patience y max_epochs: no se cruzan aquí.
 export type TrainingConfig = z.infer<typeof trainingConfigSchema>;
 
 /** Defaults congelados en #33 para prellenar el formulario. `seed` no tiene default. */
@@ -298,7 +295,7 @@ export const experimentRunSchema = z
       manifest_version: z.string().min(1),
       manifest_hash: sha256Schema,
       classes: classListSchema,
-      seed: z.number().int().nonnegative(),
+      seed: z.number().int(),
       job_id: positiveInt,
     }),
     // Solo validation: un run de la campaña nunca trae métricas de test.
@@ -326,18 +323,33 @@ export const experimentRunSchema = z
     if (run.status === "RUNNING" && run.end_time !== null)
       issue("end_time", "RUNNING sin end_time");
     if (run.summary) {
-      const best = run.history.find((row) => row.epoch === run.summary?.best_epoch);
+      const summary = run.summary;
+      const best = run.history.find((row) => row.epoch === summary.best_epoch);
       const maxAccuracy = Math.max(...run.history.map((row) => row.val_accuracy));
       if (!best) {
         issue("summary", "best_epoch no existe en history");
-      } else if (
-        best.val_accuracy !== maxAccuracy ||
-        best.val_accuracy !== run.summary.best_val_accuracy
-      ) {
-        issue(
-          "summary",
-          "best_epoch debe ser la de mayor val_accuracy (mejor checkpoint, no el último)"
-        );
+      } else {
+        if (best.val_accuracy !== maxAccuracy) {
+          issue(
+            "summary",
+            "best_epoch debe ser la de mayor val_accuracy (mejor checkpoint, no el último)"
+          );
+        }
+        // El resumen describe UNA época: las tres métricas salen de history[best_epoch].
+        const reported = [
+          ["best_val_accuracy", summary.best_val_accuracy, best.val_accuracy],
+          ["best_val_macro_f1", summary.best_val_macro_f1, best.val_macro_f1],
+          ["best_val_loss", summary.best_val_loss, best.val_loss],
+        ] as const;
+        for (const [name, value, epochValue] of reported) {
+          if (!close(value, epochValue, REPORTED_METRIC_TOLERANCE)) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["summary", name],
+              message: `${name} debe ser el de history[best_epoch] (tolerancia 1e-4)`,
+            });
+          }
+        }
       }
     }
   });
