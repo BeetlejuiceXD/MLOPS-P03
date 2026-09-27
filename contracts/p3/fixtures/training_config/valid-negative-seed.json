@@ -1,7 +1,7 @@
 {
   "contract": "training_config",
-  "valid": false,
-  "why": "patience no puede superar max_epochs",
+  "valid": true,
+  "why": "seed es un entero cualquiera en #33 (también negativo)",
   "payload": {
     "architecture": "resnet18",
     "pretrained": true,
@@ -11,10 +11,10 @@
     "learning_rate": 0.001,
     "weight_decay": 0.0001,
     "optimizer": "adam",
-    "max_epochs": 10,
-    "patience": 15,
+    "max_epochs": 30,
+    "patience": 5,
     "augmentation": true,
-    "seed": 7,
+    "seed": -3,
     "hidden_layers": 0,
     "hidden_dim": 128,
     "dropout": 0.0
