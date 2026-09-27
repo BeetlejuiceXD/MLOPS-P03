@@ -1,0 +1,22 @@
+{
+  "contract": "models_response",
+  "valid": false,
+  "why": "Versión semántica MAJOR.MINOR.PATCH (no la del dataset)",
+  "payload": {
+    "models": [
+      {
+        "semver": "v0.1.1",
+        "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "s3_bucket": "mlops-p2-prod-models-example",
+        "s3_key": "models/p3-cnn-classifier/1.0.0/model.pt",
+        "version_id": "3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "published",
+        "published_at": "2026-09-29T18:00:00Z"
+      }
+    ]
+  }
+}

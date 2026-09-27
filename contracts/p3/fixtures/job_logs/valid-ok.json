@@ -1,0 +1,20 @@
+{
+  "contract": "job_logs",
+  "valid": true,
+  "why": "Logs persistidos del job",
+  "payload": {
+    "job_id": 1,
+    "lines": [
+      {
+        "ts": "2026-09-27T17:00:05Z",
+        "level": "info",
+        "message": "Epoch 1/30 train_loss=0.61"
+      },
+      {
+        "ts": "2026-09-27T17:01:00Z",
+        "level": "error",
+        "message": "Fallo al leer un crop"
+      }
+    ]
+  }
+}

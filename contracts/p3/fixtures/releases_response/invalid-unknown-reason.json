@@ -1,0 +1,15 @@
+{
+  "contract": "releases_response",
+  "valid": false,
+  "why": "reason fuera del enum del resolver",
+  "payload": {
+    "approved": [],
+    "rejected": [
+      {
+        "dataset_version": "v0.1.0",
+        "reason": "because",
+        "detail": "v0.1.0 no está en la allowlist"
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "contract": "api_error",
+  "valid": false,
+  "why": "El mensaje de error no puede venir vacío",
+  "payload": {
+    "error": ""
+  }
+}

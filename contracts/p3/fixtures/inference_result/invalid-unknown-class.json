@@ -1,0 +1,16 @@
+{
+  "contract": "inference_result",
+  "valid": false,
+  "why": "Solo las clases declaradas (cat, dog)",
+  "payload": {
+    "inference_id": 1,
+    "model_version": "1.0.0",
+    "predicted_class": "dog",
+    "probabilities": {
+      "cat": 0.1,
+      "dog": 0.8,
+      "bird": 0.1
+    },
+    "created_at": "2026-09-29T19:00:00Z"
+  }
+}

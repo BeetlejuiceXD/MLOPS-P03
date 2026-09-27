@@ -1,0 +1,15 @@
+{
+  "contract": "inference_result",
+  "valid": false,
+  "why": "predicted_class debe ser la de mayor probabilidad",
+  "payload": {
+    "inference_id": 1,
+    "model_version": "1.0.0",
+    "predicted_class": "cat",
+    "probabilities": {
+      "cat": 0.12,
+      "dog": 0.88
+    },
+    "created_at": "2026-09-29T19:00:00Z"
+  }
+}

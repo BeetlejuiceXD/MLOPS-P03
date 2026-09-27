@@ -1,0 +1,22 @@
+{
+  "contract": "models_response",
+  "valid": true,
+  "why": "Solo borradores: Inference sigue bloqueado",
+  "payload": {
+    "models": [
+      {
+        "semver": "1.1.0",
+        "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "s3_bucket": "mlops-p2-prod-models-example",
+        "s3_key": "models/p3-cnn-classifier/1.1.0/model.pt",
+        "version_id": null,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "draft",
+        "published_at": null
+      }
+    ]
+  }
+}

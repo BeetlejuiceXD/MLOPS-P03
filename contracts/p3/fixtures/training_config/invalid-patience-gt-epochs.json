@@ -1,0 +1,22 @@
+{
+  "contract": "training_config",
+  "valid": false,
+  "why": "patience no puede superar max_epochs",
+  "payload": {
+    "architecture": "resnet18",
+    "pretrained": true,
+    "trainable_layers": "last_block",
+    "image_size": 224,
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "optimizer": "adam",
+    "max_epochs": 10,
+    "patience": 15,
+    "augmentation": true,
+    "seed": 7,
+    "hidden_layers": 0,
+    "hidden_dim": 128,
+    "dropout": 0.0
+  }
+}

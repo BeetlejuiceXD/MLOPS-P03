@@ -1,0 +1,15 @@
+{
+  "contract": "releases_response",
+  "valid": true,
+  "why": "Sin releases aprobados: Training queda bloqueado",
+  "payload": {
+    "approved": [],
+    "rejected": [
+      {
+        "dataset_version": "v0.1.0",
+        "reason": "not_allowed",
+        "detail": "v0.1.0 no está en la allowlist"
+      }
+    ]
+  }
+}

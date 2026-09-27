@@ -1,0 +1,30 @@
+{
+  "contract": "releases_response",
+  "valid": false,
+  "why": "Un release aprobado solo puede estar passed | warning",
+  "payload": {
+    "approved": [
+      {
+        "dataset_version": "v0.1.1",
+        "status": "failed",
+        "dataset_dir": "data/raw",
+        "annotations_dir": "data/raw/annotations",
+        "images_dir": "data/raw/images",
+        "annotations_md5": "11111111111111111111111111111111.dir",
+        "images_md5": "22222222222222222222222222222222.dir",
+        "annotations_nfiles": 1,
+        "images_nfiles": 600,
+        "quality_file": "reports/releases/v0.1.1/quality.json",
+        "quality_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "policy_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "min_images_per_class": 300,
+        "min_classes": 2,
+        "originals_per_class": {
+          "cat": 301,
+          "dog": 300
+        }
+      }
+    ],
+    "rejected": []
+  }
+}
