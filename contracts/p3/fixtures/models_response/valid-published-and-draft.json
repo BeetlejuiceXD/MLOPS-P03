@@ -1,0 +1,35 @@
+{
+  "contract": "models_response",
+  "valid": true,
+  "why": "Una versión publicada (con VersionId) y un borrador",
+  "payload": {
+    "models": [
+      {
+        "semver": "1.0.0",
+        "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "s3_bucket": "mlops-p2-prod-models-example",
+        "s3_key": "models/p3-cnn-classifier/1.0.0/model.pt",
+        "version_id": "3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "published",
+        "published_at": "2026-09-29T18:00:00Z"
+      },
+      {
+        "semver": "1.1.0",
+        "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "s3_bucket": "mlops-p2-prod-models-example",
+        "s3_key": "models/p3-cnn-classifier/1.1.0/model.pt",
+        "version_id": null,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "draft",
+        "published_at": null
+      }
+    ]
+  }
+}

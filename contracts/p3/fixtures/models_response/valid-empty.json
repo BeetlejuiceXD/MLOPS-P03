@@ -1,0 +1,8 @@
+{
+  "contract": "models_response",
+  "valid": true,
+  "why": "Sin versiones: Models vacío e Inference bloqueado",
+  "payload": {
+    "models": []
+  }
+}

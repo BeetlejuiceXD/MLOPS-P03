@@ -1,0 +1,10 @@
+{
+  "contract": "evaluation_response",
+  "valid": true,
+  "why": "Antes de MODEL SELECTION CLOSED no se revela nada del test",
+  "payload": {
+    "state": "blocked",
+    "reason": "model_selection_open",
+    "detail": "La selección por validation sigue abierta."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "contract": "annotation_queue_item",
+  "valid": true,
+  "why": "Elemento creado en la cola de anotación existente",
+  "payload": {
+    "inference_id": 1,
+    "image_id": 42,
+    "status": "pending"
+  }
+}

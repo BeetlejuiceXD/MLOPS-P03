@@ -1,0 +1,8 @@
+{
+  "contract": "api_error",
+  "valid": true,
+  "why": "Formato de error del backend existente",
+  "payload": {
+    "error": "Parámetro inválido."
+  }
+}

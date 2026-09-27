@@ -1,0 +1,85 @@
+{
+  "contract": "experiment_runs_response",
+  "valid": false,
+  "why": "Un run de la campaña no puede traer métricas de test",
+  "payload": {
+    "experiment_name": "p3-cnn-classifier",
+    "runs": [
+      {
+        "run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "experiment_name": "p3-cnn-classifier",
+        "status": "FINISHED",
+        "start_time": "2026-09-27T17:00:05Z",
+        "end_time": "2026-09-27T17:20:00Z",
+        "params": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0
+        },
+        "tags": {
+          "git_commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "22222222222222222222222222222222.dir",
+          "dvc_annotations_md5": "11111111111111111111111111111111.dir",
+          "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "classes": [
+            "cat",
+            "dog"
+          ],
+          "seed": 7,
+          "job_id": 1
+        },
+        "summary": {
+          "best_epoch": 2,
+          "best_val_accuracy": 0.86,
+          "best_val_macro_f1": 0.8588,
+          "best_val_loss": 0.38,
+          "test_accuracy": 0.9
+        },
+        "history": [
+          {
+            "epoch": 1,
+            "train_loss": 0.62,
+            "train_accuracy": 0.66,
+            "val_loss": 0.55,
+            "val_accuracy": 0.71,
+            "val_macro_f1": 0.7,
+            "learning_rate": 0.001
+          },
+          {
+            "epoch": 2,
+            "train_loss": 0.41,
+            "train_accuracy": 0.82,
+            "val_loss": 0.38,
+            "val_accuracy": 0.86,
+            "val_macro_f1": 0.8588,
+            "learning_rate": 0.001
+          },
+          {
+            "epoch": 3,
+            "train_loss": 0.3,
+            "train_accuracy": 0.88,
+            "val_loss": 0.4,
+            "val_accuracy": 0.84,
+            "val_macro_f1": 0.8391,
+            "learning_rate": 0.001
+          }
+        ]
+      }
+    ]
+  }
+}

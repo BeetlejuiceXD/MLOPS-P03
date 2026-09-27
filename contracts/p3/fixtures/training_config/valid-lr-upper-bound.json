@@ -1,0 +1,22 @@
+{
+  "contract": "training_config",
+  "valid": true,
+  "why": "learning_rate=1e-2 es el máximo incluido",
+  "payload": {
+    "architecture": "resnet18",
+    "pretrained": true,
+    "trainable_layers": "last_block",
+    "image_size": 224,
+    "batch_size": 16,
+    "learning_rate": 0.01,
+    "weight_decay": 0.0001,
+    "optimizer": "sgd",
+    "max_epochs": 30,
+    "patience": 5,
+    "augmentation": true,
+    "seed": 7,
+    "hidden_layers": 0,
+    "hidden_dim": 128,
+    "dropout": 0.0
+  }
+}

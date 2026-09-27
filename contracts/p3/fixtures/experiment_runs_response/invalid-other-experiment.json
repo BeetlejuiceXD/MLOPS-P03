@@ -1,0 +1,9 @@
+{
+  "contract": "experiment_runs_response",
+  "valid": false,
+  "why": "Solo el experimento p3-cnn-classifier",
+  "payload": {
+    "experiment_name": "default",
+    "runs": []
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "contract": "annotation_queue_item",
+  "valid": false,
+  "why": "Debe referenciar una imagen real del portal (id entero > 0)",
+  "payload": {
+    "inference_id": 1,
+    "image_id": 0,
+    "status": "pending"
+  }
+}

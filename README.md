@@ -1131,3 +1131,24 @@ Un release es elegible solo si cumple todo lo siguiente (en este orden):
   no está porque su reporte de calidad es `failed`.
 - Los tests `real_data` de `app/tests/test_release_resolver.py` se omiten si `data/raw` no está
   recuperado; en un clon sin `dvc pull` solo corren los de componente.
+
+## D01-05 — Contratos P3 y navegación de las cinco páginas
+
+El portal agrega un tercer grupo al menú global, en el mismo `AppLayout` de P1/P2:
+**Training** (`/ml/training`), **Experiments** (`/ml/experiments`), **Evaluation**
+(`/ml/evaluation`), **Models** (`/ml/models`) e **Inference** (`/ml/inference`).
+
+- Contratos de la API P3 (endpoints, reglas y dueños): [`contracts/p3/README.md`](contracts/p3/README.md).
+- Esquemas Zod: `backend/src/logic/p3.contracts.ts` y su espejo `frontend/src/p3/contracts.ts`.
+  Un test del backend exige que ambos tengan las mismas reglas.
+- Fixtures compartidos en `contracts/p3/fixtures/`: los validan backend y frontend
+  (`npm test` en cada paquete). Son **datos de ejemplo**, no resultados reales.
+- Cada página valida la respuesta con su contrato: un error HTTP, un endpoint todavía no
+  implementado (404) o una respuesta fuera de contrato muestran el estado de error, nunca datos.
+  Hasta que existan los endpoints (D02–D06), las páginas muestran ese estado de error.
+- Estados bloqueados: Training sin release aprobado o con el manifest sin congelar; Evaluation
+  antes de MODEL SELECTION CLOSED; Inference sin ninguna versión publicada.
+
+Para agregar o cambiar una regla: ajusta el esquema en backend **y** frontend, agrega el fixture
+válido o inválido correspondiente en `contracts/p3/fixtures/<contrato>/` y corre `npm test`
+en ambos paquetes.

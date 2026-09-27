@@ -1,0 +1,9 @@
+{
+  "contract": "experiment_runs_response",
+  "valid": true,
+  "why": "Aún no hay corridas: Experiments muestra estado vacío",
+  "payload": {
+    "experiment_name": "p3-cnn-classifier",
+    "runs": []
+  }
+}
