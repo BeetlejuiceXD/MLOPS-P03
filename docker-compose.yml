@@ -11,6 +11,9 @@ x-pipeline-env: &pipeline-env
   REPORTS_DIR: /app/reports
   # D02-01: tracking P3 dentro de Compose (el host usa http://localhost:5000).
   MLFLOW_TRACKING_URI: http://mlflow:5000
+  # Artefactos siempre a través del servidor MLflow, nunca con URL prefirmada a MinIO.
+  MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD: "false"
+  MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD: "false"
 
 services:
   mariadb:
@@ -80,6 +83,10 @@ services:
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
       AWS_DEFAULT_REGION: us-east-1
+      # boto3 reciente calcula/valida checksums por defecto; con S3 compatibles como
+      # MinIO se limita a cuando la API lo exige.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
       MLFLOW_ALLOWED_HOSTS: "mlflow:5000,localhost:*,127.0.0.1:*"
     ports:
       # En macOS el 5000 lo ocupa AirPlay Receiver: usa MLFLOW_HOST_PORT=5001 en .env.

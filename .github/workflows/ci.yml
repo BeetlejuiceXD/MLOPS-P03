@@ -195,6 +195,13 @@ jobs:
       - name: Logs de los servicios
         if: failure()
         run: docker compose logs --no-color mlflow mariadb minio
+      - name: Objetos en el bucket de artefactos (diagnóstico)
+        if: failure()
+        run: >-
+          docker compose exec -T mlflow python -c "import boto3, os;
+          s3 = boto3.client('s3', endpoint_url=os.environ['MLFLOW_S3_ENDPOINT_URL']);
+          r = s3.list_objects_v2(Bucket=os.environ['MLFLOW_ARTIFACTS_BUCKET']);
+          print([o['Key'] for o in r.get('Contents', [])])"
       - name: Limpiar
         if: always()
         run: docker compose down -v

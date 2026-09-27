@@ -69,9 +69,13 @@ def _sha256(path: Path) -> str:
 def _connect(tracking_uri: str):
     """Crea el cliente y hace una lectura real; cualquier fallo = no disponible."""
     configure_client_env()
+    import mlflow
     from mlflow.tracking import MlflowClient
 
     try:
+        # Global además del cliente: las URIs `mlflow-artifacts:/` de los runs se
+        # resuelven contra el tracking URI global al descargar artefactos.
+        mlflow.set_tracking_uri(tracking_uri)
         client = MlflowClient(tracking_uri=tracking_uri)
         client.search_experiments(max_results=1)
     except Exception as error:  # el cliente envuelve errores de red en varias clases
@@ -81,10 +85,27 @@ def _connect(tracking_uri: str):
     return client
 
 
+class ArtifactDownloadError(RuntimeError):
+    """El servidor respondió, pero no devolvió el artefacto."""
+
+
 def _download_sha256(client, run_id: str, artifact_path: str) -> str:
-    with tempfile.TemporaryDirectory() as tmp:
-        local = client.download_artifacts(run_id, artifact_path, tmp)
-        return _sha256(Path(local))
+    """Descarga desde el repositorio de artefactos del run y devuelve su SHA-256.
+
+    No usa `client.download_artifacts`: su `RunsArtifactRepository` registra el error
+    real (p. ej. de S3/MinIO) solo a nivel debug y lanza un mensaje genérico.
+    """
+    from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
+
+    artifact_uri = client.get_run(run_id).info.artifact_uri
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            local = get_artifact_repository(artifact_uri).download_artifacts(artifact_path, tmp)
+            return _sha256(Path(local))
+    except Exception as error:
+        raise ArtifactDownloadError(
+            f"{artifact_uri}/{artifact_path}: {type(error).__name__}: {error}"
+        ) from error
 
 
 def write_evidence(settings: TrackingSettings, evidence_path: Path) -> Evidence:
@@ -169,8 +190,8 @@ def check_evidence(settings: TrackingSettings, evidence: Evidence) -> list[str]:
 
     try:
         served_sha = _download_sha256(client, evidence.run_id, evidence.artifact_path)
-    except Exception as error:
-        problems.append(f"No se pudo descargar {evidence.artifact_path}: {type(error).__name__}")
+    except ArtifactDownloadError as error:
+        problems.append(f"No se pudo descargar el artefacto: {error}")
     else:
         if served_sha != evidence.artifact_sha256:
             problems.append(f"SHA-256 del artefacto: {served_sha} ≠ {evidence.artifact_sha256}")
@@ -209,6 +230,9 @@ def main(argv: list[str] | None = None) -> int:
     except TrackingUnavailableError as error:
         print(str(error), file=sys.stderr)
         return UNAVAILABLE
+    except ArtifactDownloadError as error:
+        print(f"NO persiste: el servidor no devuelve el artefacto: {error}", file=sys.stderr)
+        return MISMATCH
 
     if problems:
         print("NO persiste: " + "; ".join(problems), file=sys.stderr)

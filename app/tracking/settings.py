@@ -18,6 +18,10 @@ CLIENT_ENV_DEFAULTS = {
     "MLFLOW_HTTP_REQUEST_MAX_RETRIES": "0",
     "MLFLOW_HTTP_REQUEST_TIMEOUT": "15",
     "MLFLOW_DISABLE_AGENT_HINT": "1",
+    # Con artefactos en S3/MinIO, MLflow 3.16 daría al cliente URLs prefirmadas hacia
+    # `http://minio:9000`, que el host no resuelve. Así todo pasa por el servidor.
+    "MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD": "false",
+    "MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD": "false",
 }
 
 

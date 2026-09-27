@@ -1184,6 +1184,10 @@ datos del portal. No hay credenciales nuevas: usa `MARIADB_ROOT_PASSWORD` y
   `MLFLOW_HOST_PORT=5001` en `.env` y usa `http://localhost:5001` desde el host.
 - MLflow 3 rechaza (403) peticiones cuyo `Host` no esté permitido. Compose permite
   `mlflow:5000`, `localhost:*` y `127.0.0.1:*` (`MLFLOW_ALLOWED_HOSTS`).
+- Los artefactos siempre pasan por el servidor MLflow: los clientes usan
+  `MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD=false` y `MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD=false`
+  (ya fijados en Compose y en `tracking/settings.py`). Sin eso, MLflow 3.16 entrega URLs
+  prefirmadas hacia `http://minio:9000`, que no se resuelven desde el host.
 
 ### Verificar persistencia
 
