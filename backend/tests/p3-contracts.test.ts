@@ -62,6 +62,21 @@ describe('fixtures compartidos de contratos P3', () => {
   });
 });
 
+describe('espejo del portal', () => {
+  it('frontend/src/p3/contracts.ts tiene las mismas reglas que el backend (salvo formato)', () => {
+    // Quita el encabezado, comillas, espacios y comas finales: solo quedan las reglas.
+    const normalize = (source: string) =>
+      source
+        .slice(source.indexOf('import'))
+        .replace(/'/g, '"')
+        .replace(/\s+/g, '')
+        .replace(/,([)\]}])/g, '$1');
+    const backend = fs.readFileSync(path.resolve('src/logic/p3.contracts.ts'), 'utf8');
+    const frontend = fs.readFileSync(path.resolve('../frontend/src/p3/contracts.ts'), 'utf8');
+    expect(normalize(frontend)).toBe(normalize(backend));
+  });
+});
+
 describe('TrainingConfig congelado en #33', () => {
   it('no aplica defaults silenciosos: lo validado es lo que se registra', () => {
     expect(trainingConfigSchema.safeParse({}).success).toBe(false);
