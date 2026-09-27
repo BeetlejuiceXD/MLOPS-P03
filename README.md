@@ -1152,3 +1152,65 @@ El portal agrega un tercer grupo al menú global, en el mismo `AppLayout` de P1/
 Para agregar o cambiar una regla: ajusta el esquema en backend **y** frontend, agrega el fixture
 válido o inválido correspondiente en `contracts/p3/fixtures/<contrato>/` y corre `npm test`
 en ambos paquetes.
+
+## D02-01 — MLflow persistente (MariaDB + MinIO)
+
+Servicio `mlflow` en `docker-compose.yml` (imagen `infra/mlflow`, MLflow 3.16.1 fijado; el
+worker usa `mlflow-skinny==3.16.1` desde `app/uv.lock`).
+
+| Qué | Dónde |
+|---|---|
+| Backend store (experimentos, runs, params, métricas) | base `mlflow` en el MariaDB del portal (volumen `mariadb_data`) |
+| Artefactos (curvas, checkpoints) | bucket `mlflow-artifacts` en MinIO (volumen `minio_data`), servidos por MLflow |
+| Tracking URI | `http://mlflow:5000` dentro de Compose · `http://localhost:5000` desde el host |
+| Experimento | `p3-cnn-classifier` |
+
+### Arrancar
+
+```bash
+cp .env.example .env            # si no lo tienes; completa MARIADB_ROOT_PASSWORD y MINIO_ROOT_*
+docker compose up -d --build --wait mariadb minio mlflow
+curl -s http://localhost:5000/health   # OK
+```
+
+Al arrancar, `infra/mlflow/bootstrap.py` crea la base `mlflow` y el bucket
+`mlflow-artifacts` si no existen, así que funciona también con volúmenes que ya tenían
+datos del portal. No hay credenciales nuevas: usa `MARIADB_ROOT_PASSWORD` y
+`MINIO_ROOT_*` de tu `.env` (nunca en Git).
+
+- **macOS:** si el puerto 5000 está ocupado por AirPlay Receiver, define
+  `MLFLOW_HOST_PORT=5001` en `.env` y usa `http://localhost:5001` desde el host.
+- MLflow 3 rechaza (403) peticiones cuyo `Host` no esté permitido. Compose permite
+  `mlflow:5000`, `localhost:*` y `127.0.0.1:*` (`MLFLOW_ALLOWED_HOSTS`).
+
+### Verificar persistencia
+
+```bash
+cd app
+export MLFLOW_TRACKING_URI=http://localhost:5000
+uv run python -m tracking.verify write --evidence ../mlflow-evidence.json
+cd .. && docker compose down && docker compose up -d --wait mariadb minio mlflow && cd app
+uv run python -m tracking.verify check --evidence ../mlflow-evidence.json
+```
+
+`write` registra en `p3-cnn-classifier` un run con una métrica por pasos y un artefacto y
+guarda IDs y SHA-256; `check` vuelve a leerlos del servidor y los compara. Salida: `0`
+verificado, `1` algo cambió, `2` servidor no disponible (nunca reporta éxito sin leer del
+servidor). Desde el worker: `docker compose run --rm --no-deps app python -m tracking.verify ...`.
+El run lleva el tag `p3.run_kind=persistence_check`: no cuenta como corrida de la campaña.
+
+El job de CI **MLflow persistente** hace exactamente esto con los servicios reales, desde
+el host y desde la imagen del worker, antes y después de `down`/`up`, y comprueba que con
+MLflow detenido `check` falla con `2`.
+
+### Persistencia y recuperación
+
+- `docker compose restart` y `docker compose down` **conservan** los datos (volúmenes
+  nombrados). `docker compose down -v` **los borra**: no lo uses si quieres conservar las
+  corridas.
+- Si MLflow no arranca, revisa `docker compose logs mlflow` (conexión a MariaDB/MinIO) y
+  vuelve a `docker compose up -d --wait mlflow`; el arranque es idempotente.
+- Respaldo de metadatos: `docker compose exec mariadb sh -c 'mariadb-dump -uroot
+  -p"$MARIADB_ROOT_PASSWORD" --databases mlflow' > mlflow-metadata.sql`. El snapshot
+  completo (metadatos + artefactos) para el clean clone se versiona con DVC al cerrar la
+  campaña (D05), como quedó en #33.
