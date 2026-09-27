@@ -9,6 +9,8 @@ x-pipeline-env: &pipeline-env
   MINIO_BUCKET: image-annotations
   DATASET_DIR: /app/data/raw
   REPORTS_DIR: /app/reports
+  # D02-01: tracking P3 dentro de Compose (el host usa http://localhost:5000).
+  MLFLOW_TRACKING_URI: http://mlflow:5000
 
 services:
   mariadb:
@@ -37,6 +39,35 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+
+  # D02-01: MLflow persistente. Backend store = base `mlflow` en el MariaDB del
+  # portal; artefactos (runs y checkpoints) = bucket `mlflow-artifacts` en MinIO,
+  # servidos por el propio MLflow. Ambos viven en los volúmenes nombrados de abajo,
+  # así que sobreviven a `docker compose restart` y a `down` (sin `-v`).
+  mlflow:
+    build: ./infra/mlflow
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      MLFLOW_DB_HOST: mariadb
+      MLFLOW_DB_PORT: 3306
+      MLFLOW_DB_USER: root
+      MLFLOW_DB_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Define MARIADB_ROOT_PASSWORD en .env}
+      MLFLOW_DB_NAME: mlflow
+      MLFLOW_ARTIFACTS_BUCKET: mlflow-artifacts
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      # Credenciales de MinIO local (no de AWS): el SDK de S3 las lee con estos nombres.
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+      AWS_DEFAULT_REGION: us-east-1
+      MLFLOW_ALLOWED_HOSTS: "mlflow:5000,localhost:*,127.0.0.1:*"
+    ports:
+      # En macOS el 5000 lo ocupa AirPlay Receiver: usa MLFLOW_HOST_PORT=5001 en .env.
+      - "${MLFLOW_HOST_PORT:-5000}:5000"
+    restart: on-failure:5
 
   backend:
     build: ./backend
