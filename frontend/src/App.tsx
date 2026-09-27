@@ -2,6 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AnnotateScreen } from "@/components/annotate/AnnotateScreen";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { UploadScreen } from "@/components/upload/UploadScreen";
+import { EvaluationPage } from "@/p3/pages/Evaluation";
+import { ExperimentsPage } from "@/p3/pages/Experiments";
+import { InferencePage } from "@/p3/pages/Inference";
+import { ModelsPage } from "@/p3/pages/Models";
+import { TrainingPage } from "@/p3/pages/Training";
 import { DashboardPage } from "@/pages/Dashboard";
 import { SearchPage } from "@/pages/SearchPage";
 import { AnalyzersPage } from "@/pipeline/pages/Analyzers";
@@ -11,6 +16,15 @@ import { ProjectionsPage } from "@/pipeline/pages/Projections";
 import { SettingsPage } from "@/pipeline/pages/Settings";
 import { SplitsPage } from "@/pipeline/pages/Splits";
 import { VersionsPage } from "@/pipeline/pages/Versions";
+
+/** D01-05: las cinco páginas P3 viven en el mismo portal y AppLayout que P1/P2. */
+const P3_ROUTES = [
+  { path: "/ml/training", Page: TrainingPage },
+  { path: "/ml/experiments", Page: ExperimentsPage },
+  { path: "/ml/evaluation", Page: EvaluationPage },
+  { path: "/ml/models", Page: ModelsPage },
+  { path: "/ml/inference", Page: InferencePage },
+] as const;
 
 export function App(): JSX.Element {
   return (
@@ -101,6 +115,19 @@ export function App(): JSX.Element {
           </AppLayout>
         }
       />
+
+      <Route path="/ml" element={<Navigate to="/ml/training" replace />} />
+      {P3_ROUTES.map(({ path, Page }) => (
+        <Route
+          key={path}
+          path={path}
+          element={
+            <AppLayout>
+              <Page />
+            </AppLayout>
+          }
+        />
+      ))}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
