@@ -29,7 +29,10 @@ services:
       retries: 20
 
   minio:
-    image: quay.io/minio/minio
+    # Versión fija: MinIO retiró sus imágenes de Docker Hub (sep 2026) y en quay.io el
+    # tag por defecto pide login. Esta es la última versión comunitaria publicada y
+    # sigue siendo pública; ya no recibe parches de seguridad (solo uso local/CI).
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
