@@ -333,7 +333,9 @@ docker run --name proyecto1-minio \
   -p 9000:9000 -p 9001:9001 \
   -e MINIO_ROOT_USER=minioadmin \
   -e MINIO_ROOT_PASSWORD=minioadmin \
-  -d quay.io/minio/minio server /data --console-address ":9001"
+  --user 0:0 \
+  -d cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 \
+  server /data --console-address ":9001"
 ```
 
 El bucket se crea automáticamente al arrancar el backend.
