@@ -149,3 +149,31 @@ def test_unreadable_evidence_is_not_success(file_store, tmp_path, capsys):
     broken.write_text("{no es json", encoding="utf-8")
     assert verify.main(["check", "--evidence", str(broken)]) == verify.UNAVAILABLE
     assert "ilegible" in capsys.readouterr().err
+
+
+def _break_artifact_download(monkeypatch, message: str) -> None:
+    from mlflow.store.artifact import artifact_repo
+
+    def broken(self, artifact_path, dst_path=None):
+        raise OSError(message)
+
+    monkeypatch.setattr(artifact_repo.ArtifactRepository, "download_artifacts", broken)
+
+
+def test_write_reports_the_real_download_error(file_store, tmp_path, monkeypatch, capsys):
+    """CI PR #52: MLflow ocultaba el error de S3 tras un mensaje genérico y write tronaba."""
+    _break_artifact_download(monkeypatch, "S3 GetObject falló: checksum inválido")
+    evidence_path = tmp_path / "evidence.json"
+
+    assert verify.main(["write", "--evidence", str(evidence_path)]) == verify.MISMATCH
+    err = capsys.readouterr().err
+    assert "S3 GetObject falló: checksum inválido" in err
+    assert not evidence_path.exists()
+
+
+def test_check_reports_the_real_download_error(file_store, tmp_path, monkeypatch, capsys):
+    evidence_path, _ = _write(tmp_path)
+    _break_artifact_download(monkeypatch, "NoSuchKey en mlflow-artifacts")
+
+    assert verify.main(["check", "--evidence", str(evidence_path)]) == verify.MISMATCH
+    assert "NoSuchKey en mlflow-artifacts" in capsys.readouterr().err
