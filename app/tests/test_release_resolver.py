@@ -17,7 +17,9 @@ from presentation.release_resolver import (
     ReleaseRejectedError,
     ReleaseSource,
     load_release_sources,
+    main,
     policy_sha256,
+    resolve_all_releases,
     resolve_release,
 )
 from tests._dataset_fixtures import write_coco_dataset
@@ -314,6 +316,93 @@ def test_changing_version_changes_the_resolved_source(tmp_path):
     assert release_b.originals_per_class == {"cat": 6, "dog": 5}
 
 
+def _resolve_all(tmp_path, sources):
+    return resolve_all_releases(
+        repo_root=tmp_path,
+        reports_dir=tmp_path / "reports",
+        sources=sources,
+        policy=_policy(tmp_path),
+    )
+
+
+def test_resolve_all_lists_approved_releases_sorted_by_semver(tmp_path):
+    source_new = _add_release(tmp_path, "v0.10.0", cats=6, dogs=5)
+    source_old = _add_release(tmp_path, "v0.2.0", cats=4, dogs=3)
+
+    listing = _resolve_all(tmp_path, {"v0.10.0": source_new, "v0.2.0": source_old})
+
+    assert [r.dataset_version for r in listing.approved] == ["v0.2.0", "v0.10.0"]
+    assert listing.rejected == []
+    assert listing.approved[0].originals_per_class == {"cat": 4, "dog": 3}
+    assert listing.approved[1].originals_per_class == {"cat": 6, "dog": 5}
+
+
+def test_resolve_all_reports_rejected_releases_with_reason_instead_of_hiding_them(tmp_path):
+    good = _add_release(tmp_path, "v0.1.1")
+    failed = _add_release(
+        tmp_path,
+        "v0.1.0",
+        status="failed",
+        checks=[_check("min_images_per_class", passed=False, action="fail")],
+    )
+    _add_release(tmp_path, "v0.3.0")  # en el catálogo pero fuera de la allowlist
+
+    listing = _resolve_all(tmp_path, {"v0.1.1": good, "v0.1.0": failed})
+
+    assert [r.dataset_version for r in listing.approved] == ["v0.1.1"]
+    assert {r.dataset_version: r.reason for r in listing.rejected} == {
+        "v0.1.0": "quality_failed",
+        "v0.3.0": "not_allowed",
+    }
+    assert [r.dataset_version for r in listing.rejected] == ["v0.1.0", "v0.3.0"]
+    assert all(r.detail for r in listing.rejected)
+
+
+def test_resolve_all_flags_allowed_version_missing_from_catalog(tmp_path):
+    source = _add_release(tmp_path, "v0.1.1")
+
+    listing = _resolve_all(tmp_path, {"v0.1.1": source, "v0.9.0": source})
+
+    assert [r.dataset_version for r in listing.approved] == ["v0.1.1"]
+    assert {r.dataset_version: r.reason for r in listing.rejected} == {"v0.9.0": "not_in_catalog"}
+
+
+def test_resolve_all_without_catalog_or_sources_is_empty_not_an_error(tmp_path):
+    listing = _resolve_all(tmp_path, {})
+
+    assert listing.approved == []
+    assert listing.rejected == []
+
+
+def test_cli_all_prints_listing_json_and_exits_zero_even_with_rejections(
+    tmp_path, monkeypatch, capsys
+):
+    from presentation import release_resolver
+
+    good = _add_release(tmp_path, "v0.1.1", cats=4, dogs=3)
+    _add_release(tmp_path, "v0.3.0")  # rechazada: fuera de la allowlist
+    monkeypatch.setattr(release_resolver, "APP_ROOT", tmp_path / "app")
+    monkeypatch.setattr(release_resolver, "load_release_sources", lambda: {"v0.1.1": good})
+    monkeypatch.setattr(release_resolver, "load_quality_policy", lambda: _policy(tmp_path))
+
+    assert main(["--all"]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert [r["dataset_version"] for r in payload["approved"]] == ["v0.1.1"]
+    assert payload["approved"][0]["originals_per_class"] == {"cat": 4, "dog": 3}
+    assert [(r["dataset_version"], r["reason"]) for r in payload["rejected"]] == [
+        ("v0.3.0", "not_allowed")
+    ]
+
+
+def test_cli_requires_exactly_one_of_version_or_all(capsys):
+    for argv in ([], ["v0.1.1", "--all"]):
+        with pytest.raises(SystemExit) as excinfo:
+            main(argv)
+        assert excinfo.value.code == 2
+    capsys.readouterr()
+
+
 def test_registry_rejects_unsafe_dataset_dir(tmp_path):
     for bad in ("../outside", "/abs/path", "data/../../x", ""):
         with pytest.raises(ValueError, match="dataset_dir"):
@@ -392,6 +481,18 @@ real_data = pytest.mark.skipif(
     not (REPO_ROOT / "data" / "raw" / "images").is_dir(),
     reason="datos reales no recuperados (dvc pull -r prod)",
 )
+
+
+@real_data
+def test_real_all_lists_v0_1_1_approved_and_v0_1_0_rejected(capsys):
+    assert main(["--all"]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert [r["dataset_version"] for r in payload["approved"]] == ["v0.1.1"]
+    assert payload["approved"][0]["originals_per_class"] == {"cat": 301, "dog": 300}
+    assert {r["dataset_version"]: r["reason"] for r in payload["rejected"]} == {
+        "v0.1.0": "not_allowed"
+    }
 
 
 @real_data

@@ -113,6 +113,25 @@ class ResolvedRelease(BaseModel):
     originals_per_class: dict[str, int]
 
 
+class RejectedRelease(BaseModel):
+    """Versión conocida (catálogo o allowlist) que hoy no es elegible, con su motivo."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dataset_version: str
+    reason: RejectionReason
+    detail: str
+
+
+class ReleaseListing(BaseModel):
+    """Resultado de `resolve_all_releases`: aprobados y rechazados, ambos ordenados por semver."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    approved: list[ResolvedRelease]
+    rejected: list[RejectedRelease]
+
+
 def load_release_sources(path: Path | None = None) -> dict[str, ReleaseSource]:
     """Lee la allowlist versionada; cada clave es una versión semver."""
     sources_path = path if path is not None else DEFAULT_SOURCES_PATH
@@ -269,13 +288,73 @@ def resolve_release(
     )
 
 
+def _semver_key(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version[1:].split("."))
+
+
+def _known_versions(reports_dir: Path, sources: dict[str, ReleaseSource]) -> list[str]:
+    """Allowlist + catálogo, sin duplicados y con formato semver, de menor a mayor."""
+    versions = set(sources)
+    catalog_path = reports_dir / "versions.json"
+    if catalog_path.exists():
+        catalog = VersionsReport.model_validate_json(catalog_path.read_text(encoding="utf-8"))
+        versions.update(release.dataset_version for release in catalog.releases)
+    return sorted((v for v in versions if SEMVER_PATTERN.fullmatch(v)), key=_semver_key)
+
+
+def resolve_all_releases(
+    *,
+    repo_root: Path,
+    reports_dir: Path,
+    sources: dict[str, ReleaseSource],
+    policy: QualityPolicy,
+    min_classes: int = DEFAULT_MIN_CLASSES,
+) -> ReleaseListing:
+    """Resuelve cada versión conocida; los rechazos se reportan con su motivo, no se ocultan."""
+    approved: list[ResolvedRelease] = []
+    rejected: list[RejectedRelease] = []
+    for version in _known_versions(reports_dir, sources):
+        try:
+            approved.append(
+                resolve_release(
+                    version,
+                    repo_root=repo_root,
+                    reports_dir=reports_dir,
+                    sources=sources,
+                    policy=policy,
+                    min_classes=min_classes,
+                )
+            )
+        except ReleaseRejectedError as error:
+            rejected.append(
+                RejectedRelease(dataset_version=version, reason=error.reason, detail=str(error))
+            )
+    return ReleaseListing(approved=approved, rejected=rejected)
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(prog="presentation.release_resolver")
-    parser.add_argument("version", help="vMAJOR.MINOR.PATCH")
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("version", nargs="?", help="vMAJOR.MINOR.PATCH")
+    target.add_argument(
+        "--all",
+        action="store_true",
+        help="lista aprobados y rechazados (con motivo) de todas las versiones conocidas",
+    )
     args = parser.parse_args(argv)
 
     repo_root = APP_ROOT.parent
+    if args.all:
+        listing = resolve_all_releases(
+            repo_root=repo_root,
+            reports_dir=repo_root / "reports",
+            sources=load_release_sources(),
+            policy=load_quality_policy(),
+        )
+        print(json.dumps(listing.model_dump(), indent=2, ensure_ascii=False))
+        return 0
+
     try:
         release = resolve_release(
             args.version,

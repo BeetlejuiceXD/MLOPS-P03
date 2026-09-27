@@ -1103,7 +1103,8 @@ pasen por aquí; no usa una carpeta fija.
 ```bash
 # Con los datos recuperados (dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc)
 cd app
-uv run python -m presentation.release_resolver v0.1.1
+uv run python -m presentation.release_resolver v0.1.1   # una versión
+uv run python -m presentation.release_resolver --all      # todas las versiones conocidas
 ```
 
 Un release es elegible solo si cumple todo lo siguiente (en este orden):
@@ -1118,6 +1119,9 @@ Un release es elegible solo si cumple todo lo siguiente (en este orden):
 | `data_missing` | Los datos existen y su cantidad de archivos coincide con `nfiles` de DVC. |
 | `insufficient_classes` | Al menos 2 clases con ≥ `min_images_per_class` (300) originales distintos, contados desde el COCO real. |
 
+- `--all` (exit 0) imprime `{"approved": [...], "rejected": [{"dataset_version", "reason", "detail"}]}`
+  con las versiones de la allowlist y del catálogo, ordenadas por semver. Los rechazados se reportan con
+  su motivo, no se omiten. Es el listado que consume `GET /api/releases`.
 - El descriptor devuelto incluye hashes DVC, `quality_sha256`, `policy_sha256` (hash de la
   política *aplicada*, no del archivo) y `originals_per_class`. Las rutas son relativas a la
   raíz del repo.
