@@ -18,6 +18,11 @@ CropExclusionReason = Literal[
     "unknown_category",
 ]
 
+# Clases del clasificador, congeladas en el protocolo de D01-03 (issue #33): una
+# categoría COCO adicional (p. ej. "horse"), aunque esté bien declarada, no es una
+# clase del contrato de P3 y no debe producir un crop.
+FROZEN_CLASSES: frozenset[str] = frozenset({"cat", "dog"})
+
 
 class CropModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)

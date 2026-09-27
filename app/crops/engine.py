@@ -18,7 +18,7 @@ from math import ceil, floor, isfinite
 
 from PIL import Image, UnidentifiedImageError
 
-from crops.models import Crop, CropExclusion, CropExclusionReason, CropResult
+from crops.models import FROZEN_CLASSES, Crop, CropExclusion, CropExclusionReason, CropResult
 
 
 def _finite_number(value: object) -> bool:
@@ -26,15 +26,28 @@ def _finite_number(value: object) -> bool:
 
 
 def _real_pixel_size(data: bytes) -> tuple[int, int] | None:
-    """Tamaño real decodificado, o `None` si los bytes no son una imagen válida."""
+    """Tamaño real decodificado, o `None` si los bytes no son una imagen válida.
+
+    `Image.open` solo lee la cabecera (rápido, perezoso): un JPEG con la cabecera
+    intacta pero los píxeles truncados reporta un `.size` correcto sin que eso
+    signifique que el binario es utilizable. `image.load()` fuerza la
+    decodificación completa y es lo que de verdad detecta el truncamiento
+    (`OSError`, con `ImageFile.LOAD_TRUNCATED_IMAGES` en su valor por defecto).
+    """
     try:
         with Image.open(BytesIO(data)) as image:
+            image.load()
             return image.size
     except (UnidentifiedImageError, OSError):
         return None
 
 
-def generate_crops(coco: dict, image_contents: dict[int, bytes]) -> CropResult:
+def generate_crops(
+    coco: dict,
+    image_contents: dict[int, bytes],
+    *,
+    allowed_categories: frozenset[str] | None = None,
+) -> CropResult:
     """Genera un `Crop` por anotación válida de `coco`, o la excluye con motivo.
 
     `coco` trae `images`/`annotations`/`categories` en la forma cruda de un COCO
@@ -43,13 +56,24 @@ def generate_crops(coco: dict, image_contents: dict[int, bytes]) -> CropResult:
     decodifican como imagen, producen `missing_image` — igual que un `image_id`
     huérfano que no está declarado en `coco["images"]`.
 
+    `allowed_categories` son las clases del clasificador (por defecto
+    `FROZEN_CLASSES`, congeladas en #33): una categoría COCO adicional, aunque
+    esté bien declarada (p. ej. "horse"), es `unknown_category` si su nombre no
+    pertenece a este conjunto — el motor no produce crops de clases fuera del
+    contrato, aunque el dataset las incluya.
+
     Los límites de la caja se verifican contra el tamaño real de la imagen
     decodificada, no contra `width`/`height` declarados en el COCO: unos
     metadatos desactualizados no deben validar una caja que en realidad se sale
     de la imagen. Una caja parcialmente fuera se excluye igual que una caja
     totalmente fuera (D01-03: no se recorta al borde, para no alterar la
     geometría anotada).
+
+    Los resultados salen ordenados por `annotation_id` (D01-03): se procesa
+    `coco["annotations"]` en ese orden, así que tanto `crops` como `exclusions`
+    quedan ascendentes, sin depender del orden de entrada del COCO.
     """
+    allowed = FROZEN_CLASSES if allowed_categories is None else allowed_categories
     categories = {category["id"]: category["name"] for category in coco["categories"]}
     declared_images = {image["id"] for image in coco["images"]}
 
@@ -65,18 +89,28 @@ def generate_crops(coco: dict, image_contents: dict[int, bytes]) -> CropResult:
             )
         )
 
-    for annotation in coco["annotations"]:
+    for annotation in sorted(coco["annotations"], key=lambda item: item["id"]):
         annotation_id = annotation["id"]
         image_id = annotation["image_id"]
         category_id = annotation["category_id"]
         bbox = annotation["bbox"]
 
-        if category_id not in categories:
+        category_name = categories.get(category_id)
+        if category_name is None:
             exclude(
                 annotation_id,
                 image_id,
                 "unknown_category",
                 f"category_id={category_id} no está declarada en 'categories'",
+            )
+            continue
+        if category_name not in allowed:
+            exclude(
+                annotation_id,
+                image_id,
+                "unknown_category",
+                f"category_id={category_id} (name={category_name!r}) no pertenece a las "
+                f"clases congeladas del clasificador {sorted(allowed)!r}",
             )
             continue
 
@@ -157,7 +191,7 @@ def generate_crops(coco: dict, image_contents: dict[int, bytes]) -> CropResult:
                 image_id=image_id,
                 annotation_id=annotation_id,
                 category_id=category_id,
-                category_name=categories[category_id],
+                category_name=category_name,
                 bbox_original=[float(x), float(y), float(width), float(height)],
                 bbox_pixels=[x0, y0, x1, y1],
                 width=x1 - x0,

@@ -145,6 +145,48 @@ def test_generation_is_deterministic_for_the_same_input():
     assert first == second
 
 
+# --- orden determinista por annotation_id (D01-03, revisión de PR #48) -----------
+
+
+def test_crops_and_exclusions_are_ordered_by_annotation_id_regardless_of_input_order():
+    """El COCO trae las anotaciones en cualquier orden (id 30 antes que 5, etc.):
+    la salida siempre queda ascendente por annotation_id, mezclando válidas y
+    excluidas, sin depender del orden en que aparecen en 'annotations'."""
+    coco = _coco(
+        images=[
+            {"id": 1, "file_name": "a.jpg", "width": 64, "height": 64},
+            {"id": 2, "file_name": "b.jpg", "width": 64, "height": 64},
+        ],
+        annotations=[
+            _annotation(30, 1, 3, [0, 0, 10, 10]),  # válida, id alto, primero en la entrada
+            _annotation(5, 1, 4, [-1, 0, 10, 10]),  # excluida (out_of_bounds), id bajo
+            _annotation(17, 2, 3, [0, 0, 10, 10]),  # válida, id intermedio
+            _annotation(2, 2, 999, [0, 0, 10, 10]),  # excluida (unknown_category), id más bajo
+        ],
+    )
+    contents = {1: _image_bytes(seed=1), 2: _image_bytes(seed=2)}
+
+    result = generate_crops(coco, contents)
+
+    assert [c.annotation_id for c in result.crops] == [17, 30]
+    assert [e.annotation_id for e in result.exclusions] == [2, 5]
+
+
+def test_reordering_the_input_annotations_does_not_change_the_result():
+    coco = _coco(
+        images=[{"id": 1, "file_name": "a.jpg", "width": 64, "height": 64}],
+        annotations=[
+            _annotation(9, 1, 3, [0, 0, 10, 10]),
+            _annotation(1, 1, 4, [10, 10, 10, 10]),
+            _annotation(5, 1, 42, [0, 0, 10, 10]),  # unknown_category
+        ],
+    )
+    contents = {1: _image_bytes()}
+    shuffled = _coco(images=coco["images"], annotations=list(reversed(coco["annotations"])))
+
+    assert generate_crops(coco, contents) == generate_crops(shuffled, contents)
+
+
 # --- bordes: exactamente en el límite es válido ------------------------------------
 
 
@@ -298,15 +340,36 @@ def test_undecodable_image_bytes_are_missing_image():
     assert reason == "missing_image"
 
 
+def test_truncated_image_with_a_readable_header_is_missing_image_not_valid():
+    """Un JPEG al que le faltan los últimos bytes conserva una cabecera legible
+    (`Image.open(...).size` da el tamaño correcto) pero sus píxeles no son
+    decodificables: no debe colarse como crop válido solo porque el tamaño
+    "parece" correcto (revisión de PR #48)."""
+    full = _image_bytes()
+    truncated = full[:-20]
+    assert len(truncated) < len(full)
+    with Image.open(io.BytesIO(truncated)) as header_only:
+        assert header_only.size == (64, 64)  # la cabecera sí es legible
+        with pytest.raises(OSError):
+            header_only.load()  # pero los píxeles no decodifican completos
+    coco, _ = _one_image_dataset([0, 0, 10, 10])
+
+    reason = _only_exclusion_reason(generate_crops(coco, {1: truncated}))
+
+    assert reason == "missing_image"
+
+
 # --- unknown_category -------------------------------------------------------------
 
 
 def test_annotation_with_undeclared_category_is_unknown_category():
     coco, contents = _one_image_dataset([0, 0, 10, 10], category_id=999)
 
-    reason = _only_exclusion_reason(generate_crops(coco, contents))
+    result = generate_crops(coco, contents)
 
+    reason = _only_exclusion_reason(result)
     assert reason == "unknown_category"
+    assert "no está declarada" in result.exclusions[0].detail
 
 
 def test_unknown_category_is_reported_even_without_image_bytes():
@@ -319,6 +382,38 @@ def test_unknown_category_is_reported_even_without_image_bytes():
     reason = _only_exclusion_reason(generate_crops(coco, {}))
 
     assert reason == "unknown_category"
+
+
+def test_a_declared_category_outside_the_frozen_classes_is_unknown_category():
+    """ "horse" está bien declarada en 'categories' (a diferencia de category_id=999
+    del test anterior), pero no pertenece a las clases congeladas del clasificador
+    en #33 (cat/dog): no debe producir un crop válido (revisión de PR #48)."""
+    coco = _coco(
+        images=[{"id": 1, "file_name": "a.jpg", "width": 64, "height": 64}],
+        annotations=[_annotation(1, 1, 7, [0, 0, 10, 10])],
+        categories=[{"id": 3, "name": "dog"}, {"id": 4, "name": "cat"}, {"id": 7, "name": "horse"}],
+    )
+    contents = {1: _image_bytes()}
+
+    result = generate_crops(coco, contents)
+
+    reason = _only_exclusion_reason(result)
+    assert reason == "unknown_category"
+    assert "horse" in result.exclusions[0].detail
+
+
+def test_allowed_categories_can_be_overridden_for_a_different_class_contract():
+    coco = _coco(
+        images=[{"id": 1, "file_name": "a.jpg", "width": 64, "height": 64}],
+        annotations=[_annotation(1, 1, 7, [0, 0, 10, 10])],
+        categories=[{"id": 7, "name": "horse"}],
+    )
+    contents = {1: _image_bytes()}
+
+    result = generate_crops(coco, contents, allowed_categories=frozenset({"horse"}))
+
+    assert result.exclusions == []
+    assert result.crops[0].category_name == "horse"
 
 
 # --- mezcla: válidos y excluidos conviven, nada se pierde en silencio -------------
