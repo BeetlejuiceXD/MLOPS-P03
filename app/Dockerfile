@@ -18,6 +18,7 @@ COPY policies/ ./policies/
 COPY splits/ ./splits/
 COPY storage/ ./storage/
 COPY presentation/ ./presentation/
+COPY training/ ./training/
 COPY projections/ ./projections/
 COPY copilot/ ./copilot/
 
