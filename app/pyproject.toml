@@ -19,6 +19,7 @@ dependencies = [
     "anthropic>=1.7,<2",
     "starlette>=1.6,<2",
     "uvicorn>=0.53,<1",
+    "mlflow-skinny==3.16.1",
 ]
 
 [dependency-groups]
@@ -29,7 +30,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tests"]
+src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "tests"]
 
 [tool.ruff.lint]
 # E/F: errores y pyflakes. I: orden de imports. B: bugbear (bugs probables).
@@ -38,7 +39,7 @@ src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation"
 select = ["E", "F", "I", "B", "SIM", "C4", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot"]
+known-first-party = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
