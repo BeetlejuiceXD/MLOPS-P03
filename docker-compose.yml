@@ -9,6 +9,11 @@ x-pipeline-env: &pipeline-env
   MINIO_BUCKET: image-annotations
   DATASET_DIR: /app/data/raw
   REPORTS_DIR: /app/reports
+  # D02-01: tracking P3 dentro de Compose (el host usa http://localhost:5000).
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  # Artefactos siempre a través del servidor MLflow, nunca con URL prefirmada a MinIO.
+  MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD: "false"
+  MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD: "false"
 
 services:
   mariadb:
@@ -27,7 +32,13 @@ services:
       retries: 20
 
   minio:
-    image: quay.io/minio/minio
+    # MinIO retiró sus imágenes de Docker Hub (sep 2026) y quay.io/minio/minio ya no
+    # se descarga sin login, ni con tag fijo. Se usa la build gratuita de Chainguard
+    # del mismo binario, fijada por digest. Solo para uso local/CI.
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+    # La imagen corre como no-root; la anterior corría como root y los volúmenes
+    # minio_data existentes son de root: se mantiene root para poder escribirlos.
+    user: "0:0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
@@ -37,6 +48,50 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    healthcheck:
+      # La imagen trae bash pero no curl/wget: sonda HTTP con /dev/tcp de bash.
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /minio/health/live HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # D02-01: MLflow persistente. Backend store = base `mlflow` en el MariaDB del
+  # portal; artefactos (runs y checkpoints) = bucket `mlflow-artifacts` en MinIO,
+  # servidos por el propio MLflow. Ambos viven en los volúmenes nombrados de abajo,
+  # así que sobreviven a `docker compose restart` y a `down` (sin `-v`).
+  mlflow:
+    build: ./infra/mlflow
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      MLFLOW_DB_HOST: mariadb
+      MLFLOW_DB_PORT: 3306
+      MLFLOW_DB_USER: root
+      MLFLOW_DB_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Define MARIADB_ROOT_PASSWORD en .env}
+      MLFLOW_DB_NAME: mlflow
+      MLFLOW_ARTIFACTS_BUCKET: mlflow-artifacts
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      # Credenciales de MinIO local (no de AWS): el SDK de S3 las lee con estos nombres.
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+      AWS_DEFAULT_REGION: us-east-1
+      # boto3 reciente calcula/valida checksums por defecto; con S3 compatibles como
+      # MinIO se limita a cuando la API lo exige.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      MLFLOW_ALLOWED_HOSTS: "mlflow:5000,localhost:*,127.0.0.1:*"
+    ports:
+      # En macOS el 5000 lo ocupa AirPlay Receiver: usa MLFLOW_HOST_PORT=5001 en .env.
+      - "${MLFLOW_HOST_PORT:-5000}:5000"
+    restart: on-failure:5
 
   backend:
     build: ./backend

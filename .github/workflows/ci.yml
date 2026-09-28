@@ -127,6 +127,85 @@ jobs:
           MINIO_ROOT_PASSWORD: ci
         run: docker compose config --quiet
 
+  mlflow-persistence:
+    name: MLflow persistente (MariaDB + MinIO, reinicio)
+    # D02-01: servicios reales. Escribe un run desde el host, lo lee también desde
+    # la imagen del worker (app), reinicia todo con `down`/`up` (sin borrar
+    # volúmenes) y comprueba que experimento, run, métricas y SHA-256 del
+    # artefacto siguen iguales. Con MLflow parado, `check` debe fallar con 2.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Valores de prueba efímeros del runner; no son credenciales reales.
+      MARIADB_ROOT_PASSWORD: ci-mariadb-${{ github.run_id }}
+      MINIO_ROOT_USER: ci-minio
+      MINIO_ROOT_PASSWORD: ci-minio-${{ github.run_id }}
+      MLFLOW_TRACKING_URI: http://localhost:5000
+      EVIDENCE: ${{ github.workspace }}/mlflow-evidence.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.13"
+          enable-cache: true
+          cache-dependency-glob: app/uv.lock
+      - name: Instalar el cliente (app/uv.lock)
+        working-directory: app
+        run: uv sync --locked --no-build
+      - name: Levantar MariaDB, MinIO y MLflow
+        run: docker compose up -d --build --wait --wait-timeout 300 mariadb minio mlflow
+      - name: Construir la imagen del worker (app)
+        run: docker compose build app
+      - name: Escribir run, métrica y artefacto desde el host
+        working-directory: app
+        run: uv run --locked --no-build python -m tracking.verify write --evidence "$EVIDENCE"
+      - name: Leer desde el worker (http://mlflow:5000) antes del reinicio
+        run: >-
+          docker compose run --rm --no-deps -v "$EVIDENCE:/tmp/evidence.json:ro"
+          app python -m tracking.verify check --evidence /tmp/evidence.json
+      - name: Reiniciar servicios sin borrar volúmenes
+        run: |
+          docker compose down
+          docker volume ls
+          docker compose up -d --wait --wait-timeout 300 mariadb minio mlflow
+      - name: Comprobar desde el host después del reinicio
+        working-directory: app
+        run: uv run --locked --no-build python -m tracking.verify check --evidence "$EVIDENCE"
+      - name: Comprobar desde el worker después del reinicio
+        run: >-
+          docker compose run --rm --no-deps -v "$EVIDENCE:/tmp/evidence.json:ro"
+          app python -m tracking.verify check --evidence /tmp/evidence.json
+      - name: Evidencia (IDs, métrica y SHA-256; sin datos sensibles)
+        run: |
+          cat "$EVIDENCE"
+          curl -sf "$MLFLOW_TRACKING_URI/api/2.0/mlflow/experiments/get-by-name?experiment_name=p3-cnn-classifier"
+      - name: Con MLflow detenido no hay falso éxito
+        working-directory: app
+        run: |
+          docker compose stop mlflow
+          status=0
+          uv run --locked --no-build python -m tracking.verify check --evidence "$EVIDENCE" || status=$?
+          if [ "$status" -ne 2 ]; then
+            echo "::error::Con MLflow detenido se esperaba exit 2 y fue $status."
+            exit 1
+          fi
+          echo "Servidor detenido detectado (exit 2), sin falso éxito."
+      - name: Logs de los servicios
+        if: failure()
+        run: docker compose logs --no-color mlflow mariadb minio
+      - name: Objetos en el bucket de artefactos (diagnóstico)
+        if: failure()
+        run: >-
+          docker compose exec -T mlflow python -c "import boto3, os;
+          s3 = boto3.client('s3', endpoint_url=os.environ['MLFLOW_S3_ENDPOINT_URL']);
+          r = s3.list_objects_v2(Bucket=os.environ['MLFLOW_ARTIFACTS_BUCKET']);
+          print([o['Key'] for o in r.get('Contents', [])])"
+      - name: Limpiar
+        if: always()
+        run: docker compose down -v
+
   quality-gate:
     name: Quality gate (fixture)
     runs-on: ubuntu-latest
@@ -212,7 +291,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, backend, frontend, compose, quality-gate, quality-gate-prod]
+    needs: [python, backend, frontend, compose, mlflow-persistence, quality-gate, quality-gate-prod]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
