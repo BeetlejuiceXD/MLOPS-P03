@@ -9,6 +9,7 @@ pueden tomar ni cerrar el mismo job dos veces.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -199,6 +200,7 @@ class JobStore:
         *,
         close_run: str | None = None,
         unless_cancel_requested: bool = False,
+        abort_if: Callable[[], bool] | None = None,
     ) -> bool:
         """Cierra un job propio en ejecución. Nunca pisa un job ya terminado.
 
@@ -206,6 +208,9 @@ class JobStore:
         recibir; se borra con `mark_run_closed` cuando MLflow lo acepta. Con
         `unless_cancel_requested` el UPDATE solo aplica si nadie pidió cancelar: es el
         punto único que decide entre éxito y cancelación (sin ventana entre check y cierre).
+        `abort_if` se evalúa DENTRO de la transacción, con el UPDATE ya ejecutado y justo
+        antes del COMMIT: si devuelve True se hace rollback y el job sigue `running`
+        (así un SIGTERM recibido antes de persistir nunca termina en éxito).
         """
         if status not in TERMINAL:
             raise ValueError(f"Estado final inválido: {status}")
@@ -221,22 +226,23 @@ class JobStore:
         if unless_cancel_requested:
             conditions.append(training_jobs.c.cancel_requested.is_(False))
         now = utcnow()
-        with self.engine.begin() as conn:
-            return (
-                conn.execute(
-                    training_jobs.update()
-                    .where(and_(*conditions))
-                    .values(
-                        status=status,
-                        error=None if error is None else error[:MAX_ERROR_CHARS],
-                        finished_at=now,
-                        heartbeat_at=now,
-                        updated_at=now,
-                        mlflow_close_status=close_run,
-                    )
-                ).rowcount
-                == 1
-            )
+        with self.engine.connect() as conn, conn.begin() as transaction:
+            updated = conn.execute(
+                training_jobs.update()
+                .where(and_(*conditions))
+                .values(
+                    status=status,
+                    error=None if error is None else error[:MAX_ERROR_CHARS],
+                    finished_at=now,
+                    heartbeat_at=now,
+                    updated_at=now,
+                    mlflow_close_status=close_run,
+                )
+            ).rowcount
+            if updated != 1 or (abort_if is not None and abort_if()):
+                transaction.rollback()
+                return False
+        return True
 
     def pending_run_closes(self) -> list[tuple[int, str, str]]:
         """Jobs terminados cuyo run de MLflow aún no recibió su estado final."""

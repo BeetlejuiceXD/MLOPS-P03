@@ -1267,9 +1267,10 @@ worker (un job inválido que llegue a la tabla termina `failed` sin crear run).
   cancel_requested=false`): una cancelación que llegue hasta justo antes del cierre
   termina `cancelled`/KILLED, nunca `succeeded`.
 - `docker compose stop trainer-worker` (SIGTERM): el job en curso termina `failed` con
-  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`. Si la señal llega entre el último
-  check y el cierre, se difiere: el job conserva el estado ya decidido y el worker se
-  detiene justo después (nunca una parada aceptada que acabe en éxito).
+  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`. La parada se revisa también dentro
+  de la transacción del estado final, con el UPDATE ya ejecutado y justo antes del
+  COMMIT: un SIGTERM recibido antes de persistir hace rollback y el job nunca queda
+  `succeeded`/FINISHED.
 - Worker matado sin aviso (SIGKILL, OOM, host caído): el job queda `running` con el
   último latido. Al arrancar, cualquier worker marca `failed` los jobs `running` de otro
   worker con latido más viejo que `TRAINER_STALE_AFTER_SECONDS` (60 s, mínimo 30),

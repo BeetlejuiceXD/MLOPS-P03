@@ -11,8 +11,7 @@ from __future__ import annotations
 import math
 import threading
 import time
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
@@ -100,33 +99,12 @@ class Worker:
     epoch_seconds: float = 0.5
     sleep: Callable[[float], None] = time.sleep
     after_epoch: Callable[[int], None] = field(default=lambda _epoch: None)
-    # "Último check + estado terminal": una parada que llegue ahí se difiere hasta que el
-    # job ya es terminal (ver request_stop). Los handlers de señales de Python corren en
-    # el hilo principal entre instrucciones, así que basta con estas banderas.
-    _finalizing: bool = field(default=False, init=False, repr=False)
-    _deferred_stop: bool = field(default=False, init=False, repr=False)
     # Jobs cuyo cierre pendiente ya se avisó en su log (un aviso por job, no uno por intento).
     _close_warned: set[int] = field(default_factory=set, init=False, repr=False)
     _stop: threading.Event = field(default_factory=threading.Event)
 
     def request_stop(self) -> None:
-        if self._finalizing:
-            # Llegó entre el último check y el UPDATE final: no se acepta para este job
-            # (ya se decidió su estado); detiene el bucle en cuanto el job quede cerrado.
-            self._deferred_stop = True
-        else:
-            self._stop.set()
-
-    @contextmanager
-    def _finalization(self) -> Iterator[None]:
-        self._finalizing = True
-        try:
-            yield
-        finally:
-            self._finalizing = False
-            if self._deferred_stop:
-                self._deferred_stop = False
-                self._stop.set()
+        self._stop.set()
 
     @property
     def stopping(self) -> bool:
@@ -241,22 +219,24 @@ class Worker:
             message = f"Fallo inesperado: {type(error).__name__}: {error}"
             return self._finish(job, run_id, "failed", "FAILED", message)
 
-        # Último check + estado terminal, sin ventana entre ambos: una parada que llegue
-        # ahora se difiere (_finalization) y la cancelación de la API la decide el UPDATE.
-        with self._finalization():
-            if self.stopping:
-                return self._interrupted(job, run_id)
-            succeeded = self.store.finish(
-                job.id,
-                self.worker_id,
-                "succeeded",
-                close_run="FINISHED",
-                unless_cancel_requested=True,
-            )
+        # Estado terminal: el UPDATE exige cancel_requested=false y, dentro de la misma
+        # transacción y justo antes del COMMIT, se revisa si llegó una parada. Si llegó
+        # (aunque sea con el UPDATE ya ejecutado), rollback: nunca éxito tras un SIGTERM.
+        if self.stopping:
+            return self._interrupted(job, run_id)
+        succeeded = self.store.finish(
+            job.id,
+            self.worker_id,
+            "succeeded",
+            close_run="FINISHED",
+            unless_cancel_requested=True,
+            abort_if=lambda: self.stopping,
+        )
         if not succeeded:
             if self.store.cancel_requested(job.id):
-                # El UPDATE no aplicó porque pidieron cancelar justo antes del cierre.
                 return self._cancelled(job, run_id)
+            if self.stopping:
+                return self._interrupted(job, run_id)
             return self._lost(job)
         self.store.log(job.id, "info", "Tarea controlada terminada")
         self._close_run(job.id, run_id, "FINISHED")

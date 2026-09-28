@@ -378,7 +378,8 @@ def test_sigterm_just_before_the_final_update_is_not_succeeded(
 
     def install(_job_id):
         def sigterm_then_finish(*args, **kwargs):
-            os.kill(os.getpid(), signal.SIGTERM)
+            if args[2] == "succeeded":  # solo antes del UPDATE a succeeded
+                os.kill(os.getpid(), signal.SIGTERM)
             return original_finish(*args, **kwargs)
 
         monkeypatch.setattr(job_store, "finish", sigterm_then_finish)

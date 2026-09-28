@@ -107,10 +107,10 @@ MUTANTS = [
     Mutant(
         "app",
         "B1 parada",
-        "no diferir una parada que llega durante el cierre",
-        RUNNER,
-        "        if self._finalizing:\n",
-        "        if False:\n",
+        "no revisar la parada (SIGTERM) antes del COMMIT del estado terminal",
+        STORE,
+        "            if updated != 1 or (abort_if is not None and abort_if()):\n",
+        "            if updated != 1:\n",
         WORKER_TESTS,
     ),
 ]
