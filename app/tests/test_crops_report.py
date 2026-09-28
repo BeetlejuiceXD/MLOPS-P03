@@ -14,6 +14,9 @@ ingesta estricta: `out_of_bounds` (dimensión real vs. declarada) y
 import hashlib
 import io
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,10 +25,11 @@ from crops.models import FROZEN_CLASSES
 from PIL import Image
 
 from policies.models import load_quality_policy
-from presentation.crops_report import build_crops_report, main
+from presentation.crops_report import CropsReport, build_crops_report, main
 from presentation.release_resolver import ReleaseRejectedError, ReleaseSource, load_release_sources
 from tests._dataset_fixtures import jpeg_bytes
 
+APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 QUALITY_YAML = """
@@ -175,6 +179,108 @@ def _build(tmp_path, version, source):
     )
 
 
+# --- serialización determinista, independiente de PYTHONHASHSEED (revisión PR #50) -
+
+
+def _sample_report_kwargs(class_a_first: bool):
+    """Mismo contenido, dos órdenes de construcción distintos: simula lo que
+    produciría `dict.fromkeys(<frozenset>, ...)` en dos procesos con hash de
+    strings distinto (antes del fix, el orden de iteración de un frozenset de
+    strings depende de PYTHONHASHSEED)."""
+    names = ["cat", "dog"] if class_a_first else ["dog", "cat"]
+    counts = {"cat": 343, "dog": 325}
+    originals = {"cat": 301, "dog": 300}
+    return {
+        "dataset_version": "v0.1.1",
+        "annotations_md5": "a" * 32 + ".dir",
+        "images_md5": "b" * 32 + ".dir",
+        "quality_sha256": "c" * 64,
+        "policy_sha256": "d" * 64,
+        "min_images_per_class": 300.0,
+        "total_annotations": 668,
+        "total_crops": 668,
+        "total_exclusions": 0,
+        "annotations_equal_crops_plus_exclusions": True,
+        "exclusions_by_reason": {
+            "degenerate_bbox": 0,
+            "out_of_bounds": 0,
+            "missing_image": 0,
+            "unknown_category": 0,
+        },
+        "crops_by_class": {name: counts[name] for name in names},
+        "originals_by_class": {name: originals[name] for name in names},
+        "classes_below_minimum": [],
+        "gate_status": "ok",
+        "resolver_originals_per_class": {name: originals[name] for name in names},
+        "matches_resolver_originals_per_class": True,
+    }
+
+
+def test_report_key_order_is_canonical_regardless_of_construction_order():
+    """`CropsReport` fija el orden de claves de sus dicts (alfabético) en la
+    validación, sin importar en qué orden llegaron los valores al construirlo."""
+    cat_first = CropsReport(**_sample_report_kwargs(class_a_first=True))
+    dog_first = CropsReport(**_sample_report_kwargs(class_a_first=False))
+
+    assert cat_first.model_dump_json() == dog_first.model_dump_json()
+    assert list(cat_first.crops_by_class) == ["cat", "dog"]
+    assert list(dog_first.crops_by_class) == ["cat", "dog"]
+
+
+def test_report_serialization_is_identical_across_processes_regardless_of_hash_seed():
+    """Heri (PR #50): antes del fix, `dict.fromkeys(frozenset({'cat','dog'}), 0)`
+    itera en un orden que depende del hash de las strings — distinto según
+    PYTHONHASHSEED, que Python aleatoriza por proceso salvo que se fije. Se corre
+    el mismo código en dos procesos con semillas que producen órdenes de
+    frozenset distintos (verificado empíricamente: 0 -> cat,dog ; 1 -> dog,cat)
+    y se exige el mismo JSON byte a byte."""
+    script = (
+        "from crops.models import FROZEN_CLASSES\n"
+        "from presentation.crops_report import CropsReport\n"
+        "counts = {'cat': 343, 'dog': 325}\n"
+        "originals = {'cat': 301, 'dog': 300}\n"
+        "report = CropsReport(\n"
+        "    dataset_version='v0.1.1',\n"
+        "    annotations_md5='a' * 32 + '.dir',\n"
+        "    images_md5='b' * 32 + '.dir',\n"
+        "    quality_sha256='c' * 64,\n"
+        "    policy_sha256='d' * 64,\n"
+        "    min_images_per_class=300.0,\n"
+        "    total_annotations=668,\n"
+        "    total_crops=668,\n"
+        "    total_exclusions=0,\n"
+        "    annotations_equal_crops_plus_exclusions=True,\n"
+        "    exclusions_by_reason=dict.fromkeys(\n"
+        "        ('degenerate_bbox', 'out_of_bounds', 'missing_image', 'unknown_category'), 0\n"
+        "    ),\n"
+        "    crops_by_class={name: counts[name] for name in FROZEN_CLASSES},\n"
+        "    originals_by_class={name: originals[name] for name in FROZEN_CLASSES},\n"
+        "    classes_below_minimum=[],\n"
+        "    gate_status='ok',\n"
+        "    resolver_originals_per_class={name: originals[name] for name in FROZEN_CLASSES},\n"
+        "    matches_resolver_originals_per_class=True,\n"
+        ")\n"
+        "print(report.model_dump_json())\n"
+    )
+    outputs = []
+    for seed in ("0", "1"):  # 0 -> ['cat','dog'] ; 1 -> ['dog','cat'] al iterar el frozenset
+        env = {**os.environ, "PYTHONHASHSEED": seed}
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=APP_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        outputs.append(result.stdout.strip())
+
+    assert outputs[0], "el subproceso no produjo salida"
+    assert outputs[0] == outputs[1], (
+        f"PYTHONHASHSEED=0 dio {outputs[0]!r}, PYTHONHASHSEED=1 dio {outputs[1]!r}"
+    )
+
+
 def test_valid_release_reconciles_exactly_and_gate_is_ok(tmp_path):
     images = [{"id": i, "file_name": f"img{i}.jpg", "width": 64, "height": 64} for i in range(1, 5)]
     annotations = [
@@ -248,6 +354,92 @@ def test_out_of_bounds_from_real_pixel_mismatch_blocks_gate_and_flags_reconcilia
     assert report.matches_resolver_originals_per_class is False
     assert report.classes_below_minimum == ["dog"]
     assert report.gate_status == "blocked"
+
+
+# --- límite real de 300 originales, no un umbral sintético (revisión PR #50) -------
+
+
+def _release_at_real_threshold(tmp_path, *, mismatched_dog_size=(20, 20)):
+    """300 cat + 300 dog reales, cada uno con un único crop válido, salvo el
+    último dog: declarado 100x100 (pasa `CocoDataset`, que no valida contra
+    ninguna dimensión) pero con un binario real más chico, así que su única
+    caja queda `out_of_bounds`. `dog` empieza admisible (300 originales crudos,
+    pasa el propio gate del resolver) y el motor real lo deja en exactamente
+    299 tras esa única exclusión — el límite que pide #42, no uno sintético."""
+    cat_images = [
+        {"id": i, "file_name": f"cat{i}.jpg", "width": 64, "height": 64} for i in range(1, 301)
+    ]
+    dog_images = [
+        {"id": 300 + i, "file_name": f"dog{i}.jpg", "width": 64, "height": 64}
+        for i in range(1, 301)
+    ]
+    dog_images[-1] = {**dog_images[-1], "width": 100, "height": 100}
+
+    annotations = [_annotation(i, i, 4, [0, 0, 10, 10]) for i in range(1, 301)]
+    annotations += [_annotation(300 + i, 300 + i, 3, [0, 0, 10, 10]) for i in range(1, 300)]
+    last_dog = dog_images[-1]
+    annotations.append(
+        _annotation(600, last_dog["id"], 3, [50, 50, 10, 10])
+    )  # cabe en 100x100, no en lo real
+
+    image_bytes = {last_dog["file_name"]: _solid_jpeg(*mismatched_dog_size)}
+    return _prepare_release(
+        tmp_path,
+        "v0.1.1",
+        images=cat_images + dog_images,
+        annotations=annotations,
+        categories=CATEGORIES,
+        image_bytes=image_bytes,
+    )
+
+
+def test_real_threshold_300_becomes_299_after_one_exclusion_blocks_gate(tmp_path):
+    source = _release_at_real_threshold(tmp_path)
+
+    report, _ = build_crops_report(
+        "v0.1.1",
+        repo_root=tmp_path,
+        reports_dir=tmp_path / "reports",
+        sources={"v0.1.1": source},
+        policy=_policy(tmp_path, threshold=300),
+    )
+
+    # Admisible ANTES del motor real: el propio gate del resolver (D01-02), que
+    # cuenta anotaciones crudas, ve 300/300 y no rechaza el release.
+    assert report.resolver_originals_per_class == {"cat": 300, "dog": 300}
+    # El motor real (D01-07) excluye la única caja del último dog.
+    assert report.exclusions_by_reason == {
+        "degenerate_bbox": 0,
+        "out_of_bounds": 1,
+        "missing_image": 0,
+        "unknown_category": 0,
+    }
+    assert report.total_annotations == 600
+    assert report.total_crops == 599
+    assert report.total_exclusions == 1
+    assert report.annotations_equal_crops_plus_exclusions is True
+    assert report.crops_by_class == {"cat": 300, "dog": 299}
+    assert report.originals_by_class == {"cat": 300, "dog": 299}
+    assert report.matches_resolver_originals_per_class is False
+    assert report.classes_below_minimum == ["dog"]
+    assert report.gate_status == "blocked"
+
+
+def test_cli_exits_nonzero_at_the_real_300_to_299_threshold(tmp_path, monkeypatch, capsys):
+    from presentation import crops_report as module
+
+    source = _release_at_real_threshold(tmp_path)
+    monkeypatch.setattr(module, "APP_ROOT", tmp_path / "app")
+    monkeypatch.setattr(module, "load_release_sources", lambda: {"v0.1.1": source})
+    monkeypatch.setattr(module, "load_quality_policy", lambda: _policy(tmp_path, threshold=300))
+
+    assert main(["v0.1.1"]) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["min_images_per_class"] == 300.0
+    assert payload["originals_by_class"] == {"cat": 300, "dog": 299}
+    assert payload["classes_below_minimum"] == ["dog"]
+    assert payload["gate_status"] == "blocked"
 
 
 def test_category_outside_frozen_classes_is_excluded_even_though_coco_declares_it_validly(tmp_path):

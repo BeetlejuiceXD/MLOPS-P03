@@ -43,7 +43,7 @@ from typing import Literal
 
 from crops.engine import generate_crops
 from crops.models import FROZEN_CLASSES, CropResult
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ingestion.loader import load_dataset, load_image_contents
 from policies.models import QualityPolicy, load_quality_policy
@@ -87,6 +87,24 @@ class CropsReport(BaseModel):
     resolver_originals_per_class: dict[str, int]
     matches_resolver_originals_per_class: bool
 
+    @field_validator(
+        "exclusions_by_reason",
+        "crops_by_class",
+        "originals_by_class",
+        "resolver_originals_per_class",
+        mode="after",
+    )
+    @classmethod
+    def _canonical_key_order(cls, value: dict[str, int]) -> dict[str, int]:
+        """Orden alfabético fijo de claves (revisión de PR #50): `dict.fromkeys`
+        sobre un `frozenset` de strings itera en un orden que depende del hash
+        de esas strings, que Python aleatoriza por proceso salvo que se fije
+        `PYTHONHASHSEED`. Sin esto, la misma entrada podía serializar distinto
+        (mismos valores, JSON y hash distintos) según el proceso que lo corriera.
+        Se fuerza aquí, en la validación del contrato, para que ninguna forma de
+        construirlo pueda saltárselo."""
+        return dict(sorted(value.items()))
+
 
 def build_crops_report(
     version: str,
@@ -116,7 +134,7 @@ def build_crops_report(
     for exclusion in result.exclusions:
         exclusions_by_reason[exclusion.reason] += 1
 
-    crops_by_class: dict[str, int] = dict.fromkeys(allowed, 0)
+    crops_by_class: dict[str, int] = dict.fromkeys(sorted(allowed), 0)
     originals_by_image: dict[str, set[int]] = {name: set() for name in allowed}
     for crop in result.crops:
         crops_by_class[crop.category_name] = crops_by_class.get(crop.category_name, 0) + 1
