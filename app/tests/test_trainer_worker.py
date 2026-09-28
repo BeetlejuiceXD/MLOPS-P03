@@ -499,7 +499,9 @@ def test_orphan_run_close_is_retried_until_mlflow_comes_back(engine, job_store, 
     assert row.status == "failed"
     assert row.mlflow_close_status == "FAILED"  # el cierre pendiente queda guardado
     assert _mlflow_run(tracking, orphan_run).info.status == "RUNNING"
-    assert any("No se pudo cerrar el run" in line for line in _logs(engine, job_id))
+    warnings = [line for line in _logs(engine, job_id) if "No se pudo cerrar el run" in line]
+    assert len(warnings) == 1  # un aviso, no uno por reintento
+    assert len(tracker.end_calls) == 2  # pero sí se reintentó
 
     tracker.down = False
     worker.retry_pending_run_closes()

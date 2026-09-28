@@ -105,6 +105,8 @@ class Worker:
     # el hilo principal entre instrucciones, así que basta con estas banderas.
     _finalizing: bool = field(default=False, init=False, repr=False)
     _deferred_stop: bool = field(default=False, init=False, repr=False)
+    # Jobs cuyo cierre pendiente ya se avisó en su log (un aviso por job, no uno por intento).
+    _close_warned: set[int] = field(default_factory=set, init=False, repr=False)
     _stop: threading.Event = field(default_factory=threading.Event)
 
     def request_stop(self) -> None:
@@ -152,12 +154,14 @@ class Worker:
         try:
             self.tracker.end(run_id, run_status)
         except Exception as error:  # MLflow caído: queda pendiente y se reintenta
-            self.store.log(
-                job_id,
-                "warning",
-                f"No se pudo cerrar el run {run_id} en MLflow ({type(error).__name__}); "
-                f"queda pendiente {run_status} y se reintenta.",
-            )
+            if job_id not in self._close_warned:
+                self._close_warned.add(job_id)
+                self.store.log(
+                    job_id,
+                    "warning",
+                    f"No se pudo cerrar el run {run_id} en MLflow ({type(error).__name__}); "
+                    f"queda pendiente {run_status} y se reintenta.",
+                )
             return False
         self.store.mark_run_closed(job_id, run_status)
         self.store.log(job_id, "info", f"Run de MLflow {run_id} marcado {run_status}")
