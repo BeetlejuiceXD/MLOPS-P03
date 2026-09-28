@@ -108,6 +108,7 @@ def test_config_round_trips_through_json():
     restored = TrainingConfig.model_validate_json(config.model_dump_json())
     assert restored == config
 
+
 def test_hidden_dim_defaults_to_128():
     assert _config(hidden_layers=1).hidden_dim == 128
 

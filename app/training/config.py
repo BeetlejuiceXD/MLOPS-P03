@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 HIDDEN_DIM = 128
 
+
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
 
@@ -38,7 +39,7 @@ class TrainingConfig(BaseModel):
 
     # --- Reproducibilidad ---
     seed: int
-    
+
     @model_validator(mode="after")
     def _hidden_dim_is_frozen(self) -> Self:
         if self.hidden_layers == 1 and self.hidden_dim != HIDDEN_DIM:

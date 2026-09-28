@@ -2,11 +2,11 @@
 
 import pytest
 import torch
+from torch import nn
 
 from training.class_map import NUM_CLASSES
 from training.config import TrainingConfig
 from training.model import build_model, describe_trainable_layers
-from torch import nn
 
 BASE = {"seed": 7, "pretrained": False}  # pretrained=False: tests no descargan pesos
 
@@ -80,6 +80,7 @@ def test_different_seed_changes_head_initialization():
     second = build_model(_config(seed=2))
 
     assert not torch.equal(first.fc[-1].weight, second.fc[-1].weight)
+
 
 def test_head_with_hidden_layer_is_exactly_512_128_2():
     head = build_model(_config(hidden_layers=1, dropout=0.3)).fc
