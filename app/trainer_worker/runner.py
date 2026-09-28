@@ -115,6 +115,26 @@ class Worker:
             return None
         return self._execute(job)
 
+    def close_interrupted_runs(self, job_ids: list[int]) -> None:
+        """Cierra como FAILED los runs de jobs recuperados, para que MLflow no quede RUNNING.
+
+        Si MLflow falla, solo se registra: el job ya quedó `failed` en la base de datos.
+        """
+        for job_id in job_ids:
+            run_id = self.store.mlflow_run_id(job_id)
+            if run_id is None:
+                continue
+            try:
+                self.tracker.end(run_id, "FAILED")
+            except Exception as error:  # MLflow caído no debe tumbar el worker
+                self.store.log(
+                    job_id,
+                    "warning",
+                    f"No se pudo cerrar el run {run_id} en MLflow: {type(error).__name__}",
+                )
+            else:
+                self.store.log(job_id, "info", f"Run de MLflow {run_id} marcado FAILED")
+
     def _fail(self, job: ClaimedJob, message: str) -> str:
         self.store.log(job.id, "error", message)
         self.store.finish(job.id, self.worker_id, "failed", message)

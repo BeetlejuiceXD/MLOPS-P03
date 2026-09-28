@@ -159,6 +159,12 @@ class JobStore:
     def set_run_id(self, job_id: int, worker_id: str, run_id: str) -> bool:
         return self._update_running(job_id, worker_id, mlflow_run_id=run_id)
 
+    def mlflow_run_id(self, job_id: int) -> str | None:
+        with self.engine.connect() as conn:
+            return conn.execute(
+                select(training_jobs.c.mlflow_run_id).where(training_jobs.c.id == job_id)
+            ).scalar_one_or_none()
+
     def cancel_requested(self, job_id: int) -> bool:
         with self.engine.connect() as conn:
             value = conn.execute(

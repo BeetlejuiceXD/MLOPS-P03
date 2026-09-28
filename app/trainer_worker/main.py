@@ -56,6 +56,7 @@ def serve(
             recovered = store.recover_interrupted(worker.worker_id, stale_after)
             if recovered:
                 logger.warning("Jobs interrumpidos marcados como fallidos: %s", recovered)
+                worker.close_interrupted_runs(recovered)
             result = worker.run_once()
         except SQLAlchemyError as error:
             # P. ej. el backend aún no aplica la migración de training_jobs.
