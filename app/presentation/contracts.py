@@ -139,6 +139,20 @@ class ManifestSplitCounts(ContractModel):
     crops_per_class: dict[ManifestClassName, Count]
 
     @model_validator(mode="after")
+    def crops_per_class_declares_exactly_the_frozen_classes(self) -> Self:
+        """#33 congela `cat`/`dog`: un valor 0 explícito es válido, pero una clave
+        ausente NO equivale a 0 (revisión de Heri en PR #54). En el espejo de
+        TypeScript, `z.record(classSchema, ...)` con una clave de tipo enum exige
+        las dos claves, no solo que las que aparezcan sean válidas — `dict[K, V]`
+        de Python no hace eso por sí solo, así que se fuerza aquí."""
+        if set(self.crops_per_class) != set(MANIFEST_CLASSES):
+            raise ValueError(
+                f"crops_per_class debe declarar exactamente {sorted(MANIFEST_CLASSES)}"
+            )
+        self.crops_per_class = dict(sorted(self.crops_per_class.items()))
+        return self
+
+    @model_validator(mode="after")
     def crops_per_class_sums_to_crops(self) -> Self:
         if sum(self.crops_per_class.values()) != self.crops:
             raise ValueError("crops_per_class debe sumar crops")

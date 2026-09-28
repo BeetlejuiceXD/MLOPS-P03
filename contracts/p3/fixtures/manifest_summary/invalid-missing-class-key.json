@@ -1,0 +1,47 @@
+{
+  "contract": "manifest_summary",
+  "valid": false,
+  "why": "crops_per_class debe declarar exactamente cat y dog; una clave ausente no es lo mismo que un 0 explícito",
+  "payload": {
+    "manifest_version": "p3-v0.1.1-s42",
+    "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "dataset_version": "v0.1.1",
+    "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "seed": 42,
+    "target_ratios": {
+      "train": 0.7,
+      "val": 0.2,
+      "test": 0.1
+    },
+    "frozen": true,
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "splits": {
+      "train": {
+        "crops": 467,
+        "originals": 422,
+        "crops_per_class": {
+          "cat": 467
+        }
+      },
+      "val": {
+        "crops": 134,
+        "originals": 126,
+        "crops_per_class": {
+          "cat": 69,
+          "dog": 65
+        }
+      },
+      "test": {
+        "crops": 67,
+        "originals": 52,
+        "crops_per_class": {
+          "cat": 34,
+          "dog": 33
+        }
+      }
+    }
+  }
+}

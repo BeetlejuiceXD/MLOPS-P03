@@ -30,6 +30,7 @@ from ingestion.loader import load_dataset, load_image_contents
 from policies.duplicates import load_duplicate_config
 from policies.models import QualityPolicy, load_quality_policy
 from presentation.contracts import (
+    MANIFEST_CLASSES,
     ManifestSplitCounts,
     ManifestSplits,
     ManifestSummary,
@@ -95,12 +96,16 @@ def _manifest_hash(
 
 
 def _split_counts(candidate: ManifestCandidateResult, name: str) -> ManifestSplitCounts:
+    # `crops_per_class[name]` (MappingProxyType, congelado por el dataclass) solo
+    # trae las clases que SÍ tuvieron crops en esta partición; `ManifestSplitCounts`
+    # exige las dos claves congeladas siempre presentes, con 0 explícito si faltan
+    # (revisión de Heri en PR #54: una clave ausente no es lo mismo que un 0).
+    counts = dict.fromkeys(MANIFEST_CLASSES, 0)
+    counts.update(candidate.crops_per_class[name])
     return ManifestSplitCounts(
         crops=len(candidate.assignments[name]),
         originals=len(candidate.originals[name]),
-        # dict(...): candidate.crops_per_class[name] es un MappingProxyType (el
-        # dataclass lo congela); en modo strict, pydantic exige un dict real.
-        crops_per_class=dict(candidate.crops_per_class[name]),
+        crops_per_class=counts,
     )
 
 

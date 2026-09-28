@@ -134,13 +134,59 @@ def test_near_duplicate_images_are_grouped_indivisibly():
 
 def test_duplicate_pair_referencing_an_image_outside_the_crop_universe_is_ignored():
     """Una imagen sin ningún crop válido (ya excluida por D01-07) no participa del
-    manifest: un par que la mencione no debe fallar ni inventarle un grupo."""
+    manifest: un par que la mencione no debe fallar ni inventarle un grupo (caso sin
+    ninguna cadena hacia un nodo real — ver los tests de transitividad para el caso
+    con cadena, que sí debe unir a través de ella)."""
     crops = _crops_one_per_image(20, 20)
     pairs = ({"image_id_a": 5, "image_id_b": 99999, "hamming_distance": 0, "similarity": 1.0},)
 
     result = generate_manifest(crops, _config(), duplicate_pairs=pairs)
 
     assert 99999 not in {i for group in result.groups for i in group}
+
+
+# --- transitividad de near-duplicates, incluso con un nodo intermedio sin crops ----
+
+
+def test_transitive_near_duplicates_a_b_c_are_grouped_together():
+    """A≈B y B≈C (pares distintos, sin un par directo A≈C): las tres deben terminar
+    en el mismo grupo por transitividad, aunque las tres tengan crops válidos."""
+    crops = _crops_one_per_image(20, 20)  # imágenes cat: 1..20 ; imágenes dog: 21..40
+    pairs = (
+        {"image_id_a": 5, "image_id_b": 25, "hamming_distance": 2, "similarity": 0.97},
+        {"image_id_a": 25, "image_id_b": 10, "hamming_distance": 2, "similarity": 0.97},
+    )
+
+    result = generate_manifest(crops, _config(), duplicate_pairs=pairs)
+
+    group = next(g for g in result.groups if 5 in g)
+    assert group == (5, 10, 25)
+
+
+def test_transitivity_survives_when_the_intermediate_image_has_no_valid_crops():
+    """A≈B≈C, pero B fue excluida por D01-07/D02-02 (0 crops válidos): sin
+    considerar a B como nodo puente, la unión A-B y B-C se ignoraría por completo
+    (B no está en `image_ids`) y A/C terminarían en grupos — y posiblemente
+    particiones — distintos, aunque en la realidad son casi-duplicados. La cadena
+    debe seguir uniendo A y C a través de B, y B (sin crops) no debe aparecer en
+    ningún grupo ni asignación del manifest (revisión de Heri en PR #54)."""
+    crops = _crops_one_per_image(20, 20)  # imágenes cat: 1..20 ; imágenes dog: 21..40
+    a, b, c = 5, 999, 25  # b=999 no tiene ningún crop: no aparece en `crops`
+    pairs = (
+        {"image_id_a": a, "image_id_b": b, "hamming_distance": 1, "similarity": 0.98},
+        {"image_id_a": b, "image_id_b": c, "hamming_distance": 1, "similarity": 0.98},
+    )
+
+    result = generate_manifest(crops, _config(), duplicate_pairs=pairs)
+
+    group_with_a = next(g for g in result.groups if a in g)
+    assert group_with_a == (a, c)  # A y C en el mismo grupo; B no participa (no tiene crops)
+    assert b not in {i for group in result.groups for i in group}
+
+    owner_a = next(name for name, ids in result.assignments.items() if a in ids)
+    owner_c = next(name for name, ids in result.assignments.items() if c in ids)
+    assert owner_a == owner_c  # A y C en la MISMA partición, no repartidos por la cadena rota
+    assert b not in {i for ids in result.assignments.values() for i in ids}
 
 
 def test_crops_of_the_same_original_count_together_when_sizing_splits():

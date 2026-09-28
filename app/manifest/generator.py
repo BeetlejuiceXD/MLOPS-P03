@@ -142,21 +142,25 @@ def _verify_class_presence_in_val_and_test(classes, crops_per_class):
 def _image_groups(
     image_ids: set[int], duplicate_pairs: Sequence[Mapping]
 ) -> tuple[tuple[int, ...], ...]:
-    """Componentes conexas de `image_ids`, unidas por los pares pHash que
-    referencien a DOS imágenes dentro de ese conjunto. Un par que mencione una
-    imagen sin ningún crop válido (ya excluida por el motor de D01-07) se ignora
-    para ese lado: esa imagen no participa del manifest, no hay nada que unir."""
-    parent = {i: i for i in image_ids}
+    """Componentes conexas de `image_ids`, unidas por los pares pHash. Una imagen
+    sin ningún crop válido (ya excluida por el motor de D01-07) puede seguir
+    participando como nodo PUENTE de la unión: si A≈B≈C y B no tiene crops, A y C
+    deben quedar en el mismo grupo igual (revisión de Heri en PR #54). El nodo
+    puente en sí nunca aparece en el resultado: la proyección final solo recorre
+    `image_ids`."""
+    parent: dict[int, int] = {}
 
-    def root(i):
+    def find(i):
+        parent.setdefault(i, i)
         while parent[i] != i:
             parent[i] = parent[parent[i]]
             i = parent[i]
         return i
 
     def union(a, b):
-        a, b = root(a), root(b)
-        parent[max(a, b)] = min(a, b)
+        a, b = find(a), find(b)
+        if a != b:
+            parent[max(a, b)] = min(a, b)
 
     for pair in duplicate_pairs:
         if not isinstance(pair, Mapping) or not {"image_id_a", "image_id_b"} <= pair.keys():
@@ -164,12 +168,11 @@ def _image_groups(
         a, b = pair["image_id_a"], pair["image_id_b"]
         if a == b:
             raise ManifestValidationError("A duplicate pair must reference two distinct images")
-        if a in image_ids and b in image_ids:
-            union(a, b)
+        union(a, b)
 
     components: dict[int, list[int]] = {}
     for image_id in image_ids:
-        components.setdefault(root(image_id), []).append(image_id)
+        components.setdefault(find(image_id), []).append(image_id)
     return tuple(sorted(tuple(sorted(group)) for group in components.values()))
 
 

@@ -63,4 +63,5 @@ def test_at_least_the_known_fixture_files_are_present():
         "invalid-ratio-out-of-tolerance.json",
         "invalid-class-missing-in-test.json",
         "invalid-per-class-mismatch.json",
+        "invalid-missing-class-key.json",
     } <= names
