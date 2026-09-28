@@ -10,8 +10,10 @@ Escenarios (todos con la TAREA CONTROLADA, que no entrena ni lee datos):
   4. Fallo controlado en la época 3 → failed con error, no éxito; run FAILED.
   5. Cancelación en ejecución → cancel_requested → cancelled; run KILLED.
   6. SIGTERM al worker durante un job → failed "Interrumpido"; no se reejecuta.
-  7. Worker matado (SIGKILL) y reiniciado → el job huérfano pasa a failed tras el
-     latido vencido, conserva progreso y run (que se cierra FAILED) y no se reejecuta.
+  7. Worker matado (SIGKILL) y reiniciado CON MLflow CAÍDO → el job huérfano pasa a failed
+     tras el latido vencido, conserva progreso y run y deja el cierre pendiente
+     (mlflow_close_status=FAILED en MariaDB); al volver MLflow el mismo run queda FAILED
+     y el pendiente se borra. No se reejecuta.
   8. `docker compose down` + `up` (sin borrar volúmenes) → jobs, estados, progreso,
      errores, run IDs y logs idénticos; un job nuevo sigue funcionando.
 
@@ -65,6 +67,27 @@ def http(method: str, url: str, body: object | None = None) -> tuple[int, object
 def compose(*args: str) -> None:
     print(f"$ docker compose {' '.join(args)}", flush=True)
     subprocess.run(["docker", "compose", *args], cwd=REPO, check=True)
+
+
+def sql(query: str) -> list[list[str]]:
+    """Consulta directa a MariaDB (evidencia "antes y después"); la contraseña la pone el
+    propio contenedor desde su entorno, no pasa por este script."""
+    command = f'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" image_repo -N -B -e "{query}"'
+    result = subprocess.run(
+        ["docker", "compose", "exec", "-T", "mariadb", "sh", "-c", command],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    print(f"SQL> {query}\n{result.stdout}", flush=True)
+    return [line.split("\t") for line in result.stdout.splitlines()]
+
+
+JOBS_QUERY = (
+    "SELECT id, task, status, progress_epoch, total_epochs, mlflow_run_id, "
+    "IFNULL(mlflow_close_status, 'NULL'), cancel_requested FROM training_jobs ORDER BY id"
+)
 
 
 def wait_for(description: str, predicate, timeout: float = 120, every: float = 1.0):
@@ -201,38 +224,49 @@ def main() -> None:
     check(get_job(job["id"])["status"] == "failed", "el job interrumpido se reejecutó")
     EVIDENCE["sigterm"] = {"job_id": stopped["id"], "error": stopped["error"]}
 
-    # 7. SIGKILL + reinicio: recuperación sin duplicar.
+    # 7. SIGKILL + reinicio con MLflow caído: recuperación sin duplicar y cierre pendiente.
     _, job = create(max_epochs=60)
     running = wait_for("job en ejecución (SIGKILL)", running_with_progress(job["id"], 2))
     compose("kill", "-s", "SIGKILL", "trainer-worker")
     orphan = get_job(job["id"])
     check(orphan["status"] == "running", f"tras SIGKILL el job debía seguir running: {orphan}")
-    compose("up", "-d", "trainer-worker")
+    compose("stop", "mlflow")
+    compose("up", "-d", "--no-deps", "trainer-worker")
     recovered = wait_for("job huérfano recuperado", job_in(job["id"], "failed", "succeeded"), 150)
     check(recovered["status"] == "failed", f"el huérfano terminó en {recovered['status']}")
     check("no se reintenta" in recovered["error"], f"error: {recovered['error']}")
     check(recovered["mlflow_run_id"] == running["mlflow_run_id"], "cambió el run del job")
-    orphan_run = wait_for(
-        "run huérfano cerrado en MLflow",
-        lambda: (
-            (run := mlflow_run(recovered["mlflow_run_id"]))["info"]["status"] == "FAILED" and run
-        ),
-        30,
-    )
     check(
         recovered["progress"]["epoch"] >= running["progress"]["epoch"]
         and recovered["progress"]["epoch"] < 60,
         f"progreso inesperado tras recuperar: {recovered['progress']}",
     )
-    EVIDENCE["sigkill_recovery"] = {
+    pending = sql(f"SELECT status, mlflow_close_status FROM training_jobs WHERE id = {job['id']}")
+    check(pending == [["failed", "FAILED"]], f"el cierre del run debía quedar pendiente: {pending}")
+    compose("up", "-d", "--wait", "--wait-timeout", "300", "mlflow")
+    orphan_run = wait_for(
+        "run huérfano cerrado en MLflow al volver",
+        lambda: (
+            (run := mlflow_run(recovered["mlflow_run_id"]))["info"]["status"] == "FAILED" and run
+        ),
+        150,
+    )
+    closed = sql(
+        f"SELECT IFNULL(mlflow_close_status, 'NULL') FROM training_jobs WHERE id = {job['id']}"
+    )
+    check(closed == [["NULL"]], f"el pendiente debía borrarse: {closed}")
+    check(get_job(job["id"]) == recovered, "el job cambió al cerrar el run (¿se reejecutó?)")
+    EVIDENCE["sigkill_recovery_mlflow_down"] = {
         "job_id": recovered["id"],
         "progress": recovered["progress"],
         "error": recovered["error"],
-        "run_status": orphan_run["info"]["status"],
+        "mlflow_close_status_while_down": pending[0][1],
+        "run_status_after_mlflow_back": orphan_run["info"]["status"],
     }
 
-    # 8. down + up: todo persiste.
+    # 8. down + up: todo persiste (API y consulta directa a MariaDB, antes y después).
     _, snapshot = http("GET", f"{API}/training/jobs")
+    rows_before = sql(JOBS_QUERY)
     log_counts = {job["id"]: len(logs(job["id"])) for job in snapshot["jobs"]}
     compose("down")
     compose("up", "-d", "--wait", "--wait-timeout", "300", "mariadb", "minio", "mlflow")
@@ -240,6 +274,7 @@ def main() -> None:
     wait_for("API tras reinicio", lambda: http("GET", f"{API}/health")[0] == 200, timeout=180)
     _, restored = http("GET", f"{API}/training/jobs")
     check(restored == snapshot, "los jobs cambiaron tras down/up")
+    check(sql(JOBS_QUERY) == rows_before, "las filas de training_jobs cambiaron tras down/up")
     for job_id, count in log_counts.items():
         check(len(logs(job_id)) == count, f"los logs del job {job_id} cambiaron tras down/up")
     check(
@@ -254,6 +289,7 @@ def main() -> None:
     )
     EVIDENCE["after_restart"] = {
         "jobs_identical": True,
+        "sql_rows": rows_before,
         "jobs": [(j["id"], j["status"], j["mlflow_run_id"]) for j in restored["jobs"]],
         "new_job": {"id": final["id"], "status": final["status"]},
     }
