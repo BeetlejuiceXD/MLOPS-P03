@@ -340,46 +340,71 @@ def test_stop_after_the_last_epoch_is_failed_not_succeeded(engine, job_store, tr
     assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "KILLED"
 
 
-def test_sigterm_cannot_land_between_the_final_check_and_the_commit(
-    engine, job_store, tracking, monkeypatch
-):
-    """SIGTERM real, enviado justo antes del UPDATE final.
-
-    Una parada que llega entre "último check" y "estado terminal" se difiere: el handler
-    corre, pero la parada solo detiene el bucle cuando el job ya es terminal. Así nunca
-    hay una parada aceptada durante el job que termine como éxito.
-    """
+def _run_with_real_sigterm(engine, job_store, tracking, send_sigterm):
+    """Corre un job con un handler real de SIGTERM (como main.py) y `send_sigterm`
+    instalando el punto exacto donde llega la señal. Devuelve (estado, fila, run)."""
     job_id = _insert(engine)
     worker = _worker(job_store, tracking)
-    seen_by_handler: list[tuple[str, bool]] = []
+    received: list[str] = []
 
     def handler(_signum, _frame):
+        received.append(_row(engine, job_id).status)  # estado del job al recibirla
         worker.request_stop()
-        # (estado del job, ¿parada aceptada?) justo después de pedir la parada.
-        seen_by_handler.append((_row(engine, job_id).status, worker.stopping))
 
     previous = signal.signal(signal.SIGTERM, handler)
-    original_finish = job_store.finish
-
-    def sigterm_just_before_commit(*args, **kwargs):
-        os.kill(os.getpid(), signal.SIGTERM)
-        return original_finish(*args, **kwargs)
-
-    monkeypatch.setattr(job_store, "finish", sigterm_just_before_commit)
     try:
+        send_sigterm(job_id)
         status = worker.run_once()
     finally:
         signal.signal(signal.SIGTERM, previous)
-
     row = _row(engine, job_id)
-    # El handler corrió en pleno cierre, con el job aún running, y la parada NO se
-    # aceptó para ese job (se difirió)...
-    assert seen_by_handler == [("running", False)]
-    # ...y el estado en MariaDB y en MLflow es el mismo, sin mezclas.
-    expected_run = {"succeeded": "FINISHED", "failed": "KILLED"}[status]
-    assert row.status == status
-    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == expected_run
-    assert worker.stopping  # y el worker sí se detiene después
+    return status, row, _mlflow_run(tracking, row.mlflow_run_id), received
+
+
+def _assert_interrupted_not_succeeded(status, row, run, received):
+    assert received == ["running"]  # SIGTERM recibido ANTES de persistir el estado final
+    assert status != "succeeded" and row.status != "succeeded"
+    assert run.info.status != "FINISHED"
+    assert (status, row.status) == ("failed", "failed")
+    assert "SIGTERM" in row.error
+    assert run.info.status == "KILLED"
+
+
+def test_sigterm_just_before_the_final_update_is_not_succeeded(
+    engine, job_store, tracking, monkeypatch
+):
+    """SIGTERM real justo antes de llamar al UPDATE del estado terminal."""
+    original_finish = job_store.finish
+
+    def install(_job_id):
+        def sigterm_then_finish(*args, **kwargs):
+            os.kill(os.getpid(), signal.SIGTERM)
+            return original_finish(*args, **kwargs)
+
+        monkeypatch.setattr(job_store, "finish", sigterm_then_finish)
+
+    _assert_interrupted_not_succeeded(*_run_with_real_sigterm(engine, job_store, tracking, install))
+
+
+def test_sigterm_after_the_update_but_before_commit_is_not_succeeded(engine, job_store, tracking):
+    """SIGTERM real cuando el UPDATE a succeeded ya se ejecutó pero aún no hay COMMIT."""
+    from sqlalchemy import event
+
+    sent: list[bool] = []
+
+    def install(_job_id):
+        def after_execute(_conn, _cursor, statement, parameters, _context, _many):
+            is_success_update = statement.startswith("UPDATE training_jobs") and (
+                "succeeded" in str(parameters)
+            )
+            if is_success_update and not sent:
+                sent.append(True)
+                os.kill(os.getpid(), signal.SIGTERM)
+
+        event.listen(engine, "after_cursor_execute", after_execute)
+
+    _assert_interrupted_not_succeeded(*_run_with_real_sigterm(engine, job_store, tracking, install))
+    assert sent == [True]  # la señal sí llegó con el UPDATE ya ejecutado
 
 
 def test_job_taken_by_another_worker_is_not_overwritten(engine, job_store, tracking):
