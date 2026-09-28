@@ -273,6 +273,54 @@ def test_recovery_marks_stale_running_jobs_failed_without_rerunning(engine, job_
     assert any("Interrumpido" in line for line in _logs(engine, stale))
 
 
+def _stale_running(engine, run_id: str | None) -> int:
+    return _insert(
+        engine,
+        status="running",
+        worker_id="worker-muerto",
+        started_at=_naive_utc(timedelta(minutes=-10)),
+        heartbeat_at=_naive_utc(timedelta(minutes=-5)),
+        progress_epoch=2,
+        total_epochs=10,
+        mlflow_run_id=run_id,
+    )
+
+
+def test_recovery_also_closes_the_orphan_mlflow_run_as_failed(engine, job_store, tracking):
+    from mlflow.tracking import MlflowClient
+
+    client = MlflowClient(tracking_uri=tracking)
+    experiment_id = client.create_experiment("p3-recovery")
+    orphan_run = client.create_run(experiment_id).info.run_id
+    job_id = _stale_running(engine, orphan_run)
+    worker = _worker(job_store, tracking)
+
+    recovered = job_store.recover_interrupted(worker.worker_id, timedelta(seconds=60))
+    worker.close_interrupted_runs(recovered)
+
+    # Sin esto, MLflow mostraría para siempre un run RUNNING de un job ya fallido.
+    assert _mlflow_run(tracking, orphan_run).info.status == "FAILED"
+    assert _row(engine, job_id).mlflow_run_id == orphan_run
+    assert any("marcado FAILED" in line for line in _logs(engine, job_id))
+
+
+def test_closing_orphan_runs_tolerates_jobs_without_run_and_mlflow_errors(engine, job_store):
+    class BrokenTracker:
+        def end(self, run_id, status):
+            raise ConnectionError("mlflow caído")
+
+    without_run = _stale_running(engine, None)
+    with_run = _stale_running(engine, "b" * 32)
+    worker = runner.Worker(store=job_store, tracker=BrokenTracker(), worker_id="worker-test")
+
+    recovered = job_store.recover_interrupted(worker.worker_id, timedelta(seconds=60))
+    worker.close_interrupted_runs(recovered)  # no lanza: el job ya quedó failed
+
+    assert _row(engine, without_run).status == "failed"
+    assert _row(engine, with_run).status == "failed"
+    assert any("No se pudo cerrar el run" in line for line in _logs(engine, with_run))
+
+
 def test_finish_never_overwrites_a_terminal_job(engine, job_store):
     job_id = _insert(engine, status="cancelled", finished_at=_naive_utc())
     assert job_store.finish(job_id, "worker-test", "succeeded") is False
@@ -292,6 +340,7 @@ class _FakeWorker:
         self.calls = 0
         self.stopped = False
         self.worker_id = "worker-test"
+        self.closed: list[list[int]] = []
 
     def run_once(self):
         self.calls += 1
@@ -303,18 +352,23 @@ class _FakeWorker:
     def request_stop(self):
         self.stopped = True
 
+    def close_interrupted_runs(self, job_ids):
+        self.closed.append(list(job_ids))
+
     @property
     def stopping(self):
         return self.stopped
 
 
 class _FakeStore:
-    def __init__(self):
+    def __init__(self, recovered=()):
         self.recoveries = 0
+        self.recovered = list(recovered)
 
     def recover_interrupted(self, worker_id, stale_after):
         self.recoveries += 1
-        return []
+        recovered, self.recovered = self.recovered, []
+        return recovered
 
 
 def test_serve_polls_recovers_and_sleeps_only_when_idle():
@@ -334,6 +388,19 @@ def test_serve_polls_recovers_and_sleeps_only_when_idle():
     assert fake.calls == 4
     assert store_.recoveries == 4
     assert sleeps == [2.0, 2.0]  # sin espera tras ejecutar un job
+
+
+def test_serve_closes_the_runs_of_recovered_jobs():
+    fake = _FakeWorker([None, None])
+    worker_main.serve(
+        fake,
+        _FakeStore(recovered=[7, 9]),
+        poll_seconds=1.0,
+        stale_after=timedelta(seconds=60),
+        sleep=lambda _s: None,
+        max_iterations=2,
+    )
+    assert fake.closed == [[7, 9]]
 
 
 def test_serve_survives_database_errors_until_the_tables_exist():
