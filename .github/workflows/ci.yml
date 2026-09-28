@@ -291,7 +291,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, backend, frontend, compose, mlflow-persistence, quality-gate, quality-gate-prod]
+    needs: [python, backend, frontend, compose, mlflow-persistence, quality-gate, quality-gate-prod, app-image]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
