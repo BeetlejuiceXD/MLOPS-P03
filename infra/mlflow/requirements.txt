@@ -1,0 +1,5 @@
+# D02-01 — servidor MLflow de P3. Versiones fijadas; mlflow igual que
+# `mlflow-skinny` en app/uv.lock (cliente del worker).
+mlflow==3.16.1
+pymysql==1.2.3
+boto3==1.43.103

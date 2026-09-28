@@ -21,6 +21,7 @@ dependencies = [
     "uvicorn>=0.53,<1",
     "torch>=2.6,<3",
     "torchvision>=0.21,<1",
+    "mlflow-skinny==3.16.1",
 ]
 
 [dependency-groups]
