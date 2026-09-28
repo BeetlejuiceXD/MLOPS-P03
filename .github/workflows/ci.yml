@@ -49,6 +49,8 @@ jobs:
         run: uv run --locked --no-build pytest -q
       - name: Mutation test (quality gate)
         run: uv run --locked --no-build python ../.github/scripts/run_gate_mutation.py
+      - name: Mutation test (D02-05, trainer-worker)
+        run: uv run --locked --no-build python ../.github/scripts/run_jobs_mutations.py --suite app
 
   backend:
     name: Backend (Biome, tsc, tests y build)
@@ -77,6 +79,8 @@ jobs:
         run: npm run typecheck
       - name: Tests
         run: npm test
+      - name: Mutation test (D02-05, compuerta de training)
+        run: python3 ../.github/scripts/run_jobs_mutations.py --suite backend
       - name: Build
         run: npm run build
 

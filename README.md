@@ -1287,3 +1287,12 @@ y trainer-worker reales y ejecuta `.github/scripts/jobs_e2e.py`: config inválid
 entrenamiento real (409), éxito, fallo controlado, cancelación, SIGTERM, SIGKILL con
 recuperación y `down`/`up` con jobs y logs idénticos; imprime Job IDs, estados y run IDs.
 Los fixtures de `contracts/p3/fixtures` son evidencia de componente, no de integración.
+
+**Mutaciones:** `.github/scripts/run_jobs_mutations.py` aplica 7 mutantes (claim atómico,
+latido vencido, cierre pendiente del run huérfano, compuerta release/manifest y las dos
+protecciones del cierre), corre solo los tests del área, informa qué tests detectaron
+cada uno y restaura el archivo. CI lo corre en los jobs Python y Backend:
+
+```bash
+cd app && uv run python ../.github/scripts/run_jobs_mutations.py   # ambas suites
+```
