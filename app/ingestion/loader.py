@@ -58,6 +58,28 @@ def load_image_bytes(coco: CocoDataset, images_dir: Path) -> dict[int, bytes]:
     """Lee del disco los binarios de cada imagen declarada en `coco`.
 
     Compartido por `presentation.gate` y `presentation.release`: ambos
-    necesitan los mismos bytes por `image_id` para correr pHash.
+    necesitan los mismos bytes por `image_id` para correr pHash. Falla rápido
+    (`FileNotFoundError`) ante un archivo ausente: para esos dos consumidores,
+    un archivo faltante es un problema de todo el dataset, no de una imagen
+    aislada — no hay una noción de "excluir una imagen y seguir".
     """
     return {image.id: (images_dir / image.file_name).read_bytes() for image in coco.images}
+
+
+def load_image_contents(coco: CocoDataset, images_dir: Path) -> dict[int, bytes]:
+    """Como `load_image_bytes`, pero tolera archivos ausentes/ilegibles: los omite
+    del resultado en vez de lanzar.
+
+    Lo usa `presentation.crops_report` (D02-02): el motor de crops
+    (`crops.engine.generate_crops`) trata un `image_id` sin entrada en
+    `image_contents` como `missing_image` y excluye esa anotación puntual, en
+    vez de abortar la generación completa — justo lo contrario del criterio de
+    `load_image_bytes` arriba.
+    """
+    contents: dict[int, bytes] = {}
+    for image in coco.images:
+        try:
+            contents[image.id] = (images_dir / image.file_name).read_bytes()
+        except OSError:
+            continue
+    return contents

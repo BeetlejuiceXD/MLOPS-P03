@@ -107,3 +107,26 @@ def test_config_round_trips_through_json():
     config = _config(batch_size=32, learning_rate=3e-4, hidden_layers=1)
     restored = TrainingConfig.model_validate_json(config.model_dump_json())
     assert restored == config
+
+
+def test_hidden_dim_defaults_to_128():
+    assert _config(hidden_layers=1).hidden_dim == 128
+
+
+def test_hidden_dim_128_is_accepted_with_hidden_layer():
+    assert _config(hidden_layers=1, hidden_dim=128).hidden_dim == 128
+
+
+@pytest.mark.parametrize("value", [1, 32, 127, 129, 256])
+def test_hidden_dim_other_than_128_is_rejected_with_hidden_layer(value):
+    with pytest.raises(ValidationError, match="128"):
+        _config(hidden_layers=1, hidden_dim=value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("batch_size", "16"), ("learning_rate", "0.001"), ("pretrained", "true"), ("seed", "42")],
+)
+def test_strict_mode_rejects_values_of_the_wrong_type(field, value):
+    with pytest.raises(ValidationError):
+        _config(**{field: value})

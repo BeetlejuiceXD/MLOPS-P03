@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from ingestion.loader import load_dataset
+from ingestion.loader import load_dataset, load_image_contents
 
 CATEGORIES = [{"id": 1, "name": "person"}, {"id": 3, "name": "dog"}, {"id": 4, "name": "cat"}]
 
@@ -97,6 +97,35 @@ def test_cross_file_id_collision_is_rejected_not_silently_merged(tmp_path):
 def test_empty_directory_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_dataset(tmp_path)
+
+
+def test_load_image_contents_reads_existing_files(tmp_path):
+    _write_lote(tmp_path, "lote.json", image_id=1, ann_id=1, file_name="cat.0.jpg", category_id=4)
+    dataset = load_dataset(tmp_path)
+    images_dir = tmp_path / "images"
+    images_dir.mkdir()
+    (images_dir / "cat.0.jpg").write_bytes(b"contenido real")
+
+    contents = load_image_contents(dataset, images_dir)
+
+    assert contents == {1: b"contenido real"}
+
+
+def test_load_image_contents_omits_missing_files_instead_of_raising(tmp_path):
+    """A diferencia de `load_image_bytes`, un archivo ausente no aborta la carga
+    de los demás: el motor de crops (D01-07) lo reporta como `missing_image`."""
+    _write_lote(tmp_path, "lote-a.json", image_id=1, ann_id=1, file_name="cat.0.jpg", category_id=4)
+    _write_lote(tmp_path, "lote-b.json", image_id=2, ann_id=2, file_name="dog.0.jpg", category_id=3)
+    dataset = load_dataset(tmp_path)
+    images_dir = tmp_path / "images"
+    images_dir.mkdir()
+    (images_dir / "cat.0.jpg").write_bytes(b"solo esta existe")
+    # dog.0.jpg no se escribe: simula un archivo ausente en disco.
+
+    contents = load_image_contents(dataset, images_dir)
+
+    assert contents == {1: b"solo esta existe"}
+    assert 2 not in contents
 
 
 def test_loads_real_shared_dataset():

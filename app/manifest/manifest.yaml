@@ -1,0 +1,7 @@
+# Configuración del manifest P3 (D02-04): proporciones sobre CROPS y semilla.
+# Identidad propia, independiente de splits/splits.yaml (70/15/15 de P2, Tier 4):
+# no se sobreescribe ese archivo. Congelado en el protocolo de D01-03 (#33).
+train: 0.70
+val: 0.20
+test: 0.10
+seed: 42
