@@ -247,6 +247,10 @@ export const trainingJobs = mysqlTable(
     progressEpoch: int('progress_epoch', { unsigned: true }),
     totalEpochs: int('total_epochs', { unsigned: true }),
     mlflowRunId: char('mlflow_run_id', { length: 32 }),
+    // Estado que el run de MLflow aún debe recibir (FINISHED/FAILED/KILLED). Se escribe
+    // en el mismo UPDATE que cierra el job y el worker lo reintenta hasta que MLflow
+    // responde; así un run nunca se queda RUNNING si MLflow estaba caído (#53, B2).
+    mlflowCloseStatus: mysqlEnum('mlflow_close_status', ['FINISHED', 'FAILED', 'KILLED']),
     error: text('error'),
     cancelRequested: boolean('cancel_requested').notNull().default(false),
     workerId: varchar('worker_id', { length: 128 }),

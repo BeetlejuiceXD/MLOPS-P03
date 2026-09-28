@@ -1,6 +1,6 @@
 """D02-05 — Acceso del worker a `training_jobs` y `training_job_logs`.
 
-Las tablas las crea la migración del backend (Drizzle, 0003_training_jobs.sql); aquí se
+Las tablas las crean las migraciones del backend (Drizzle, 0003 y 0004); aquí se
 declaran las mismas columnas para SQLAlchemy Core (un test compara ambas). Toda
 transición se hace con un UPDATE condicionado al estado actual, así dos procesos no
 pueden tomar ni cerrar el mismo job dos veces.
@@ -24,6 +24,7 @@ from sqlalchemy import (
     Table,
     Text,
     and_,
+    case,
     select,
 )
 from sqlalchemy.engine import Engine
@@ -46,6 +47,8 @@ training_jobs = Table(
     Column("progress_epoch", Integer),
     Column("total_epochs", Integer),
     Column("mlflow_run_id", String(32)),
+    # Estado pendiente de aplicar al run de MLflow (0004_training_jobs_mlflow_close.sql).
+    Column("mlflow_close_status", String(16)),
     Column("error", Text),
     Column("cancel_requested", Boolean, nullable=False, default=False),
     Column("worker_id", String(128)),
@@ -67,6 +70,7 @@ training_job_logs = Table(
 )
 
 TERMINAL = ("succeeded", "failed", "cancelled")
+RUN_TERMINAL = ("FINISHED", "FAILED", "KILLED")
 MAX_ERROR_CHARS = 2000
 
 
@@ -165,6 +169,12 @@ class JobStore:
                 select(training_jobs.c.mlflow_run_id).where(training_jobs.c.id == job_id)
             ).scalar_one_or_none()
 
+    def status(self, job_id: int) -> str:
+        with self.engine.connect() as conn:
+            return conn.execute(
+                select(training_jobs.c.status).where(training_jobs.c.id == job_id)
+            ).scalar_one()
+
     def cancel_requested(self, job_id: int) -> bool:
         with self.engine.connect() as conn:
             value = conn.execute(
@@ -180,25 +190,96 @@ class JobStore:
                 )
             )
 
-    def finish(self, job_id: int, worker_id: str, status: str, error: str | None = None) -> bool:
-        """Cierra un job propio en ejecución. Nunca pisa un job ya terminado."""
+    def finish(
+        self,
+        job_id: int,
+        worker_id: str,
+        status: str,
+        error: str | None = None,
+        *,
+        close_run: str | None = None,
+        unless_cancel_requested: bool = False,
+    ) -> bool:
+        """Cierra un job propio en ejecución. Nunca pisa un job ya terminado.
+
+        `close_run` guarda, en el MISMO UPDATE, el estado que su run de MLflow aún debe
+        recibir; se borra con `mark_run_closed` cuando MLflow lo acepta. Con
+        `unless_cancel_requested` el UPDATE solo aplica si nadie pidió cancelar: es el
+        punto único que decide entre éxito y cancelación (sin ventana entre check y cierre).
+        """
         if status not in TERMINAL:
             raise ValueError(f"Estado final inválido: {status}")
         if (status == "failed") != (error is not None):
             raise ValueError("Solo 'failed' lleva mensaje de error, y siempre lo lleva")
-        return self._update_running(
-            job_id,
-            worker_id,
-            status=status,
-            error=None if error is None else error[:MAX_ERROR_CHARS],
-            finished_at=utcnow(),
-        )
+        if close_run is not None and close_run not in RUN_TERMINAL:
+            raise ValueError(f"Estado de run inválido: {close_run}")
+        conditions = [
+            training_jobs.c.id == job_id,
+            training_jobs.c.status == "running",
+            training_jobs.c.worker_id == worker_id,
+        ]
+        if unless_cancel_requested:
+            conditions.append(training_jobs.c.cancel_requested.is_(False))
+        now = utcnow()
+        with self.engine.begin() as conn:
+            return (
+                conn.execute(
+                    training_jobs.update()
+                    .where(and_(*conditions))
+                    .values(
+                        status=status,
+                        error=None if error is None else error[:MAX_ERROR_CHARS],
+                        finished_at=now,
+                        heartbeat_at=now,
+                        updated_at=now,
+                        mlflow_close_status=close_run,
+                    )
+                ).rowcount
+                == 1
+            )
+
+    def pending_run_closes(self) -> list[tuple[int, str, str]]:
+        """Jobs terminados cuyo run de MLflow aún no recibió su estado final."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                select(
+                    training_jobs.c.id,
+                    training_jobs.c.mlflow_run_id,
+                    training_jobs.c.mlflow_close_status,
+                )
+                .where(
+                    and_(
+                        training_jobs.c.mlflow_close_status.is_not(None),
+                        training_jobs.c.mlflow_run_id.is_not(None),
+                        training_jobs.c.status.in_(TERMINAL),
+                    )
+                )
+                .order_by(training_jobs.c.id)
+            ).all()
+        return [(job_id, run_id, status) for job_id, run_id, status in rows]
+
+    def mark_run_closed(self, job_id: int, run_status: str) -> bool:
+        with self.engine.begin() as conn:
+            return (
+                conn.execute(
+                    training_jobs.update()
+                    .where(
+                        and_(
+                            training_jobs.c.id == job_id,
+                            training_jobs.c.mlflow_close_status == run_status,
+                        )
+                    )
+                    .values(mlflow_close_status=None, updated_at=utcnow())
+                ).rowcount
+                == 1
+            )
 
     def recover_interrupted(self, worker_id: str, stale_after: timedelta) -> list[int]:
         """Marca como fallidos los jobs `running` de otro worker sin latido reciente.
 
         No los vuelve a encolar: reejecutar en silencio duplicaría el entrenamiento.
-        Conserva progreso y run de MLflow; el error explica qué pasó.
+        Conserva progreso y run de MLflow; el error explica qué pasó. El cierre FAILED
+        del run queda pendiente (lo aplica `Worker.retry_pending_run_closes`).
         """
         limit = utcnow() - stale_after
         with self.engine.connect() as conn:
@@ -227,7 +308,16 @@ class JobStore:
                             training_jobs.c.worker_id == owner,
                         )
                     )
-                    .values(status="failed", error=message, finished_at=now, updated_at=now)
+                    .values(
+                        status="failed",
+                        error=message,
+                        finished_at=now,
+                        updated_at=now,
+                        # Mismo UPDATE: el run huérfano queda pendiente de cerrarse FAILED.
+                        mlflow_close_status=case(
+                            (training_jobs.c.mlflow_run_id.is_(None), None), else_="FAILED"
+                        ),
+                    )
                 ).rowcount
             if updated == 1:
                 self.log(job_id, "error", message)

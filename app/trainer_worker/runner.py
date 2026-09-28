@@ -11,7 +11,8 @@ from __future__ import annotations
 import math
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
@@ -99,10 +100,31 @@ class Worker:
     epoch_seconds: float = 0.5
     sleep: Callable[[float], None] = time.sleep
     after_epoch: Callable[[int], None] = field(default=lambda _epoch: None)
+    # "Último check + estado terminal": una parada que llegue ahí se difiere hasta que el
+    # job ya es terminal (ver request_stop). Los handlers de señales de Python corren en
+    # el hilo principal entre instrucciones, así que basta con estas banderas.
+    _finalizing: bool = field(default=False, init=False, repr=False)
+    _deferred_stop: bool = field(default=False, init=False, repr=False)
     _stop: threading.Event = field(default_factory=threading.Event)
 
     def request_stop(self) -> None:
-        self._stop.set()
+        if self._finalizing:
+            # Llegó entre el último check y el UPDATE final: no se acepta para este job
+            # (ya se decidió su estado); detiene el bucle en cuanto el job quede cerrado.
+            self._deferred_stop = True
+        else:
+            self._stop.set()
+
+    @contextmanager
+    def _finalization(self) -> Iterator[None]:
+        self._finalizing = True
+        try:
+            yield
+        finally:
+            self._finalizing = False
+            if self._deferred_stop:
+                self._deferred_stop = False
+                self._stop.set()
 
     @property
     def stopping(self) -> bool:
@@ -115,25 +137,59 @@ class Worker:
             return None
         return self._execute(job)
 
-    def close_interrupted_runs(self, job_ids: list[int]) -> None:
-        """Cierra como FAILED los runs de jobs recuperados, para que MLflow no quede RUNNING.
+    def retry_pending_run_closes(self) -> list[int]:
+        """Aplica en MLflow los cierres pendientes (p. ej. MLflow estaba caído).
 
-        Si MLflow falla, solo se registra: el job ya quedó `failed` en la base de datos.
+        Nunca reencola ni reejecuta: solo lleva el run al estado que el job ya tiene.
         """
-        for job_id in job_ids:
-            run_id = self.store.mlflow_run_id(job_id)
-            if run_id is None:
-                continue
-            try:
-                self.tracker.end(run_id, "FAILED")
-            except Exception as error:  # MLflow caído no debe tumbar el worker
-                self.store.log(
-                    job_id,
-                    "warning",
-                    f"No se pudo cerrar el run {run_id} en MLflow: {type(error).__name__}",
-                )
-            else:
-                self.store.log(job_id, "info", f"Run de MLflow {run_id} marcado FAILED")
+        closed = []
+        for job_id, run_id, run_status in self.store.pending_run_closes():
+            if self._close_run(job_id, run_id, run_status):
+                closed.append(job_id)
+        return closed
+
+    def _close_run(self, job_id: int, run_id: str, run_status: str) -> bool:
+        try:
+            self.tracker.end(run_id, run_status)
+        except Exception as error:  # MLflow caído: queda pendiente y se reintenta
+            self.store.log(
+                job_id,
+                "warning",
+                f"No se pudo cerrar el run {run_id} en MLflow ({type(error).__name__}); "
+                f"queda pendiente {run_status} y se reintenta.",
+            )
+            return False
+        self.store.mark_run_closed(job_id, run_status)
+        self.store.log(job_id, "info", f"Run de MLflow {run_id} marcado {run_status}")
+        return True
+
+    def _finish(
+        self,
+        job: ClaimedJob,
+        run_id: str,
+        status: str,
+        run_status: str,
+        error: str | None = None,
+    ) -> str:
+        """Primero el estado terminal en MariaDB (con el cierre del run pendiente en el
+        mismo UPDATE); después MLflow. Si MLflow falla, el cierre queda para reintentarse."""
+        if error is not None:
+            self.store.log(job.id, "error", error)
+        if not self.store.finish(job.id, self.worker_id, status, error, close_run=run_status):
+            return self._lost(job)
+        self._close_run(job.id, run_id, run_status)
+        return status
+
+    def _lost(self, job: ClaimedJob) -> str:
+        """El job ya no está `running` para este worker (p. ej. otro lo recuperó por latido
+        vencido): no se sobrescribe; se devuelve el estado que realmente tiene."""
+        current = self.store.status(job.id)
+        self.store.log(
+            job.id,
+            "warning",
+            f"{self.worker_id} ya no tenía el job en ejecución (estado {current}); no se toca.",
+        )
+        return current
 
     def _fail(self, job: ClaimedJob, message: str) -> str:
         self.store.log(job.id, "error", message)
@@ -172,28 +228,49 @@ class Worker:
         try:
             self._run_controlled(job, config, run_id)
         except JobCancelledError:
-            self.store.log(job.id, "warning", "Cancelado a petición del usuario")
-            self.tracker.end(run_id, "KILLED")
-            self.store.finish(job.id, self.worker_id, "cancelled")
-            return "cancelled"
+            return self._cancelled(job, run_id)
         except WorkerStoppingError:
-            self.tracker.end(run_id, "KILLED")
-            return self._fail(
-                job,
-                "Interrumpido: el worker se detuvo (SIGTERM) durante la ejecución. "
-                "No se reintenta automáticamente para no duplicar el entrenamiento.",
-            )
+            return self._interrupted(job, run_id)
         except ControlledFailureError as error:
-            self.tracker.end(run_id, "FAILED")
-            return self._fail(job, f"Fallo controlado: {error}")
+            return self._finish(job, run_id, "failed", "FAILED", f"Fallo controlado: {error}")
         except Exception as error:
-            self.tracker.end(run_id, "FAILED")
-            return self._fail(job, f"Fallo inesperado: {type(error).__name__}: {error}")
+            message = f"Fallo inesperado: {type(error).__name__}: {error}"
+            return self._finish(job, run_id, "failed", "FAILED", message)
 
-        self.tracker.end(run_id, "FINISHED")
+        # Último check + estado terminal, sin ventana entre ambos: una parada que llegue
+        # ahora se difiere (_finalization) y la cancelación de la API la decide el UPDATE.
+        with self._finalization():
+            if self.stopping:
+                return self._interrupted(job, run_id)
+            succeeded = self.store.finish(
+                job.id,
+                self.worker_id,
+                "succeeded",
+                close_run="FINISHED",
+                unless_cancel_requested=True,
+            )
+        if not succeeded:
+            if self.store.cancel_requested(job.id):
+                # El UPDATE no aplicó porque pidieron cancelar justo antes del cierre.
+                return self._cancelled(job, run_id)
+            return self._lost(job)
         self.store.log(job.id, "info", "Tarea controlada terminada")
-        self.store.finish(job.id, self.worker_id, "succeeded")
+        self._close_run(job.id, run_id, "FINISHED")
         return "succeeded"
+
+    def _cancelled(self, job: ClaimedJob, run_id: str) -> str:
+        self.store.log(job.id, "warning", "Cancelado a petición del usuario")
+        return self._finish(job, run_id, "cancelled", "KILLED")
+
+    def _interrupted(self, job: ClaimedJob, run_id: str) -> str:
+        return self._finish(
+            job,
+            run_id,
+            "failed",
+            "KILLED",
+            "Interrumpido: el worker se detuvo (SIGTERM) durante la ejecución. "
+            "No se reintenta automáticamente para no duplicar el entrenamiento.",
+        )
 
     def _run_controlled(self, job: ClaimedJob, config: TrainingConfig, run_id: str) -> None:
         for epoch in range(1, config.max_epochs + 1):

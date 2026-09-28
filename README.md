@@ -1260,12 +1260,23 @@ worker (un job inválido que llegue a la tabla termina `failed` sin crear run).
 
 **Interrupciones (sin duplicar entrenamientos):**
 
+- Primero se escribe el estado terminal en MariaDB y después se cierra el run en MLflow
+  con el estado equivalente (`succeeded`→FINISHED, `failed`→FAILED/KILLED,
+  `cancelled`→KILLED).
+- Éxito vs. cancelación lo decide un único UPDATE (`status='running' AND
+  cancel_requested=false`): una cancelación que llegue hasta justo antes del cierre
+  termina `cancelled`/KILLED, nunca `succeeded`.
 - `docker compose stop trainer-worker` (SIGTERM): el job en curso termina `failed` con
-  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`.
+  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`. Si la señal llega entre el último
+  check y el cierre, se difiere: el job conserva el estado ya decidido y el worker se
+  detiene justo después (nunca una parada aceptada que acabe en éxito).
 - Worker matado sin aviso (SIGKILL, OOM, host caído): el job queda `running` con el
   último latido. Al arrancar, cualquier worker marca `failed` los jobs `running` de otro
   worker con latido más viejo que `TRAINER_STALE_AFTER_SECONDS` (60 s, mínimo 30),
-  conserva progreso y run, y cierra el run como `FAILED`.
+  conserva progreso y run, y deja pendiente cerrar el run como `FAILED`.
+- Si MLflow no responde al cerrar un run, el estado pendiente queda en
+  `training_jobs.mlflow_close_status` (migración `0004`) y el worker lo reintenta en cada
+  vuelta hasta que MLflow vuelve. Un run nunca se queda `RUNNING` para siempre.
 - Nunca se reencola un job interrumpido: se vuelve a lanzar a mano si corresponde.
 
 Variables: `TRAINER_POLL_SECONDS` (2), `TRAINER_CONTROLLED_EPOCH_SECONDS` (0.5),

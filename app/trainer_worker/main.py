@@ -56,7 +56,8 @@ def serve(
             recovered = store.recover_interrupted(worker.worker_id, stale_after)
             if recovered:
                 logger.warning("Jobs interrumpidos marcados como fallidos: %s", recovered)
-                worker.close_interrupted_runs(recovered)
+            # Cierres de runs pendientes (MLflow caído antes): se reintentan cada vuelta.
+            worker.retry_pending_run_closes()
             result = worker.run_once()
         except SQLAlchemyError as error:
             # P. ej. el backend aún no aplica la migración de training_jobs.

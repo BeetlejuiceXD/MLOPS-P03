@@ -1,0 +1,1 @@
+ALTER TABLE `training_jobs` ADD `mlflow_close_status` enum('FINISHED','FAILED','KILLED');
