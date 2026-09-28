@@ -121,3 +121,12 @@ def test_hidden_dim_128_is_accepted_with_hidden_layer():
 def test_hidden_dim_other_than_128_is_rejected_with_hidden_layer(value):
     with pytest.raises(ValidationError, match="128"):
         _config(hidden_layers=1, hidden_dim=value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("batch_size", "16"), ("learning_rate", "0.001"), ("pretrained", "true"), ("seed", "42")],
+)
+def test_strict_mode_rejects_values_of_the_wrong_type(field, value):
+    with pytest.raises(ValidationError):
+        _config(**{field: value})
