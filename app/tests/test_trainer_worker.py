@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, select
+
+from trainer_worker import main as worker_main
 from trainer_worker import runner, store
 from trainer_worker.store import JobStore, training_job_logs, training_jobs
 
@@ -279,3 +281,102 @@ def test_finish_never_overwrites_a_terminal_job(engine, job_store):
 
 def test_idle_worker_does_nothing(job_store, tracking):
     assert _worker(job_store, tracking).run_once() is None
+
+
+# --- Proceso principal (python -m trainer_worker.main) ---------------------------------
+
+
+class _FakeWorker:
+    def __init__(self, results):
+        self.results = list(results)
+        self.calls = 0
+        self.stopped = False
+        self.worker_id = "worker-test"
+
+    def run_once(self):
+        self.calls += 1
+        result = self.results.pop(0) if self.results else None
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def request_stop(self):
+        self.stopped = True
+
+    @property
+    def stopping(self):
+        return self.stopped
+
+
+class _FakeStore:
+    def __init__(self):
+        self.recoveries = 0
+
+    def recover_interrupted(self, worker_id, stale_after):
+        self.recoveries += 1
+        return []
+
+
+def test_serve_polls_recovers_and_sleeps_only_when_idle():
+    sleeps: list[float] = []
+    fake = _FakeWorker(["succeeded", None, "failed", None])
+    store_ = _FakeStore()
+
+    worker_main.serve(
+        fake,
+        store_,
+        poll_seconds=2.0,
+        stale_after=timedelta(seconds=60),
+        sleep=sleeps.append,
+        max_iterations=4,
+    )
+
+    assert fake.calls == 4
+    assert store_.recoveries == 4
+    assert sleeps == [2.0, 2.0]  # sin espera tras ejecutar un job
+
+
+def test_serve_survives_database_errors_until_the_tables_exist():
+    from sqlalchemy.exc import OperationalError
+
+    sleeps: list[float] = []
+    fake = _FakeWorker([OperationalError("SELECT", {}, Exception("no such table")), "succeeded"])
+
+    worker_main.serve(
+        fake,
+        _FakeStore(),
+        poll_seconds=1.0,
+        stale_after=timedelta(seconds=60),
+        sleep=sleeps.append,
+        max_iterations=2,
+    )
+
+    assert fake.calls == 2
+    assert sleeps == [1.0]
+
+
+def test_serve_stops_when_asked():
+    fake = _FakeWorker(["succeeded"] * 10)
+    fake.request_stop()
+    worker_main.serve(
+        fake,
+        _FakeStore(),
+        poll_seconds=1.0,
+        stale_after=timedelta(seconds=60),
+        sleep=lambda _s: None,
+    )
+    assert fake.calls == 0
+
+
+def test_settings_need_database_and_tracking(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    with pytest.raises(Exception, match=r"database_url|DATABASE_URL"):
+        worker_main.WorkerSettings()
+
+    monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://u:p@mariadb:3306/image_repo")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+    settings = worker_main.WorkerSettings()
+    assert settings.poll_seconds > 0
+    assert settings.stale_after_seconds >= 30
+    assert "u:p@" not in repr(settings)  # la URL con contraseña no se imprime
