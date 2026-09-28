@@ -5,10 +5,11 @@ ResNet18 preentrenada. Este módulo solo declara y valida la forma de la
 configuración; no entrena ni carga datos (eso es un ticket posterior).
 """
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+HIDDEN_DIM = 128
 
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
@@ -20,7 +21,7 @@ class TrainingConfig(BaseModel):
 
     # --- Cabeza clasificadora ---
     hidden_layers: Literal[0, 1] = 0
-    hidden_dim: int = Field(default=128, gt=0)
+    hidden_dim: int = Field(default=HIDDEN_DIM, gt=0)
     dropout: float = Field(default=0.0, ge=0.0, le=0.5)
 
     # --- Los siete parámetros de D01-04 ---
@@ -37,3 +38,11 @@ class TrainingConfig(BaseModel):
 
     # --- Reproducibilidad ---
     seed: int
+    
+    @model_validator(mode="after")
+    def _hidden_dim_is_frozen(self) -> Self:
+        if self.hidden_layers == 1 and self.hidden_dim != HIDDEN_DIM:
+            raise ValueError(
+                f"hidden_dim debe ser {HIDDEN_DIM} cuando hidden_layers=1 (protocolo #33)"
+            )
+        return self
