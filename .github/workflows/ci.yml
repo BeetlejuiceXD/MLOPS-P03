@@ -291,7 +291,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, backend, frontend, compose, mlflow-persistence, quality-gate, quality-gate-prod]
+    needs: [python, backend, frontend, compose, mlflow-persistence, quality-gate, quality-gate-prod, app-image]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -306,3 +306,18 @@ jobs:
               exit 1
             fi
           done
+
+  app-image:
+    name: Imagen app (training importable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Construir la imagen de app
+        run: docker build -t p3-app-check app
+      - name: training.class_map se importa dentro de la imagen
+        run: >-
+          docker run --rm p3-app-check python -c
+          "from training.class_map import CLASS_MAP; assert CLASS_MAP == {'cat': 0, 'dog': 1}; print(CLASS_MAP)"
