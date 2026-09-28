@@ -3,6 +3,7 @@
   "valid": false,
   "why": "manifest_hash debe ser sha256 hex (64)",
   "payload": {
+    "task": "controlled",
     "dataset_version": "v0.1.1",
     "manifest_hash": "abc",
     "config": {

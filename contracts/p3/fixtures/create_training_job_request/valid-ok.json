@@ -1,8 +1,9 @@
 {
   "contract": "create_training_job_request",
   "valid": true,
-  "why": "Job sobre el release aprobado y el manifest congelado",
+  "why": "Tarea controlada (D02-05) sobre release y manifest declarados",
   "payload": {
+    "task": "controlled",
     "dataset_version": "v0.1.1",
     "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "config": {

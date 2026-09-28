@@ -3,6 +3,7 @@
   "valid": false,
   "why": "dataset_version debe ser vMAJOR.MINOR.PATCH",
   "payload": {
+    "task": "controlled",
     "dataset_version": "latest",
     "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "config": {

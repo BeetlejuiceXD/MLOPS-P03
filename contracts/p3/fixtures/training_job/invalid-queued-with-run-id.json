@@ -4,6 +4,7 @@
   "why": "No se fabrica un mlflow_run_id antes de crear el run",
   "payload": {
     "id": 1,
+    "task": "controlled",
     "dataset_version": "v0.1.1",
     "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "config": {
@@ -23,6 +24,7 @@
       "hidden_dim": 128,
       "dropout": 0.0
     },
+    "cancel_requested": false,
     "created_at": "2026-09-27T17:00:00Z",
     "status": "queued",
     "progress": null,
