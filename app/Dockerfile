@@ -21,6 +21,7 @@ COPY presentation/ ./presentation/
 COPY training/ ./training/
 COPY projections/ ./projections/
 COPY copilot/ ./copilot/
+COPY tracking/ ./tracking/
 
 # El volumen nombrado reports_data (docker-compose.yml) se inicializa la
 # primera vez con el contenido/dueño de este directorio si ya existe en la
