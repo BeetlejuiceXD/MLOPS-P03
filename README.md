@@ -1220,3 +1220,59 @@ MLflow detenido `check` falla con `2`.
   -p"$MARIADB_ROOT_PASSWORD" --databases mlflow' > mlflow-metadata.sql`. El snapshot
   completo (metadatos + artefactos) para el clean clone se versiona con DVC al cerrar la
   campaña (D05), como quedó en #33.
+
+## D02-05 — Jobs persistentes y formulario Training
+
+Los entrenamientos no corren dentro del request HTTP: la API **encola** un job en MariaDB
+(`training_jobs` + `training_job_logs`, migración `0003_training_jobs.sql`) y el servicio
+`trainer-worker` lo toma por polling y lo ejecuta. Todo el estado (config, estado,
+progreso, logs, error, `mlflow_run_id`) vive en la base de datos, así que sobrevive a
+recargas del portal y a reinicios de contenedores.
+
+```bash
+docker compose up -d --build            # incluye trainer-worker
+docker compose logs -f trainer-worker   # "trainer-worker <id> escuchando training_jobs"
+```
+
+Portal: **Training** (`/ml/training`) → formulario → *Encolar job*. La tabla se refresca
+sola mientras haya jobs `queued`/`running`; cada job muestra progreso, logs, error y run.
+
+| Endpoint | Uso |
+| --- | --- |
+| `POST /api/training/jobs` | Crea un job (`create_training_job_request`). `400` si el `TrainingConfig` es inválido (nombra el campo), `409` si se pide entrenamiento real y no hay release/manifest elegibles. |
+| `GET /api/training/jobs` · `GET /api/training/jobs/:id` | Lista / detalle (`training_job`). |
+| `GET /api/training/jobs/:id/logs` | Últimas 500 líneas. |
+| `POST /api/training/jobs/:id/cancel` | `queued` → `cancelled` inmediato; `running` → `cancel_requested` y el worker lo detiene en la siguiente época; terminado → `409`. |
+
+**Estados:** `queued → running → succeeded | failed | cancelled`. Un estado terminal
+nunca se sobrescribe. El `TrainingConfig` se valida en la UI, en la API y otra vez en el
+worker (un job inválido que llegue a la tabla termina `failed` sin crear run).
+
+**Tareas:**
+
+- `controlled` — tarea controlada para probar el ciclo de vida: no entrena ni lee datos,
+  registra por época métricas sintéticas `controlled_*` y crea un run con tag
+  `p3.run_kind=controlled_task` (Experiments debe filtrarlo: no es corrida de la campaña).
+  `controlled.fail_at_epoch` fuerza un fallo en esa época.
+- `training` — entrenamiento real. **Cerrado por defecto:** la API responde `409` hasta
+  que existan el release aprobado y el manifest congelado oficiales (D03-01/D03-03). La
+  compuerta (`createEligibilityGate`) ya está probada con los fixtures de contratos.
+
+**Interrupciones (sin duplicar entrenamientos):**
+
+- `docker compose stop trainer-worker` (SIGTERM): el job en curso termina `failed` con
+  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`.
+- Worker matado sin aviso (SIGKILL, OOM, host caído): el job queda `running` con el
+  último latido. Al arrancar, cualquier worker marca `failed` los jobs `running` de otro
+  worker con latido más viejo que `TRAINER_STALE_AFTER_SECONDS` (60 s, mínimo 30),
+  conserva progreso y run, y cierra el run como `FAILED`.
+- Nunca se reencola un job interrumpido: se vuelve a lanzar a mano si corresponde.
+
+Variables: `TRAINER_POLL_SECONDS` (2), `TRAINER_CONTROLLED_EPOCH_SECONDS` (0.5),
+`TRAINER_STALE_AFTER_SECONDS` (60), más `DATABASE_URL` y `MLFLOW_TRACKING_URI` del worker.
+
+**Evidencia:** el job de CI **Jobs persistentes** levanta MariaDB, MinIO, MLflow, backend
+y trainer-worker reales y ejecuta `.github/scripts/jobs_e2e.py`: config inválido (400),
+entrenamiento real (409), éxito, fallo controlado, cancelación, SIGTERM, SIGKILL con
+recuperación y `down`/`up` con jobs y logs idénticos; imprime Job IDs, estados y run IDs.
+Los fixtures de `contracts/p3/fixtures` son evidencia de componente, no de integración.
