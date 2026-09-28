@@ -9,20 +9,23 @@ CI "Jobs persistentes". La tarea controlada no entrena: recorre la máquina de e
 from __future__ import annotations
 
 import json
+import os
 import re
+import signal
 import socket
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import and_, create_engine, select
 
 from trainer_worker import main as worker_main
 from trainer_worker import runner, store
 from trainer_worker.store import JobStore, training_job_logs, training_jobs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = REPO_ROOT / "backend/src/data/db/migrations/0003_training_jobs.sql"
+MIGRATIONS = REPO_ROOT / "backend/src/data/db/migrations"
+MIGRATION = MIGRATIONS / "0003_training_jobs.sql"
 CONFIG = json.loads(
     (REPO_ROOT / "contracts/p3/fixtures/training_config/valid-defaults.json").read_text()
 )["payload"]
@@ -98,13 +101,22 @@ def _mlflow_run(tracking_uri: str, run_id: str):
     return MlflowClient(tracking_uri=tracking_uri).get_run(run_id)
 
 
-def test_worker_tables_match_the_backend_migration():
-    sql = MIGRATION.read_text(encoding="utf-8")
+def _migration_columns(table: str) -> set[str]:
+    """Columnas de `table` según todas las migraciones del backend (CREATE + ALTER ADD)."""
+    columns: set[str] = set()
+    for migration in sorted(MIGRATIONS.glob("*.sql")):
+        sql = migration.read_text(encoding="utf-8")
+        block = re.search(rf"CREATE TABLE `{table}` \((.*?)\n\);", sql, re.S)
+        if block:
+            columns |= set(re.findall(r"^\t`([a-z_]+)`", block.group(1), re.M))
+        columns |= set(re.findall(rf"ALTER TABLE `{table}` ADD `([a-z_]+)`", sql))
+    return columns
+
+
+def test_worker_tables_match_the_backend_migrations():
+    assert MIGRATION.is_file()
     for table in (training_jobs, training_job_logs):
-        block = re.search(rf"CREATE TABLE `{table.name}` \((.*?)\n\);", sql, re.S)
-        assert block, f"{table.name} no está en la migración"
-        migration_columns = set(re.findall(r"^\t`([a-z_]+)`", block.group(1), re.M))
-        assert migration_columns == {column.name for column in table.columns}
+        assert _migration_columns(table.name) == {column.name for column in table.columns}
 
 
 def test_claim_is_atomic_and_only_takes_queued_jobs(engine, job_store):
@@ -266,6 +278,108 @@ def test_stop_signal_marks_the_job_interrupted(engine, job_store, tracking):
     assert row.progress_epoch == 1
 
 
+# --- B1: una cancelación o parada aceptada nunca termina en éxito --------------------
+
+
+def _request_cancel(engine, job_id: int) -> None:
+    """Lo mismo que hace la API (requestTrainingJobCancel): solo si sigue running."""
+    with engine.begin() as conn:
+        conn.execute(
+            training_jobs.update()
+            .where(and_(training_jobs.c.id == job_id, training_jobs.c.status == "running"))
+            .values(cancel_requested=True)
+        )
+
+
+def test_cancel_after_the_last_epoch_is_cancelled_not_succeeded(engine, job_store, tracking):
+    job_id = _insert(engine)
+
+    def cancel_at_last_epoch(epoch: int) -> None:
+        if epoch == 10:  # después del último check del bucle
+            _request_cancel(engine, job_id)
+
+    worker = _worker(job_store, tracking, after_epoch=cancel_at_last_epoch)
+    assert worker.run_once() == "cancelled"
+
+    row = _row(engine, job_id)
+    assert (row.status, row.progress_epoch, row.error) == ("cancelled", 10, None)
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "KILLED"
+
+
+def test_cancel_racing_the_final_commit_is_cancelled_not_succeeded(
+    engine, job_store, tracking, monkeypatch
+):
+    """La API marca cancel_requested justo entre el último check y el UPDATE final."""
+    job_id = _insert(engine)
+    original_finish = job_store.finish
+
+    def cancel_just_before_commit(*args, **kwargs):
+        _request_cancel(engine, job_id)
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(job_store, "finish", cancel_just_before_commit)
+
+    assert _worker(job_store, tracking).run_once() == "cancelled"
+
+    row = _row(engine, job_id)
+    assert row.status == "cancelled"
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "KILLED"
+    assert not any("terminada" in line for line in _logs(engine, job_id))
+
+
+def test_stop_after_the_last_epoch_is_failed_not_succeeded(engine, job_store, tracking):
+    job_id = _insert(engine)
+    worker = _worker(job_store, tracking)
+    worker.after_epoch = lambda epoch: epoch == 10 and worker.request_stop()
+
+    assert worker.run_once() == "failed"
+
+    row = _row(engine, job_id)
+    assert row.status == "failed" and "SIGTERM" in row.error
+    assert row.progress_epoch == 10
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "KILLED"
+
+
+def test_sigterm_cannot_land_between_the_final_check_and_the_commit(
+    engine, job_store, tracking, monkeypatch
+):
+    """SIGTERM real, enviado justo antes del UPDATE final.
+
+    El worker bloquea SIGTERM/SIGINT durante "último check + estado terminal": la señal
+    se entrega después, cuando el job ya es terminal, y solo detiene el bucle. Así nunca
+    hay una parada aceptada durante el job que termine como éxito.
+    """
+    job_id = _insert(engine)
+    worker = _worker(job_store, tracking, critical_section=worker_main.block_stop_signals)
+    seen_by_handler: list[str] = []
+
+    def handler(_signum, _frame):
+        seen_by_handler.append(_row(engine, job_id).status)
+        worker.request_stop()
+
+    previous = signal.signal(signal.SIGTERM, handler)
+    original_finish = job_store.finish
+
+    def sigterm_just_before_commit(*args, **kwargs):
+        os.kill(os.getpid(), signal.SIGTERM)
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(job_store, "finish", sigterm_just_before_commit)
+    try:
+        status = worker.run_once()
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+    row = _row(engine, job_id)
+    # La señal no interrumpió la transición: llegó con el job ya cerrado...
+    assert seen_by_handler == [status]
+    # ...y el estado en MariaDB y en MLflow es el mismo, sin mezclas.
+    expected_run = {"succeeded": "FINISHED", "failed": "KILLED"}[status]
+    assert row.status == status
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == expected_run
+    assert worker.stopping  # y el worker sí se detiene después
+
+
 def test_recovery_marks_stale_running_jobs_failed_without_rerunning(engine, job_store, tracking):
     stale = _insert(
         engine,
@@ -314,39 +428,96 @@ def _stale_running(engine, run_id: str | None) -> int:
     )
 
 
-def test_recovery_also_closes_the_orphan_mlflow_run_as_failed(engine, job_store, tracking):
+class _FlakyTracker:
+    """MlflowTracker real que se puede "apagar" para simular MLflow caído."""
+
+    def __init__(self, tracking_uri: str, down: bool = False):
+        self.real = runner.MlflowTracker(tracking_uri)
+        self.down = down
+        self.end_calls: list[tuple[str, str]] = []
+
+    def start(self, job, config):
+        return self.real.start(job, config)
+
+    def log_epoch(self, run_id, epoch, metrics):
+        self.real.log_epoch(run_id, epoch, metrics)
+
+    def end(self, run_id, status):
+        self.end_calls.append((run_id, status))
+        if self.down:
+            raise ConnectionError("MLflow no disponible")
+        self.real.end(run_id, status)
+
+
+def _orphan_run(tracking: str) -> str:
     from mlflow.tracking import MlflowClient
 
     client = MlflowClient(tracking_uri=tracking)
-    experiment_id = client.create_experiment("p3-recovery")
-    orphan_run = client.create_run(experiment_id).info.run_id
+    experiment = client.get_experiment_by_name("p3-recovery")
+    experiment_id = (
+        experiment.experiment_id if experiment else client.create_experiment("p3-recovery")
+    )
+    return client.create_run(experiment_id).info.run_id
+
+
+def test_orphan_run_close_is_retried_until_mlflow_comes_back(engine, job_store, tracking):
+    """running + latido vencido → MLflow caído → failed con cierre pendiente →
+    MLflow vuelve → cierre reintentado → el mismo run queda FAILED."""
+    orphan_run = _orphan_run(tracking)
     job_id = _stale_running(engine, orphan_run)
-    worker = _worker(job_store, tracking)
+    tracker = _FlakyTracker(tracking, down=True)
+    worker = runner.Worker(store=job_store, tracker=tracker, worker_id="worker-test")
 
-    recovered = job_store.recover_interrupted(worker.worker_id, timedelta(seconds=60))
-    worker.close_interrupted_runs(recovered)
+    assert job_store.recover_interrupted(worker.worker_id, timedelta(seconds=60)) == [job_id]
+    worker.retry_pending_run_closes()
+    worker.retry_pending_run_closes()
 
-    # Sin esto, MLflow mostraría para siempre un run RUNNING de un job ya fallido.
+    row = _row(engine, job_id)
+    assert row.status == "failed"
+    assert row.mlflow_close_status == "FAILED"  # el cierre pendiente queda guardado
+    assert _mlflow_run(tracking, orphan_run).info.status == "RUNNING"
+    assert any("No se pudo cerrar el run" in line for line in _logs(engine, job_id))
+
+    tracker.down = False
+    worker.retry_pending_run_closes()
+
+    row = _row(engine, job_id)
     assert _mlflow_run(tracking, orphan_run).info.status == "FAILED"
-    assert _row(engine, job_id).mlflow_run_id == orphan_run
-    assert any("marcado FAILED" in line for line in _logs(engine, job_id))
+    assert row.mlflow_close_status is None
+    # Sin reencolar ni reejecutar, y sin perder progreso ni run.
+    assert (row.status, row.progress_epoch, row.mlflow_run_id) == ("failed", 2, orphan_run)
+    assert job_store.claim_next("worker-test") is None
+    calls = len(tracker.end_calls)
+    worker.retry_pending_run_closes()
+    assert len(tracker.end_calls) == calls  # ya cerrado: no se vuelve a intentar
 
 
-def test_closing_orphan_runs_tolerates_jobs_without_run_and_mlflow_errors(engine, job_store):
-    class BrokenTracker:
-        def end(self, run_id, status):
-            raise ConnectionError("mlflow caído")
+def test_recovered_job_without_run_has_nothing_pending(engine, job_store):
+    job_id = _stale_running(engine, None)
+    job_store.recover_interrupted("worker-test", timedelta(seconds=60))
+    row = _row(engine, job_id)
+    assert (row.status, row.mlflow_close_status) == ("failed", None)
+    assert job_store.pending_run_closes() == []
 
-    without_run = _stale_running(engine, None)
-    with_run = _stale_running(engine, "b" * 32)
-    worker = runner.Worker(store=job_store, tracker=BrokenTracker(), worker_id="worker-test")
 
-    recovered = job_store.recover_interrupted(worker.worker_id, timedelta(seconds=60))
-    worker.close_interrupted_runs(recovered)  # no lanza: el job ya quedó failed
+def test_mlflow_down_at_the_end_of_a_successful_job_is_retried(engine, job_store, tracking):
+    job_id = _insert(engine)
+    tracker = _FlakyTracker(tracking)
+    worker = runner.Worker(
+        store=job_store, tracker=tracker, worker_id="worker-test", epoch_seconds=0
+    )
+    worker.after_epoch = lambda epoch: epoch == 10 and setattr(tracker, "down", True)
 
-    assert _row(engine, without_run).status == "failed"
-    assert _row(engine, with_run).status == "failed"
-    assert any("No se pudo cerrar el run" in line for line in _logs(engine, with_run))
+    assert worker.run_once() == "succeeded"
+    row = _row(engine, job_id)
+    assert (row.status, row.mlflow_close_status) == ("succeeded", "FINISHED")
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "RUNNING"
+
+    tracker.down = False
+    worker.retry_pending_run_closes()
+    row = _row(engine, job_id)
+    assert row.mlflow_close_status is None
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "FINISHED"
 
 
 def test_finish_never_overwrites_a_terminal_job(engine, job_store):
@@ -368,7 +539,7 @@ class _FakeWorker:
         self.calls = 0
         self.stopped = False
         self.worker_id = "worker-test"
-        self.closed: list[list[int]] = []
+        self.retries = 0
 
     def run_once(self):
         self.calls += 1
@@ -380,8 +551,8 @@ class _FakeWorker:
     def request_stop(self):
         self.stopped = True
 
-    def close_interrupted_runs(self, job_ids):
-        self.closed.append(list(job_ids))
+    def retry_pending_run_closes(self):
+        self.retries += 1
 
     @property
     def stopping(self):
@@ -418,17 +589,17 @@ def test_serve_polls_recovers_and_sleeps_only_when_idle():
     assert sleeps == [2.0, 2.0]  # sin espera tras ejecutar un job
 
 
-def test_serve_closes_the_runs_of_recovered_jobs():
-    fake = _FakeWorker([None, None])
+def test_serve_retries_pending_run_closes_every_iteration():
+    fake = _FakeWorker([None, "succeeded", None])
     worker_main.serve(
         fake,
-        _FakeStore(recovered=[7, 9]),
+        _FakeStore(recovered=[7]),
         poll_seconds=1.0,
         stale_after=timedelta(seconds=60),
         sleep=lambda _s: None,
-        max_iterations=2,
+        max_iterations=3,
     )
-    assert fake.closed == [[7, 9]]
+    assert fake.retries == 3
 
 
 def test_serve_survives_database_errors_until_the_tables_exist():
