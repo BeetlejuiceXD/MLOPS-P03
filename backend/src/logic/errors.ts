@@ -25,3 +25,14 @@ export class NotFoundError extends Error {
     this.name = 'NotFoundError';
   }
 }
+
+/**
+ * D02-05 — La petición es válida pero el estado actual no la permite (p. ej. cancelar un
+ * job terminado o encolar un training real sin release/manifest oficial). La UI responde 409.
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}

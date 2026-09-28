@@ -68,7 +68,7 @@ class InMemoryRepository implements TrainingJobRepository {
 
   async cancelQueued(id: number): Promise<boolean> {
     const job = this.jobs.find((candidate) => candidate.id === id);
-    if (!job || job.status !== 'queued') return false;
+    if (job?.status !== 'queued') return false;
     job.status = 'cancelled';
     job.finishedAt = new Date('2026-09-27T20:00:10Z');
     return true;
@@ -76,7 +76,7 @@ class InMemoryRepository implements TrainingJobRepository {
 
   async requestCancel(id: number): Promise<boolean> {
     const job = this.jobs.find((candidate) => candidate.id === id);
-    if (!job || job.status !== 'running') return false;
+    if (job?.status !== 'running') return false;
     job.cancelRequested = true;
     return true;
   }
@@ -208,7 +208,7 @@ describe('consultar y cancelar', () => {
   it('lista del más reciente al más antiguo y cada job cumple el contrato', async () => {
     await service.create(validRequest());
     await service.create(validRequest());
-    const jobs = await service.list();
+    const { jobs } = await service.list();
     expect(jobs.map((job) => job.id)).toEqual([2, 1]);
     for (const job of jobs) expect(trainingJobSchema.safeParse(job).success).toBe(true);
   });
