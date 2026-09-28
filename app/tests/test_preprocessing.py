@@ -51,3 +51,24 @@ def test_train_transform_with_augmentation_adds_more_steps_than_eval():
     assert len(build_train_transform(config).transforms) > len(
         build_eval_transform(config).transforms
     )
+
+
+def test_eval_transform_normalizes_with_imagenet_stats():
+    config = _config(image_size=128)
+    white = Image.new("RGB", (64, 64), color=(255, 255, 255))
+
+    tensor = preprocess_image(white, config, train=False)
+
+    expected = (
+        (1.0 - 0.485) / 0.229,
+        (1.0 - 0.456) / 0.224,
+        (1.0 - 0.406) / 0.225,
+    )
+    for channel, value in enumerate(expected):
+        assert torch.allclose(tensor[channel], torch.full((128, 128), value), atol=1e-4)
+
+
+def test_grayscale_input_is_converted_to_three_channels():
+    gray = Image.new("L", (64, 64), color=128)
+
+    assert preprocess_image(gray, _config(image_size=128), train=False).shape == (3, 128, 128)
