@@ -125,6 +125,34 @@ def test_claim_is_atomic_and_only_takes_queued_jobs(engine, job_store):
     assert row.started_at is not None and row.heartbeat_at is not None
 
 
+def test_claim_skips_a_job_cancelled_between_read_and_update(engine, job_store, monkeypatch):
+    """Carrera real: la API cancela (u otro worker toma) el job justo después del SELECT."""
+    raced = _insert(engine)
+    second = _insert(engine)
+    original_config = store._config
+    interfered: list[int] = []
+
+    def cancel_during_claim(value):
+        if not interfered:
+            with engine.begin() as conn:
+                conn.execute(
+                    training_jobs.update()
+                    .where(training_jobs.c.id == raced)
+                    .values(status="cancelled", finished_at=_naive_utc())
+                )
+            interfered.append(raced)
+        return original_config(value)
+
+    monkeypatch.setattr(store, "_config", cancel_during_claim)
+
+    claimed = job_store.claim_next("worker-a")
+
+    assert interfered == [raced]
+    assert claimed is not None and claimed.id == second
+    # El cancelado no se "revive" como running: el UPDATE exige status queued.
+    assert (_row(engine, raced).status, _row(engine, raced).worker_id) == ("cancelled", None)
+
+
 def test_controlled_task_succeeds_with_progress_logs_and_mlflow_run(engine, job_store, tracking):
     job_id = _insert(engine)
 
