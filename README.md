@@ -1267,10 +1267,12 @@ worker (un job inválido que llegue a la tabla termina `failed` sin crear run).
   cancel_requested=false`): una cancelación que llegue hasta justo antes del cierre
   termina `cancelled`/KILLED, nunca `succeeded`.
 - `docker compose stop trainer-worker` (SIGTERM): el job en curso termina `failed` con
-  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`. La parada se revisa también dentro
-  de la transacción del estado final, con el UPDATE ya ejecutado y justo antes del
-  COMMIT: un SIGTERM recibido antes de persistir hace rollback y el job nunca queda
-  `succeeded`/FINISHED.
+  "Interrumpido ... (SIGTERM)"; su run queda `KILLED`. Al persistir el éxito, la parada se
+  revisa dentro de la transacción (UPDATE ya ejecutado, justo antes del COMMIT) y, si la
+  señal llega después de ese check, el handler corta la transacción antes del COMMIT
+  (la conexión se descarta y MariaDB deshace el cambio): un SIGTERM recibido antes de
+  que el estado terminal quede persistido nunca deja `succeeded`/FINISHED. Si llega con
+  el COMMIT ya hecho, el éxito ya estaba persistido y solo se detiene el worker.
 - Worker matado sin aviso (SIGKILL, OOM, host caído): el job queda `running` con el
   último latido. Al arrancar, cualquier worker marca `failed` los jobs `running` de otro
   worker con latido más viejo que `TRAINER_STALE_AFTER_SECONDS` (60 s, mínimo 30),

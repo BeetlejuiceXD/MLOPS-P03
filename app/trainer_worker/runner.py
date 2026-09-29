@@ -32,6 +32,15 @@ class WorkerStoppingError(Exception):
     """El proceso recibió SIGTERM/SIGINT mientras ejecutaba el job."""
 
 
+class StopDuringFinalizationError(BaseException):
+    """Parada recibida mientras se persiste el estado terminal de un job.
+
+    `request_stop` la lanza desde el handler de SIGTERM/SIGINT: interrumpe la
+    transacción en el punto exacto donde llegó la señal (como KeyboardInterrupt), así el
+    COMMIT no llega a hacerse. BaseException para que ningún `except Exception` la trague.
+    """
+
+
 class ControlledFailureError(Exception):
     """Fallo provocado a propósito por `controlled.fail_at_epoch`."""
 
@@ -102,9 +111,20 @@ class Worker:
     # Jobs cuyo cierre pendiente ya se avisó en su log (un aviso por job, no uno por intento).
     _close_warned: set[int] = field(default_factory=set, init=False, repr=False)
     _stop: threading.Event = field(default_factory=threading.Event)
+    # True solo mientras se persiste `succeeded` (UPDATE + último check + COMMIT).
+    _finalizing: bool = field(default=False, init=False, repr=False)
 
     def request_stop(self) -> None:
+        """Pide detener el worker (lo llama el handler de SIGTERM/SIGINT de main.py).
+
+        Si llega mientras se persiste el éxito de un job, además corta esa transacción
+        (StopDuringFinalizationError): una parada recibida antes de que el estado terminal
+        quede persistido nunca termina en succeeded/FINISHED.
+        """
         self._stop.set()
+        if self._finalizing:
+            self._finalizing = False  # una sola interrupción aunque lleguen dos señales
+            raise StopDuringFinalizationError
 
     @property
     def stopping(self) -> bool:
@@ -219,20 +239,36 @@ class Worker:
             message = f"Fallo inesperado: {type(error).__name__}: {error}"
             return self._finish(job, run_id, "failed", "FAILED", message)
 
-        # Estado terminal: el UPDATE exige cancel_requested=false y, dentro de la misma
-        # transacción y justo antes del COMMIT, se revisa si llegó una parada. Si llegó
-        # (aunque sea con el UPDATE ya ejecutado), rollback: nunca éxito tras un SIGTERM.
+        # Estado terminal: el UPDATE exige cancel_requested=false; dentro de la misma
+        # transacción, justo antes del COMMIT, se revisa si llegó una parada; y si la señal
+        # llega DESPUÉS de ese check, request_stop corta la transacción antes del COMMIT.
         if self.stopping:
             return self._interrupted(job, run_id)
-        succeeded = self.store.finish(
-            job.id,
-            self.worker_id,
-            "succeeded",
-            close_run="FINISHED",
-            unless_cancel_requested=True,
-            abort_if=lambda: self.stopping,
-        )
-        if not succeeded:
+        committed: bool | None
+        try:
+            try:
+                self._finalizing = True
+                committed = self.store.finish(
+                    job.id,
+                    self.worker_id,
+                    "succeeded",
+                    close_run="FINISHED",
+                    unless_cancel_requested=True,
+                    abort_if=lambda: self.stopping,
+                )
+            finally:
+                self._finalizing = False
+        except StopDuringFinalizationError:
+            committed = None  # la señal cortó el cierre: MariaDB dice si hubo COMMIT
+        if committed is None:
+            committed = self.store.status(job.id) == "succeeded"
+            if committed:
+                self.store.log(
+                    job.id,
+                    "info",
+                    "La parada llegó con el COMMIT ya hecho: el éxito estaba persistido.",
+                )
+        if not committed:
             if self.store.cancel_requested(job.id):
                 return self._cancelled(job, run_id)
             if self.stopping:

@@ -209,8 +209,9 @@ class JobStore:
         `unless_cancel_requested` el UPDATE solo aplica si nadie pidió cancelar: es el
         punto único que decide entre éxito y cancelación (sin ventana entre check y cierre).
         `abort_if` se evalúa DENTRO de la transacción, con el UPDATE ya ejecutado y justo
-        antes del COMMIT: si devuelve True se hace rollback y el job sigue `running`
-        (así un SIGTERM recibido antes de persistir nunca termina en éxito).
+        antes del COMMIT: si devuelve True se hace rollback y el job sigue `running`. Si
+        algo interrumpe la transacción (una parada que llega después de ese check), la
+        conexión se invalida antes del COMMIT y el job también sigue `running`.
         """
         if status not in TERMINAL:
             raise ValueError(f"Estado final inválido: {status}")
@@ -226,22 +227,31 @@ class JobStore:
         if unless_cancel_requested:
             conditions.append(training_jobs.c.cancel_requested.is_(False))
         now = utcnow()
-        with self.engine.connect() as conn, conn.begin() as transaction:
-            updated = conn.execute(
-                training_jobs.update()
-                .where(and_(*conditions))
-                .values(
-                    status=status,
-                    error=None if error is None else error[:MAX_ERROR_CHARS],
-                    finished_at=now,
-                    heartbeat_at=now,
-                    updated_at=now,
-                    mlflow_close_status=close_run,
-                )
-            ).rowcount
-            if updated != 1 or (abort_if is not None and abort_if()):
-                transaction.rollback()
-                return False
+        with self.engine.connect() as conn:
+            transaction = conn.begin()
+            try:
+                updated = conn.execute(
+                    training_jobs.update()
+                    .where(and_(*conditions))
+                    .values(
+                        status=status,
+                        error=None if error is None else error[:MAX_ERROR_CHARS],
+                        finished_at=now,
+                        heartbeat_at=now,
+                        updated_at=now,
+                        mlflow_close_status=close_run,
+                    )
+                ).rowcount
+                if updated != 1 or (abort_if is not None and abort_if()):
+                    transaction.rollback()
+                    return False
+                transaction.commit()
+            except BaseException:
+                # Cortado a mitad de la transacción (p. ej. SIGTERM, ver Worker.request_stop):
+                # se descarta la conexión en vez de reutilizarla a medio protocolo; lo que no
+                # llegó a COMMIT se deshace al cerrarse. Quien llama relee el estado real.
+                conn.invalidate()
+                raise
         return True
 
     def pending_run_closes(self) -> list[tuple[int, str, str]]:
