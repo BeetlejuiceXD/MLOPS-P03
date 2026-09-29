@@ -20,11 +20,26 @@ class EpochMetrics:
 
 
 def is_better(candidate: EpochMetrics, current_best: EpochMetrics) -> bool:
+    """Selecciona qué checkpoint guardar (accuracy -> macro-F1 -> val_loss,
+    empate a 4 decimales en cada paso). No controla la paciencia del early
+    stopping — eso es `accuracy_improved`, deliberadamente más estricto."""
     if round(candidate.val_accuracy, 4) != round(current_best.val_accuracy, 4):
         return candidate.val_accuracy > current_best.val_accuracy
     if round(candidate.val_macro_f1, 4) != round(current_best.val_macro_f1, 4):
         return candidate.val_macro_f1 > current_best.val_macro_f1
-    return candidate.val_loss < current_best.val_loss
+    if round(candidate.val_loss, 4) != round(current_best.val_loss, 4):
+        return candidate.val_loss < current_best.val_loss
+    # Empate total a 4 decimales en los tres campos. Sin run_id (fuera de
+    # alcance de D02-03), no hay como desempatar mas -> se conserva el actual.
+    return False
+
+
+def accuracy_improved(candidate: EpochMetrics, reference: EpochMetrics) -> bool:
+    """Unico criterio que alimenta el contador de paciencia (#33: early
+    stopping monitorea val_accuracy). Deliberadamente ignora macro-F1 y
+    val_loss: que el checkpoint elegido mejore por esos campos no debe
+    mantener vivo un entrenamiento cuya accuracy esta estancada."""
+    return round(candidate.val_accuracy, 4) > round(reference.val_accuracy, 4)
 
 
 def should_stop(epochs_without_improvement: int, patience: int) -> bool:

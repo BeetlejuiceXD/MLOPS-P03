@@ -2,7 +2,7 @@
 
 import pytest
 
-from trainer.metrics import EpochMetrics, is_better, should_stop
+from trainer.metrics import EpochMetrics, accuracy_improved, is_better, should_stop
 
 
 def _metrics(**overrides):
@@ -53,3 +53,36 @@ def test_tie_tolerance_is_four_decimals_not_coarser():
 )
 def test_should_stop_boundary_is_exactly_patience(epochs_without_improvement, expected):
     assert should_stop(epochs_without_improvement, patience=3) is expected
+
+
+# --- B2: el desempate por val_loss tambien respeta 4 decimales ---
+
+
+def test_val_loss_tie_break_respects_four_decimal_tolerance():
+    best = _metrics(val_accuracy=0.80, val_macro_f1=0.80, val_loss=0.40002)
+    candidate = _metrics(val_accuracy=0.80, val_macro_f1=0.80, val_loss=0.40001)
+    assert not is_better(candidate, best)
+    assert not is_better(best, candidate)
+
+
+def test_val_loss_beyond_four_decimals_still_decides():
+    best = _metrics(val_accuracy=0.80, val_macro_f1=0.80, val_loss=0.4500)
+    candidate = _metrics(val_accuracy=0.80, val_macro_f1=0.80, val_loss=0.3500)
+    assert is_better(candidate, best)
+
+
+# --- B3: accuracy_improved es el UNICO criterio de paciencia ---
+
+
+def test_accuracy_improved_true_when_strictly_higher():
+    assert accuracy_improved(_metrics(val_accuracy=0.81), _metrics(val_accuracy=0.80))
+
+
+def test_accuracy_improved_false_when_tied_at_four_decimals():
+    assert not accuracy_improved(_metrics(val_accuracy=0.80001), _metrics(val_accuracy=0.80004))
+
+
+def test_accuracy_improved_false_when_macro_f1_or_loss_improve_but_accuracy_does_not():
+    reference = _metrics(val_accuracy=0.80, val_macro_f1=0.50, val_loss=0.50)
+    better_secondary_metrics = _metrics(val_accuracy=0.80, val_macro_f1=0.95, val_loss=0.05)
+    assert not accuracy_improved(better_secondary_metrics, reference)

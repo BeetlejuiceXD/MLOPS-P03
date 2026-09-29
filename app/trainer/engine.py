@@ -25,19 +25,28 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 from trainer.dataset import TrainingDataset, TrainingSample
-from trainer.metrics import EpochMetrics, is_better, should_stop
+from trainer.metrics import EpochMetrics, accuracy_improved, is_better, should_stop
 from training.class_map import CLASS_MAP
 from training.config import TrainingConfig
 from training.model import build_model
 from training.preprocessing import preprocess_image
 
 
+def _normalize_seed(seed: int) -> int:
+    """Adapta la seed del run al dominio [0, 2**32) que exige NumPy (y, por
+    consistencia entre backends, también random/PyTorch/DataLoader) — sin
+    tocar la seed original que queda registrada en TrainingConfig/MLflow.
+    Determinista: la misma seed de entrada siempre da el mismo resultado."""
+    return seed % 2**32
+
+
 def seed_everything(seed: int) -> None:
     """Fija random, NumPy y PyTorch. Seed del *run*, independiente de la seed
     42 del manifest (#33)."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    normalized = _normalize_seed(seed)
+    random.seed(normalized)
+    np.random.seed(normalized)
+    torch.manual_seed(normalized)
 
 
 class _SampleDataset(Dataset):
@@ -59,7 +68,7 @@ def _make_loader(
     samples: tuple[TrainingSample, ...], config: TrainingConfig, *, train: bool
 ) -> DataLoader:
     dataset = _SampleDataset(samples, config, train=train)
-    generator = torch.Generator().manual_seed(config.seed)
+    generator = torch.Generator().manual_seed(_normalize_seed(config.seed))
     return DataLoader(dataset, batch_size=config.batch_size, shuffle=train, generator=generator)
 
 
@@ -118,6 +127,7 @@ def train(
     history: list[EpochMetrics] = []
     best: EpochMetrics | None = None
     best_state: dict[str, torch.Tensor] | None = None
+    best_val_accuracy_metrics: EpochMetrics | None = None  # solo alimenta la paciencia
     epochs_without_improvement = 0
     stopped_early = False
 
@@ -148,8 +158,17 @@ def train(
         )
         history.append(metrics)
 
+        # Checkpoint: puede desempatar por macro-F1/val_loss (is_better).
         if best is None or is_better(metrics, best):
             best, best_state = metrics, copy.deepcopy(model.state_dict())
+
+        # Paciencia: depende SOLO de val_accuracy (#33) - independiente de
+        # cuál metrics quedó como `best` arriba, para que una mejora de
+        # macro-F1/val_loss nunca mantenga vivo un entrenamiento cuya
+        # accuracy está estancada.
+        accuracy_baseline = best_val_accuracy_metrics
+        if accuracy_baseline is None or accuracy_improved(metrics, accuracy_baseline):
+            best_val_accuracy_metrics = metrics
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1

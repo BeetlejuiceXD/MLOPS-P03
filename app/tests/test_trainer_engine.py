@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from trainer.dataset import build_fixture_dataset
-from trainer.engine import _build_optimizer, _make_loader, train
+from trainer.engine import _build_optimizer, _make_loader, seed_everything, train
 from training.config import TrainingConfig
 from training.model import build_model
 
@@ -134,3 +134,52 @@ def test_shuffle_order_depends_on_seed(dataset):
     order_b = [labels for _, labels in _make_loader(dataset.train, _config(seed=2), train=True)]
 
     assert not all(torch.equal(a, b) for a, b in zip(order_a, order_b, strict=True))
+
+
+# --- B1: seeds fuera del dominio de NumPy (validas segun TrainingConfig, #33/#51) ---
+
+
+@pytest.mark.parametrize("seed", [-1, 4_294_967_296])
+def test_seed_everything_accepts_seeds_outside_numpy_domain(seed):
+    seed_everything(seed)  # no debe lanzar ValueError
+
+
+@pytest.mark.parametrize("seed", [-1, 4_294_967_296])
+def test_shuffle_generator_accepts_seeds_outside_numpy_domain(seed, dataset):
+    loader = _make_loader(dataset.train, _config(seed=seed), train=True)
+    next(iter(loader))  # no debe lanzar
+
+
+@pytest.mark.parametrize("seed", [-1, 4_294_967_296])
+def test_train_runs_end_to_end_with_out_of_range_seed(seed, dataset):
+    train(_config(seed=seed), dataset)  # no debe lanzar ValueError (smoke)
+
+
+def test_out_of_range_seed_keeps_original_value_on_config():
+    # seed_everything/_make_loader normalizan internamente, pero la seed
+    # registrada en TrainingConfig (para MLflow/evidencia) no cambia.
+    config = _config(seed=-1)
+    assert config.seed == -1
+
+
+# --- B3: la paciencia depende solo de val_accuracy, no de macro-F1/val_loss ---
+
+
+def test_early_stopping_ignores_macro_f1_and_loss_improvement(monkeypatch, dataset):
+    """Reproduce el caso de la auditoria: val_accuracy constante en 0.8
+    mientras macro-F1/val_loss mejoran cada epoca no debe reiniciar la
+    paciencia (#33: early stopping monitorea val_accuracy)."""
+    config = _config(patience=3, max_epochs=10)
+    fake_metrics = iter((0.5 - 0.01 * i, 0.8, 0.5 + 0.01 * i) for i in range(10))
+
+    def fake_evaluate(model, loader, criterion):
+        return next(fake_metrics)
+
+    monkeypatch.setattr("trainer.engine._evaluate", fake_evaluate)
+
+    result = train(config, dataset)
+
+    assert result.stopped_early
+    assert len(result.history) == config.patience + 1
+    assert all(m.val_accuracy == 0.8 for m in result.history)
+    assert result.best.epoch == len(result.history)
