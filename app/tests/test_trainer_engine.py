@@ -12,7 +12,14 @@ from trainer.engine import _build_optimizer, _make_loader, train
 from training.config import TrainingConfig
 from training.model import build_model
 
-BASE = dict(seed=7, pretrained=False, batch_size=8, max_epochs=10, image_size=128, patience=3)
+BASE = {
+    "seed": 7,
+    "pretrained": False,
+    "batch_size": 8,
+    "max_epochs": 10,
+    "image_size": 128,
+    "patience": 3,
+}
 
 
 def _config(**overrides):

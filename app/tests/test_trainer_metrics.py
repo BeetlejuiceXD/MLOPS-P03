@@ -6,10 +6,15 @@ from trainer.metrics import EpochMetrics, is_better, should_stop
 
 
 def _metrics(**overrides):
-    base = dict(
-        epoch=1, train_loss=0.5, train_accuracy=0.8, val_loss=0.4,
-        val_accuracy=0.8, val_macro_f1=0.8, learning_rate=1e-3,
-    )
+    base = {
+        "epoch": 1,
+        "train_loss": 0.5,
+        "train_accuracy": 0.8,
+        "val_loss": 0.4,
+        "val_accuracy": 0.8,
+        "val_macro_f1": 0.8,
+        "learning_rate": 1e-3,
+    }
     return EpochMetrics(**{**base, **overrides})
 
 
@@ -43,6 +48,8 @@ def test_tie_tolerance_is_four_decimals_not_coarser():
     assert is_better(candidate, best)
 
 
-@pytest.mark.parametrize(("epochs_without_improvement", "expected"), [(2, False), (3, True), (4, True)])
+@pytest.mark.parametrize(
+    ("epochs_without_improvement", "expected"), [(2, False), (3, True), (4, True)]
+)
 def test_should_stop_boundary_is_exactly_patience(epochs_without_improvement, expected):
     assert should_stop(epochs_without_improvement, patience=3) is expected
