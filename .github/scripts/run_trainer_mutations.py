@@ -66,7 +66,7 @@ MUTANTS = [
     Mutant(
         "shuffle ignora seed",
         E,
-        "generator = torch.Generator().manual_seed(config.seed)",
+        "generator = torch.Generator().manual_seed(_normalize_seed(config.seed))",
         "generator = torch.Generator().manual_seed(0)",
         ENGINE_TESTS,
     ),
