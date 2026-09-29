@@ -145,6 +145,35 @@ def mlflow_run(run_id: str) -> dict:
     return body["run"]  # type: ignore[index]
 
 
+MLFLOW_TERMINAL = ("FINISHED", "FAILED", "KILLED")
+
+
+def wait_run_status(run_id: str, expected: str, timeout: float = 60) -> dict:
+    """Espera acotada a que ESE run de MLflow llegue a `expected`.
+
+    El worker escribe primero el estado terminal en MariaDB y después cierra el run en
+    MLflow, así que justo después de ver el job terminado el run puede seguir RUNNING un
+    instante. RUNNING nunca se acepta: si no llega a `expected` antes del timeout, falla;
+    si llega a OTRO estado terminal, falla de inmediato.
+    """
+    deadline = time.monotonic() + timeout
+    last = "sin respuesta"
+    while time.monotonic() < deadline:
+        try:
+            run = mlflow_run(run_id)
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+            last = f"error {type(error).__name__}"
+        else:
+            last = run["info"]["status"]
+            if last == expected:
+                return run
+            if last in MLFLOW_TERMINAL:
+                fail(f"el run {run_id} terminó en {last}, se esperaba {expected}")
+        time.sleep(1)
+    fail(f"Tiempo agotado ({timeout:.0f}s): el run {run_id} sigue en {last} ≠ {expected}")
+    return {}
+
+
 def run_tags(run: dict) -> dict:
     return {tag["key"]: tag["value"] for tag in run["data"].get("tags", [])}
 
@@ -178,9 +207,8 @@ def main() -> None:
     )
     check(done["progress"] == {"epoch": 10, "total_epochs": 10}, f"progreso: {done['progress']}")
     check(any("Época 10/10" in line for line in logs(ok_id)), "faltan logs por época")
-    run = mlflow_run(done["mlflow_run_id"])
+    run = wait_run_status(done["mlflow_run_id"], "FINISHED")
     tags = run_tags(run)
-    check(run["info"]["status"] == "FINISHED", f"run MLflow: {run['info']['status']}")
     check(tags.get("p3.run_kind") == "controlled_task", f"tags: {tags}")
     check(tags.get("p3.job_id") == str(ok_id), f"tags: {tags}")
     EVIDENCE["succeeded"] = {
@@ -196,7 +224,7 @@ def main() -> None:
     failed = wait_for("fallo controlado", job_in(job["id"], "succeeded", "failed", "cancelled"))
     check(failed["status"] == "failed", f"el fallo controlado terminó en {failed['status']}")
     check("Fallo controlado" in failed["error"], f"error: {failed['error']}")
-    check(mlflow_run(failed["mlflow_run_id"])["info"]["status"] == "FAILED", "run no FAILED")
+    wait_run_status(failed["mlflow_run_id"], "FAILED")
     EVIDENCE["failed"] = {"job_id": failed["id"], "error": failed["error"]}
 
     # 5. Cancelación en ejecución.
@@ -208,7 +236,7 @@ def main() -> None:
     )
     cancelled = wait_for("cancelado", job_in(job["id"], "cancelled", "succeeded", "failed"))
     check(cancelled["status"] == "cancelled", f"la cancelación terminó en {cancelled['status']}")
-    check(mlflow_run(cancelled["mlflow_run_id"])["info"]["status"] == "KILLED", "run no KILLED")
+    wait_run_status(cancelled["mlflow_run_id"], "KILLED")
     status, _ = http("POST", f"{API}/training/jobs/{job['id']}/cancel")
     check(status == 409, f"cancelar un job terminado debía dar 409 y dio {status}")
     EVIDENCE["cancelled"] = {"job_id": cancelled["id"], "progress": cancelled["progress"]}
