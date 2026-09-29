@@ -1,10 +1,9 @@
 {
   "contract": "training_job",
-  "valid": true,
-  "why": "Cancelado antes de iniciar",
+  "valid": false,
+  "why": "Todo job declara su task",
   "payload": {
     "id": 1,
-    "task": "controlled",
     "dataset_version": "v0.1.1",
     "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "config": {
@@ -26,11 +25,11 @@
     },
     "cancel_requested": false,
     "created_at": "2026-09-27T17:00:00Z",
-    "status": "cancelled",
+    "status": "queued",
     "progress": null,
     "mlflow_run_id": null,
     "error": null,
     "started_at": null,
-    "finished_at": "2026-09-27T17:00:30Z"
+    "finished_at": null
   }
 }

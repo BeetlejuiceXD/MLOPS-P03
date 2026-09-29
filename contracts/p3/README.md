@@ -24,6 +24,7 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/training/jobs` | `{ jobs: training_job[] }` | Hannah (D02-05) |
 | `GET /api/training/jobs/:id` | `training_job` | Hannah (D02-05) |
 | `GET /api/training/jobs/:id/logs` | `job_logs` | Hannah (D02-05) |
+| `POST /api/training/jobs/:id/cancel` | `training_job` (`queued` → `cancelled`; `running` → `cancel_requested`) | Hannah (D02-05) |
 | `GET /api/experiments/runs` | `experiment_runs_response` (proxy de MLflow, sin datos fijos) | Hannah (D04) |
 | `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED) | Ale |
 | `GET /api/models` | `models_response` | Hannah (D06) |
@@ -41,6 +42,7 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | `training_config` | Campos y rangos congelados en #33, sin restricciones adicionales: `learning_rate` en (1e-5, 1e-2]; `seed` obligatoria y entera (cualquier valor); `patience` y `max_epochs` con rangos independientes; `hidden_dim` fijo en 128; campos desconocidos rechazados. |
 | `manifest_summary` | Seed 42; clases `cat`, `dog`; cada split ±5 pp de 70/20/10 medido en crops; cada clase presente en val y test; `crops_per_class` suma `crops`. |
 | `training_job` | Máquina de estados `queued → running → succeeded \| failed \| cancelled`; sin `mlflow_run_id` en `queued` (no se fabrican IDs); `succeeded` exige run; `failed` exige error; `total_epochs = max_epochs`. |
+| `create_training_job_request` | `task` obligatoria: `controlled` (tarea sintética de D02-05, sin datos ni entrenamiento) o `training` (D03-03: la API exige release elegible y manifest oficial congelado, si no responde 409); `controlled.fail_at_epoch` solo con `controlled` y ≤ `max_epochs`. |
 | `experiment_runs_response` | Solo `p3-cnn-classifier`; tags de trazabilidad obligatorios (`git_commit`, `dvc_release`, `dvc_images_md5`, `dvc_annotations_md5`, `dvc_release_hash`, `manifest_version`, `manifest_hash`, `classes`, `seed`, `job_id`); `tags.seed = params.seed`; `best_epoch` es la de mayor `val_accuracy` (restaurar el mejor, no el último) y `best_val_accuracy`, `best_val_macro_f1` y `best_val_loss` son los de `history[best_epoch]` (tolerancia 1e-4); sin métricas de test. |
 | `evaluation_response` | `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
 | `models_response` | `semver` propio del modelo (no del dataset); `s3_key` bajo `models/p3-cnn-classifier/<semver>/`; `sha256` hex de 64; `published` exige `version_id` y `published_at`. |

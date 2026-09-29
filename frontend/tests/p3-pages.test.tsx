@@ -185,11 +185,14 @@ describe("errores y respuestas incompatibles", () => {
     expect(screen.queryByTestId("p3-content")).not.toBeInTheDocument();
   });
 
-  it("Training no muestra el formulario si una de sus tres fuentes falla", async () => {
+  it("D02-05: si falla el manifest, Training bloquea solo el entrenamiento real", async () => {
     mockApi({ ...TRAINING_READY, "/api/manifest": { status: 503, body: { error: "x" } } });
     renderAt("/ml/training");
-    expect(await screen.findByText("El servidor respondió con estado 503.")).toBeInTheDocument();
-    expect(screen.queryByTestId("p3-content")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("p3-state-blocked")).toHaveTextContent(
+      "El servidor respondió con estado 503."
+    );
+    // La tarea controlada no depende del manifest oficial (#45).
+    expect(screen.getByRole("button", { name: "Encolar job" })).toBeInTheDocument();
   });
 });
 

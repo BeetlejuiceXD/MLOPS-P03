@@ -157,6 +157,30 @@ services:
       - ./app/splits:/app/splits:ro
     restart: on-failure:5
 
+  # D02-05: ejecuta los jobs de entrenamiento fuera del request HTTP. Hace polling de
+  # training_jobs en MariaDB (tablas de la migración del backend; espera a que existan),
+  # registra runs en MLflow y persiste progreso, logs y errores. Un job interrumpido
+  # (SIGTERM o worker caído) termina como failed con motivo; nunca se reejecuta solo.
+  trainer-worker:
+    build: ./app
+    command: ["python", "-m", "trainer_worker.main"]
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-env
+      TRAINER_POLL_SECONDS: ${TRAINER_POLL_SECONDS:-2}
+      TRAINER_CONTROLLED_EPOCH_SECONDS: ${TRAINER_CONTROLLED_EPOCH_SECONDS:-0.5}
+      TRAINER_STALE_AFTER_SECONDS: ${TRAINER_STALE_AFTER_SECONDS:-60}
+      # Con MLflow caído, cada intento falla rápido y el cierre queda pendiente para la
+      # siguiente vuelta, en vez de bloquear el worker minutos en reintentos HTTP.
+      MLFLOW_HTTP_REQUEST_MAX_RETRIES: "2"
+      MLFLOW_HTTP_REQUEST_TIMEOUT: "10"
+    stop_grace_period: 20s
+    restart: on-failure:5
+
   # P2-52: agente del Copilot (LLM + herramientas MCP de solo lectura). Misma
   # imagen que `app`, otro comando. No se publica ningún puerto: solo nginx
   # (servicio `frontend`) lo alcanza, en /copilot-api/. Sin ANTHROPIC_API_KEY

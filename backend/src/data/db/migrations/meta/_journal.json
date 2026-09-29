@@ -22,6 +22,20 @@
       "when": 1788151427164,
       "tag": "0002_needy_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1790554100052,
+      "tag": "0003_training_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1790632082558,
+      "tag": "0004_training_jobs_mlflow_close",
+      "breakpoints": true
     }
   ]
 }

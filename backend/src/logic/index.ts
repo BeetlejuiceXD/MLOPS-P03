@@ -41,7 +41,7 @@ export type {
 export { buildDashboardSummary, buildThumbnailUrl } from './dashboard.builder.js';
 export { getDashboardSummary } from './dashboard.service.js';
 // Errores tipados: la capa UI los mapea a códigos HTTP (SPEC-VALID-001).
-export { NotFoundError, ValidationError } from './errors.js';
+export { ConflictError, NotFoundError, ValidationError } from './errors.js';
 export type { HealthStatus } from './health.service.js';
 export { checkHealth } from './health.service.js';
 export type { ImageFile } from './image-file.service.js';
@@ -60,3 +60,14 @@ export type { ParsedSearchQuery, SearchOperator } from './search-query.parser.js
 export { parseSearchQuery } from './search-query.parser.js';
 export { createSettingsService } from './settings.service.js';
 export { initializeApplication } from './startup.service.js';
+export { mariaDbTrainingJobRepository } from './training-jobs.repository.js';
+// Jobs de entrenamiento P3 (D02-05)
+export type {
+  TrainingJobRepository,
+  TrainingJobsService,
+} from './training-jobs.service.js';
+export {
+  createEligibilityGate,
+  createTrainingJobsService,
+  officialSourcesUnavailableGate,
+} from './training-jobs.service.js';

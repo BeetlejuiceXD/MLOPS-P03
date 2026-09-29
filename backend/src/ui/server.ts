@@ -5,6 +5,7 @@ import {
   checkHealth,
   createAnnotationForImage,
   createSettingsService,
+  createTrainingJobsService,
   deleteAnnotation,
   deleteImage,
   exportCocoDataset,
@@ -15,13 +16,15 @@ import {
   idParamSchema,
   imageSearchSchema,
   initializeApplication,
-  NotFoundError,
+  mariaDbTrainingJobRepository,
+  officialSourcesUnavailableGate,
   searchImages,
   setImageStatus,
   updateAnnotation,
   uploadImage,
-  ValidationError,
 } from '../logic/index.js';
+import { sendError } from './http-errors.js';
+import { createTrainingRouter } from './training.routes.js';
 
 /**
  * SPEC-VALID-001 — Valida un route param de id (`:imageId`, `:annotationId`)
@@ -31,27 +34,6 @@ import {
 function parseIdParam(raw: unknown): number | null {
   const result = idParamSchema.safeParse(raw);
   return result.success ? result.data : null;
-}
-
-/**
- * SPEC-VALID-001 — Traduce un error de la capa Logic al código HTTP correcto.
- *
- * El mapeo se hace por clase de error, no comparando el texto del mensaje,
- * para que un cambio de redacción no altere la semántica de la respuesta.
- */
-function sendError(res: express.Response, error: unknown, fallback: string): void {
-  if (error instanceof NotFoundError) {
-    res.status(404).json({ error: error.message });
-    return;
-  }
-
-  if (error instanceof ValidationError) {
-    res.status(400).json({ error: error.message });
-    return;
-  }
-
-  console.error(fallback, error);
-  res.status(500).json({ error: fallback });
 }
 
 /**
@@ -67,6 +49,15 @@ const port = env.PORT;
 
 app.use(express.json());
 const settingsService = createSettingsService(env.PIPELINE_CONFIG_ROOT);
+
+// D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`.
+// Hasta D03-01/D03-03 el training real queda cerrado (solo tareas controladas).
+app.use(
+  '/training',
+  createTrainingRouter(
+    createTrainingJobsService(mariaDbTrainingJobRepository, officialSourcesUnavailableGate),
+  ),
+);
 
 app.get('/settings', async (_req, res) => {
   try {

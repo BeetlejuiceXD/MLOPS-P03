@@ -85,11 +85,40 @@ export const TRAINING_CONFIG_DEFAULTS: Omit<TrainingConfig, 'seed'> = {
   dropout: 0,
 };
 
-export const createTrainingJobRequestSchema = z.strictObject({
-  dataset_version: datasetVersionSchema,
-  manifest_hash: sha256Schema,
-  config: trainingConfigSchema,
-});
+/**
+ * D02-05: `controlled` es una tarea sintética que recorre la máquina de estados, registra
+ * un run de MLflow etiquetado y no entrena; `training` (D03-03) exige además release
+ * elegible y manifest oficial congelado, comprobados por la API antes de encolar.
+ */
+export const trainingJobTasks = ['controlled', 'training'] as const;
+
+export const createTrainingJobRequestSchema = z
+  .strictObject({
+    task: z.enum(trainingJobTasks),
+    dataset_version: datasetVersionSchema,
+    manifest_hash: sha256Schema,
+    config: trainingConfigSchema,
+    controlled: z.strictObject({ fail_at_epoch: positiveInt.nullable() }).optional(),
+  })
+  .superRefine((request, ctx) => {
+    if (request.controlled === undefined) return;
+    if (request.task !== 'controlled') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['controlled'],
+        message: 'Las opciones de la tarea controlada solo aplican a task=controlled',
+      });
+    }
+    const failAt = request.controlled.fail_at_epoch;
+    if (failAt !== null && failAt > request.config.max_epochs) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['controlled', 'fail_at_epoch'],
+        message: 'fail_at_epoch no puede superar config.max_epochs',
+      });
+    }
+  });
+export type CreateTrainingJobRequest = z.infer<typeof createTrainingJobRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Releases: forma de `python -m presentation.release_resolver --all` (#40).
@@ -208,6 +237,7 @@ export const trainingJobStatuses = [
 export const trainingJobSchema = z
   .strictObject({
     id: positiveInt,
+    task: z.enum(trainingJobTasks),
     status: z.enum(trainingJobStatuses),
     dataset_version: datasetVersionSchema,
     manifest_hash: sha256Schema,
@@ -215,6 +245,7 @@ export const trainingJobSchema = z
     progress: z.strictObject({ epoch: nonNegativeInt, total_epochs: positiveInt }).nullable(),
     mlflow_run_id: mlflowRunIdSchema.nullable(),
     error: z.string().min(1).nullable(),
+    cancel_requested: z.boolean(),
     created_at: timestampSchema,
     started_at: timestampSchema.nullable(),
     finished_at: timestampSchema.nullable(),
@@ -554,6 +585,7 @@ export const P3_ENDPOINTS = {
   listTrainingJobs: 'GET /api/training/jobs',
   getTrainingJob: 'GET /api/training/jobs/:id',
   getTrainingJobLogs: 'GET /api/training/jobs/:id/logs',
+  cancelTrainingJob: 'POST /api/training/jobs/:id/cancel',
   listRuns: 'GET /api/experiments/runs',
   getEvaluation: 'GET /api/evaluation',
   listModels: 'GET /api/models',

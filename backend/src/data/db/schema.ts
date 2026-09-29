@@ -2,11 +2,14 @@ import { relations } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  char,
   double,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
+  text,
   timestamp,
   uniqueIndex,
   varchar,
@@ -220,3 +223,59 @@ export type NewCategory = typeof categories.$inferInsert;
 
 export type Annotation = typeof annotations.$inferSelect;
 export type NewAnnotation = typeof annotations.$inferInsert;
+
+/**
+ * D02-05 — Jobs de entrenamiento P3. La API los crea en `queued`; `trainer-worker`
+ * los toma por polling (sin otra tecnología de colas) y persiste progreso, logs,
+ * error y run de MLflow. El worker usa `worker_id`/`heartbeat_at` para no duplicar
+ * un job interrumpido al reiniciarse.
+ */
+export const trainingJobs = mysqlTable(
+  'training_jobs',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    task: mysqlEnum('task', ['controlled', 'training']).notNull(),
+    status: mysqlEnum('status', ['queued', 'running', 'succeeded', 'failed', 'cancelled'])
+      .notNull()
+      .default('queued'),
+    datasetVersion: varchar('dataset_version', { length: 32 }).notNull(),
+    manifestHash: char('manifest_hash', { length: 64 }).notNull(),
+    // TrainingConfig efectivo, ya validado por el contrato (contracts/p3).
+    config: json('config').notNull(),
+    // Solo tarea controlada: época en la que falla a propósito (prueba de fallos).
+    controlledFailAtEpoch: int('controlled_fail_at_epoch', { unsigned: true }),
+    progressEpoch: int('progress_epoch', { unsigned: true }),
+    totalEpochs: int('total_epochs', { unsigned: true }),
+    mlflowRunId: char('mlflow_run_id', { length: 32 }),
+    // Estado que el run de MLflow aún debe recibir (FINISHED/FAILED/KILLED). Se escribe
+    // en el mismo UPDATE que cierra el job y el worker lo reintenta hasta que MLflow
+    // responde; así un run nunca se queda RUNNING si MLflow estaba caído (#53, B2).
+    mlflowCloseStatus: mysqlEnum('mlflow_close_status', ['FINISHED', 'FAILED', 'KILLED']),
+    error: text('error'),
+    cancelRequested: boolean('cancel_requested').notNull().default(false),
+    workerId: varchar('worker_id', { length: 128 }),
+    heartbeatAt: timestamp('heartbeat_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    startedAt: timestamp('started_at'),
+    finishedAt: timestamp('finished_at'),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => [index('training_jobs_status_created_idx').on(table.status, table.createdAt)],
+);
+
+export const trainingJobLogs = mysqlTable(
+  'training_job_logs',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    jobId: bigint('job_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => trainingJobs.id, { onDelete: 'cascade' }),
+    ts: timestamp('ts', { fsp: 3 }).notNull().defaultNow(),
+    level: mysqlEnum('level', ['info', 'warning', 'error']).notNull(),
+    message: text('message').notNull(),
+  },
+  (table) => [index('training_job_logs_job_idx').on(table.jobId, table.id)],
+);
+
+export type TrainingJobRow = typeof trainingJobs.$inferSelect;
+export type TrainingJobLogRow = typeof trainingJobLogs.$inferSelect;
