@@ -408,6 +408,94 @@ def test_sigterm_after_the_update_but_before_commit_is_not_succeeded(engine, job
     assert sent == [True]  # la señal sí llegó con el UPDATE ya ejecutado
 
 
+def _sigterm_in_success_finish(monkeypatch, job_store, *, after_check=False, after_commit=False):
+    """Envuelve store.finish (solo el cierre a succeeded) para mandar un SIGTERM real
+    justo después del último abort_if o justo después del COMMIT."""
+    original_finish = job_store.finish
+
+    def finish(*args, **kwargs):
+        if args[2] != "succeeded":
+            return original_finish(*args, **kwargs)
+        if after_check:
+            check = kwargs["abort_if"]
+
+            def check_then_sigterm():
+                result = check()  # el último check pasa (aún no hay parada)...
+                signal.raise_signal(signal.SIGTERM)  # ...y la señal llega justo después
+                return result
+
+            kwargs["abort_if"] = check_then_sigterm
+        committed = original_finish(*args, **kwargs)
+        if after_commit:
+            signal.raise_signal(signal.SIGTERM)
+        return committed
+
+    monkeypatch.setattr(job_store, "finish", finish)
+
+
+def test_sigterm_after_the_last_check_but_before_commit_is_not_succeeded(
+    engine, job_store, tracking, monkeypatch
+):
+    """Reauditoría B1: abort_if() -> llega SIGTERM -> COMMIT nunca puede dar succeeded."""
+
+    def install(_job_id):
+        _sigterm_in_success_finish(monkeypatch, job_store, after_check=True)
+
+    _assert_interrupted_not_succeeded(*_run_with_real_sigterm(engine, job_store, tracking, install))
+
+
+def test_sigterm_right_before_the_dbapi_commit_is_not_succeeded(engine, job_store, tracking):
+    """La señal llega en el evento `commit` de SQLAlchemy: justo antes del COMMIT real."""
+    from sqlalchemy import event
+
+    armed: list[bool] = []
+    sent: list[bool] = []
+
+    def install(_job_id):
+        def after_execute(_conn, _cursor, statement, parameters, _context, _many):
+            if statement.startswith("UPDATE training_jobs") and "succeeded" in str(parameters):
+                armed.append(True)  # el UPDATE a succeeded ya corrió (y su abort_if pasó)
+
+        def before_commit(_conn):
+            if armed and not sent:
+                sent.append(True)
+                signal.raise_signal(signal.SIGTERM)
+
+        event.listen(engine, "after_cursor_execute", after_execute)
+        event.listen(engine, "commit", before_commit)
+
+    result = _run_with_real_sigterm(engine, job_store, tracking, install)
+    assert sent == [True]
+    _assert_interrupted_not_succeeded(*result)
+
+
+def test_sigterm_after_the_commit_keeps_the_persisted_success(
+    engine, job_store, tracking, monkeypatch
+):
+    """Límite: si el COMMIT ya se hizo, el éxito está persistido; el SIGTERM solo detiene
+    el worker. Job y run quedan coherentes (succeeded/FINISHED), sin mezclas."""
+    job_id = _insert(engine)
+    worker = _worker(job_store, tracking)
+    received: list[str] = []
+
+    def handler(_signum, _frame):
+        received.append(_row(engine, job_id).status)
+        worker.request_stop()
+
+    _sigterm_in_success_finish(monkeypatch, job_store, after_commit=True)
+    previous = signal.signal(signal.SIGTERM, handler)
+    try:
+        status = worker.run_once()
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+    row = _row(engine, job_id)
+    assert received == ["succeeded"]  # llegó con el COMMIT ya hecho
+    assert (status, row.status) == ("succeeded", "succeeded")
+    assert _mlflow_run(tracking, row.mlflow_run_id).info.status == "FINISHED"
+    assert worker.stopping
+
+
 def test_job_taken_by_another_worker_is_not_overwritten(engine, job_store, tracking):
     """Si otro worker ya lo marcó failed (latido vencido), este no lo pisa como éxito."""
     job_id = _insert(engine)
