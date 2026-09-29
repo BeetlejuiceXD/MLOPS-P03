@@ -243,6 +243,48 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  short-run-instrumentation:
+    name: Corrida corta instrumentada (D02-06)
+    # D02-06: servicios reales (MariaDB, MinIO, MLflow). Entrena de verdad sobre
+    # el fixture de D02-03 y lo registra en MLflow; comprueba desde el host
+    # que el run, sus tags/params/métricas y el checkpoint son recuperables.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MARIADB_ROOT_PASSWORD: ci-mariadb-${{ github.run_id }}
+      MINIO_ROOT_USER: ci-minio
+      MINIO_ROOT_PASSWORD: ci-minio-${{ github.run_id }}
+      MLFLOW_TRACKING_URI: http://localhost:5000
+      EVIDENCE: ${{ github.workspace }}/short-run-evidence.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.13"
+          enable-cache: true
+          cache-dependency-glob: app/uv.lock
+      - name: Instalar dependencias (app/uv.lock)
+        working-directory: app
+        run: uv sync --locked --no-build
+      - name: Levantar MariaDB, MinIO y MLflow
+        run: docker compose up -d --build --wait --wait-timeout 300 mariadb minio mlflow
+      - name: Entrenar corto y registrar en MLflow
+        working-directory: app
+        run: uv run --locked --no-build python -m tracking.short_run run --evidence "$EVIDENCE"
+      - name: Verificar run, tags, métricas y checkpoint desde el host
+        working-directory: app
+        run: uv run --locked --no-build python -m tracking.short_run check --evidence "$EVIDENCE"
+      - name: Evidencia (IDs, hashes y summary; sin datos sensibles)
+        run: cat "$EVIDENCE"
+      - name: Logs de los servicios
+        if: failure()
+        run: docker compose logs --no-color mlflow mariadb minio
+      - name: Limpiar
+        if: always()
+        run: docker compose down -v
+
   quality-gate:
     name: Quality gate (fixture)
     runs-on: ubuntu-latest
@@ -328,7 +370,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, backend, frontend, compose, mlflow-persistence, training-jobs, quality-gate, quality-gate-prod, app-image]
+    needs: [python, backend, frontend, compose, mlflow-persistence, training-jobs, short-run-instrumentation, quality-gate, quality-gate-prod, app-image]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
