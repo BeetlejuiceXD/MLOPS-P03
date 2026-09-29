@@ -95,8 +95,12 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _device() -> str:
-    return "cuda" if torch.cuda.is_available() else "cpu"
+def _device_of(model: torch.nn.Module) -> str:
+    """Dispositivo real donde quedaron los parámetros del modelo entrenado —
+    nunca una suposición a partir de `torch.cuda.is_available()`. El trainer
+    de D02-03 no mueve el modelo a GPU (fuera de alcance aquí), así que hoy
+    siempre da 'cpu'; queda correcto igual si algún día se entrena en GPU."""
+    return next(model.parameters()).device.type
 
 
 def _peak_memory_mb() -> float:
@@ -216,6 +220,7 @@ def run_short_training(
     run_id = run.info.run_id
     for name, value in config.model_dump().items():
         client.log_param(run_id, name, value)
+    client.log_param(run_id, "classes", ",".join(classes))
 
     status = "FAILED"
     duration = 0.0
@@ -237,7 +242,7 @@ def run_short_training(
         client.log_metric(run_id, "best_val_loss", result.best.val_loss)
         client.log_metric(run_id, "duration_seconds", duration)
         client.log_metric(run_id, "peak_memory_mb", _peak_memory_mb())
-        device = _device()
+        device = _device_of(result.model)
         client.set_tag(run_id, "device", device)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -263,16 +268,16 @@ def run_short_training(
             )
             client.log_artifact(run_id, str(tmp_path / "environment.json"), CHECKPOINT_DIR)
 
+        checkpoint_artifact_path = f"{CHECKPOINT_DIR}/model.pt"
+        served_sha = _download_sha256(client, run_id, checkpoint_artifact_path)
+        if served_sha != checkpoint_sha_local:
+            raise RuntimeError("El checkpoint descargado del servidor no coincide con el guardado")
+
         status = "FINISHED"
     except Exception as error:
         client.set_terminated(run_id, "FAILED")
         raise RuntimeError(f"Entrenamiento corto falló; run {run_id} quedó FAILED") from error
     client.set_terminated(run_id, status)
-
-    checkpoint_artifact_path = f"{CHECKPOINT_DIR}/model.pt"
-    served_sha = _download_sha256(client, run_id, checkpoint_artifact_path)
-    if served_sha != checkpoint_sha_local:
-        raise RuntimeError("El checkpoint descargado del servidor no coincide con el guardado")
 
     evidence = Evidence(
         tracking_uri=settings.mlflow_tracking_uri,
@@ -353,6 +358,8 @@ def check_evidence(settings: TrackingSettings, evidence: Evidence) -> list[str]:
             problems.append(
                 f"Métrica {field_name}: {len(history)} puntos, se esperaban {evidence.epochs}"
             )
+        if run.data.params.get("classes") != ",".join(evidence.classes):
+            problems.append("Param classes no coincide con el TrainingConfig efectivo")
 
     best_metrics = {
         "best_epoch": evidence.best_epoch,

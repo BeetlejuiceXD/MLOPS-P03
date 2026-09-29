@@ -14,6 +14,7 @@ import socket
 from pathlib import Path
 
 import pytest
+import torch
 
 from tracking import short_run
 from tracking.settings import P3_EXPERIMENT
@@ -46,6 +47,17 @@ def _client(uri: str):
     from mlflow.tracking import MlflowClient
 
     return MlflowClient(tracking_uri=uri)
+
+
+def _latest_run(uri: str):
+    """El run más reciente del experimento — para casos donde `run` falla
+    antes de escribir evidencia (no hay `run_id` a mano de otra forma)."""
+    client = _client(uri)
+    experiment = client.get_experiment_by_name(P3_EXPERIMENT)
+    runs = client.search_runs(
+        [experiment.experiment_id], order_by=["start_time DESC"], max_results=1
+    )
+    return runs[0]
 
 
 def test_run_then_check_round_trip(file_store, tmp_path):
@@ -227,3 +239,96 @@ def test_check_without_server_is_unavailable_not_success(tmp_path, monkeypatch):
     monkeypatch.setenv("MLFLOW_TRACKING_URI", _closed_port_uri())
 
     assert short_run.main(["check", "--evidence", str(evidence_path)]) == short_run.UNAVAILABLE
+
+
+# --- Bloqueante 1: device es el dispositivo real del modelo, no una suposición ---
+
+
+def test_device_of_reflects_actual_model_placement_not_cuda_availability(monkeypatch):
+    # CUDA "disponible" simulado (sin GPU real): _device_of no debe confiar en
+    # torch.cuda.is_available(), solo en donde quedaron los parámetros del
+    # modelo. No se llama a train()/optimizer aquí a propósito: eso sí
+    # dispara la inicialización real de CUDA y truena sin driver.
+    monkeypatch.setattr("torch.cuda.is_available", lambda: True)
+    model = torch.nn.Linear(4, 2)  # se queda en CPU por default
+
+    assert short_run._device_of(model) == "cpu"
+
+
+# --- Bloqueante 2: FINISHED solo despues de verificar el checkpoint --------------
+
+
+def test_run_leaves_status_failed_if_training_itself_raises(file_store, tmp_path, monkeypatch):
+    def _boom(*args, **kwargs):
+        raise RuntimeError("entrenamiento simulado roto")
+
+    monkeypatch.setattr(short_run, "train", _boom)
+    evidence_path = tmp_path / "evidence.json"
+
+    exit_code = short_run.main(["run", "--evidence", str(evidence_path), "--seed", "1"])
+
+    assert exit_code == short_run.UNAVAILABLE
+    assert not evidence_path.exists()
+    run = _latest_run(file_store)
+    assert run.info.status == "FAILED"
+
+
+def test_run_leaves_status_failed_if_metric_logging_raises(file_store, tmp_path, monkeypatch):
+    from mlflow.tracking import MlflowClient
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("log_metric simulado roto")
+
+    monkeypatch.setattr(MlflowClient, "log_metric", _boom)
+    evidence_path = tmp_path / "evidence.json"
+
+    exit_code = short_run.main(["run", "--evidence", str(evidence_path), "--seed", "1"])
+
+    assert exit_code == short_run.UNAVAILABLE
+    assert not evidence_path.exists()
+    run = _latest_run(file_store)
+    assert run.info.status == "FAILED"
+
+
+def test_run_leaves_status_failed_if_artifact_logging_raises(file_store, tmp_path, monkeypatch):
+    from mlflow.tracking import MlflowClient
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("log_artifact simulado roto")
+
+    monkeypatch.setattr(MlflowClient, "log_artifact", _boom)
+    evidence_path = tmp_path / "evidence.json"
+
+    exit_code = short_run.main(["run", "--evidence", str(evidence_path), "--seed", "1"])
+
+    assert exit_code == short_run.UNAVAILABLE
+    assert not evidence_path.exists()
+    run = _latest_run(file_store)
+    assert run.info.status == "FAILED"
+
+
+def test_run_leaves_status_failed_if_checkpoint_verification_fails(
+    file_store, tmp_path, monkeypatch
+):
+    # El corazon del bloqueante 2: la descarga/verificacion inmediata del
+    # checkpoint pasa DESPUES de que el run pudo haberse marcado FINISHED en
+    # el codigo viejo. Si esto falla, el run debe quedar FAILED, no FINISHED.
+    monkeypatch.setattr(short_run, "_download_sha256", lambda *a, **k: "hash-no-coincide")
+    evidence_path = tmp_path / "evidence.json"
+
+    exit_code = short_run.main(["run", "--evidence", str(evidence_path), "--seed", "1"])
+
+    assert exit_code == short_run.UNAVAILABLE
+    assert not evidence_path.exists()
+    run = _latest_run(file_store)
+    assert run.info.status == "FAILED"
+
+
+# --- Bloqueante 3: classes tambien como param de MLflow -------------------------
+
+
+def test_classes_are_logged_as_mlflow_param(file_store, tmp_path):
+    _, evidence = _run(tmp_path)
+    run = _client(file_store).get_run(evidence["run_id"])
+
+    assert run.data.params["classes"] == ",".join(evidence["classes"])
