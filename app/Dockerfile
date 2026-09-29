@@ -24,6 +24,7 @@ COPY projections/ ./projections/
 COPY copilot/ ./copilot/
 COPY tracking/ ./tracking/
 COPY trainer_worker/ ./trainer_worker/
+COPY trainer/ ./trainer/
 
 # El volumen nombrado reports_data (docker-compose.yml) se inicializa la
 # primera vez con el contenido/dueño de este directorio si ya existe en la
