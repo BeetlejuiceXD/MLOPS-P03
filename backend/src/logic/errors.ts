@@ -36,3 +36,14 @@ export class ConflictError extends Error {
     this.name = 'ConflictError';
   }
 }
+
+/**
+ * D03-03 — Una dependencia necesaria no está disponible todavía (p. ej. el snapshot de
+ * fuentes que publica `trainer-worker`). Se traduce a HTTP 503 con el motivo.
+ */
+export class ServiceUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+  }
+}
