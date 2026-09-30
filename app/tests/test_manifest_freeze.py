@@ -1,8 +1,8 @@
 """D03-01 — auditoría y congelación del manifest P3.
 
-Congela el candidato de D02-04 sin reconstruirlo: `train_val.json` (lo único que
-consume el trainer) y `test.json` (custodia de Ale) son archivos separados, y el
-registro de congelación guarda el sha256 de ambos. La auditoría es independiente
+Congela el candidato de D02-04 sin reconstruirlo en `data/p3/manifest.json`, con el
+contrato `FrozenManifest` que lee Training (D03-03): identidad DVC, `test_split_hash`
+y `crop_id` por partición, versionado con `dvc add`. La auditoría es independiente
 del generador: recalcula grupos (con puentes near-duplicate sin crops), hashes,
 proporciones, clases y el mínimo de originales, y bloquea la congelación ante
 cualquier violación."""
@@ -15,18 +15,20 @@ from pathlib import Path
 import pytest
 import yaml
 from crops.models import Crop
-from manifest.frozen import FrozenManifestError, load_train_val
 
 from policies.models import load_quality_policy
 from presentation.contracts import (
+    FrozenManifest,
     ManifestSplitCounts,
     ManifestSplits,
     ManifestSummary,
     ManifestTargetRatios,
+    frozen_test_split_hash,
 )
 from presentation.manifest_candidate import _dvc_release_hash, _manifest_hash
 from presentation.manifest_freeze import (
     FreezeBlockedError,
+    _audit,
     _image_groups,
     _release_inputs,
     audit_frozen_on_disk,
@@ -112,7 +114,6 @@ def _freeze(crops, assignments, *, duplicate_pairs=(), min_originals=2, summary=
         summary if summary is not None else _summary(crops, assignments),
         assignments,
         crops=crops,
-        file_names={crop.image_id: f"img{crop.image_id}.jpg" for crop in crops},
         duplicate_pairs=list(duplicate_pairs),
         images_md5=IMAGES_MD5,
         annotations_md5=ANNOTATIONS_MD5,
@@ -125,6 +126,22 @@ def _blocked(reason, **kwargs):
         _freeze(**kwargs)
     assert excinfo.value.reason == reason, str(excinfo.value)
     return excinfo.value
+
+
+def _audit_bytes(frozen, manifest, crops):
+    return _audit(
+        frozen.summary,
+        manifest,
+        crops=crops,
+        duplicate_pairs=[],
+        images_md5=IMAGES_MD5,
+        annotations_md5=ANNOTATIONS_MD5,
+        min_originals_per_class=2,
+    )
+
+
+def _dumps(doc) -> bytes:
+    return (json.dumps(doc, sort_keys=True, indent=2) + "\n").encode()
 
 
 # --- congelación válida ---------------------------------------------------------------
@@ -145,33 +162,26 @@ def test_valid_candidate_freezes_with_the_same_identity():
     ManifestSummary.model_validate(frozen.summary.model_dump())
 
 
-def test_train_val_and_test_payloads_are_separate_and_hashed():
-    import hashlib
-
+def test_artifact_is_the_frozen_manifest_contract_read_by_training():
+    """El artefacto es exactamente el documento que espera D03-03 (#65): mismo
+    contrato, mismas claves y el mismo `test_split_hash`."""
     crops, assignments = _dataset()
 
     frozen = _freeze(crops, assignments)
 
-    train_val = json.loads(frozen.train_val)
-    test = json.loads(frozen.test)
-    assert set(train_val["splits"]) == {"train", "val"}
-    assert set(test["splits"]) == {"test"}
-    assert [e["crop_id"] for e in test["splits"]["test"]] == sorted(assignments["test"])
-    assert frozen.record.test_sha256 == hashlib.sha256(frozen.test).hexdigest()
-    assert frozen.record.train_val_sha256 == hashlib.sha256(frozen.train_val).hexdigest()
-    for payload in (train_val, test):
-        assert payload["manifest_hash"] == frozen.summary.manifest_hash
-        assert payload["dataset_version"] == "v0.1.1"
-        assert payload["dvc_release_hash"] == frozen.summary.dvc_release_hash
-    entry = train_val["splits"]["train"][0]
-    assert set(entry) == {
-        "crop_id",
-        "image_id",
-        "annotation_id",
-        "category_name",
-        "file_name",
-        "bbox_pixels",
-    }
+    artifact = FrozenManifest.model_validate_json(frozen.manifest)
+    assert artifact.frozen is True
+    assert artifact.manifest_hash == frozen.summary.manifest_hash
+    assert (artifact.images_md5, artifact.annotations_md5) == (IMAGES_MD5, ANNOTATIONS_MD5)
+    assert artifact.dvc_release_hash == _dvc_release_hash(IMAGES_MD5, ANNOTATIONS_MD5)
+    assert artifact.test_split_hash == frozen_test_split_hash(assignments["test"])
+    for name in SPLITS:
+        assert getattr(artifact.assignments, name) == sorted(assignments[name])
+    # Solo IDs: ninguna caja, archivo ni píxel del test viaja en el artefacto.
+    assert set(json.loads(frozen.manifest)) == set(FrozenManifest.model_fields)
+    assert frozen.record.test_split_hash == artifact.test_split_hash
+    assert frozen.record.manifest_sha256 == hashlib.sha256(frozen.manifest).hexdigest()
+    assert frozen.record.manifest_md5 == hashlib.md5(frozen.manifest).hexdigest()
 
 
 def test_freezing_is_byte_for_byte_deterministic():
@@ -180,8 +190,7 @@ def test_freezing_is_byte_for_byte_deterministic():
     first = _freeze(crops, assignments)
     second = _freeze(list(reversed(crops)), {k: list(reversed(v)) for k, v in assignments.items()})
 
-    assert first.train_val == second.train_val
-    assert first.test == second.test
+    assert first.manifest == second.manifest
     assert first.record == second.record
 
 
@@ -279,6 +288,15 @@ def test_unassigned_crop_blocks_freeze():
     _blocked("coverage", crops=crops, assignments=assignments)
 
 
+def test_unknown_crop_id_blocks_freeze():
+    crops, assignments = _dataset()
+    assignments = {**assignments, "train": [*assignments["train"], 999]}
+    # Resumen y hashes coherentes con un crop 999 que el release real no tiene.
+    summary = _summary([*crops, _crop(999, 999, "cat")], assignments)
+
+    _blocked("coverage", crops=crops, assignments=assignments, summary=summary)
+
+
 def test_tampered_manifest_hash_blocks_freeze():
     crops, assignments = _dataset()
     summary = _summary(crops, assignments)
@@ -309,68 +327,59 @@ def test_summary_counts_disagreeing_with_assignments_block_freeze():
     )
 
 
-# --- escritura, relectura y auditoría desde disco ------------------------------------
+@pytest.mark.parametrize(
+    ("mutate", "reason"),
+    [
+        (lambda d: d.update(test_split_hash="0" * 64), "test_hash_mismatch"),
+        (lambda d: d.update(images_md5="c" * 32 + ".dir"), "identity_mismatch"),
+        (lambda d: d.update(manifest_version="p3-v9.9.9-s42"), "identity_mismatch"),
+        (lambda d: d.update(frozen=False), "artifact_invalid"),
+        (lambda d: d.pop("test_split_hash"), "artifact_invalid"),
+    ],
+    ids=["test_split_hash", "images_md5", "manifest_version", "not_frozen", "missing_field"],
+)
+def test_tampered_artifact_fields_are_rejected(mutate, reason):
+    crops, assignments = _dataset()
+    frozen = _freeze(crops, assignments)
+    doc = json.loads(frozen.manifest)
+    mutate(doc)
+
+    with pytest.raises(FreezeBlockedError) as excinfo:
+        _audit_bytes(frozen, _dumps(doc), crops)
+    assert excinfo.value.reason == reason, str(excinfo.value)
 
 
-def _write(tmp_path, frozen):
-    manifest_dir, reports_dir = tmp_path / "data" / "manifest_p3", tmp_path / "reports"
-    write_frozen_manifest(frozen, manifest_dir=manifest_dir, reports_dir=reports_dir)
-    return manifest_dir, reports_dir
+# --- escritura y auditoría desde disco ------------------------------------------------
+
+
+def _write(tmp_path, frozen, *, dvc=True):
+    manifest_path, reports_dir = tmp_path / "data" / "p3" / "manifest.json", tmp_path / "out"
+    write_frozen_manifest(frozen, manifest_path=manifest_path, reports_dir=reports_dir)
+    if dvc:
+        _write_dvc(manifest_path)
+    return manifest_path, reports_dir
+
+
+def _write_dvc(path):
+    """Lo que deja `dvc add` (mismo formato que usa Training para verificar el md5)."""
+    data = path.read_bytes()
+    dvc = {"outs": [{"md5": hashlib.md5(data).hexdigest(), "size": len(data), "path": path.name}]}
+    path.with_name(path.name + ".dvc").write_text(yaml.safe_dump(dvc), encoding="utf-8")
 
 
 def test_written_files_are_exactly_the_frozen_bytes(tmp_path):
     crops, assignments = _dataset()
     frozen = _freeze(crops, assignments)
 
-    manifest_dir, reports_dir = _write(tmp_path, frozen)
+    manifest_path, reports_dir = _write(tmp_path, frozen, dvc=False)
 
-    assert (manifest_dir / "train_val.json").read_bytes() == frozen.train_val
-    assert (manifest_dir / "test.json").read_bytes() == frozen.test
+    assert manifest_path.read_bytes() == frozen.manifest
     summary = ManifestSummary.model_validate_json(
         (reports_dir / "manifest_p3.json").read_text(encoding="utf-8")
     )
     assert summary.frozen is True
     record = json.loads((reports_dir / "manifest_p3_freeze.json").read_text(encoding="utf-8"))
-    assert record["test_sha256"] == frozen.record.test_sha256
-
-
-def test_trainer_loader_returns_only_train_and_val(tmp_path):
-    crops, assignments = _dataset()
-    manifest_dir, reports_dir = _write(tmp_path, _freeze(crops, assignments))
-    (manifest_dir / "test.json").unlink()  # el trainer nunca necesita el test
-
-    loaded = load_train_val(
-        manifest_dir / "train_val.json", reports_dir / "manifest_p3_freeze.json"
-    )
-
-    assert set(loaded["splits"]) == {"train", "val"}
-    assert len(loaded["splits"]["train"]) == 14
-    assert "test" not in json.dumps(loaded["splits"])
-
-
-def test_trainer_loader_rejects_a_tampered_train_val(tmp_path):
-    crops, assignments = _dataset()
-    manifest_dir, reports_dir = _write(tmp_path, _freeze(crops, assignments))
-    path = manifest_dir / "train_val.json"
-    path.write_bytes(path.read_bytes().replace(b'"dog"', b'"cat"', 1))
-
-    with pytest.raises(FrozenManifestError, match="sha256"):
-        load_train_val(path, reports_dir / "manifest_p3_freeze.json")
-
-
-def test_trainer_loader_rejects_an_unfrozen_record(tmp_path):
-    crops, assignments = _dataset()
-    manifest_dir, reports_dir = _write(tmp_path, _freeze(crops, assignments))
-    record_path = reports_dir / "manifest_p3_freeze.json"
-    record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["frozen"] = False
-    record_path.write_text(json.dumps(record), encoding="utf-8")
-
-    with pytest.raises(FrozenManifestError, match="congelado"):
-        load_train_val(manifest_dir / "train_val.json", record_path)
-
-
-# --- extremo a extremo sobre un release sintético --------------------------------------
+    assert record["manifest_sha256"] == frozen.record.manifest_sha256
 
 
 def _freeze_release(tmp_path, source, policy):
@@ -383,51 +392,68 @@ def _freeze_release(tmp_path, source, policy):
     )
 
 
-def test_end_to_end_freeze_keeps_the_candidate_and_audits_from_disk(tmp_path):
-    source, policy = _balanced_release(tmp_path)
-
-    frozen = _freeze_release(tmp_path, source, policy)
-    again = _freeze_release(tmp_path, source, policy)
-    manifest_dir = tmp_path / "data" / "manifest_p3"
-    write_frozen_manifest(frozen, manifest_dir=manifest_dir, reports_dir=tmp_path / "out")
-
-    assert frozen.train_val == again.train_val and frozen.test == again.test
-    record = audit_frozen_on_disk(
+def _audit_disk(tmp_path, source, policy, manifest_path, reports_dir):
+    return audit_frozen_on_disk(
         "v0.1.1",
         repo_root=tmp_path,
         reports_dir=tmp_path / "reports",
         sources={"v0.1.1": source},
         policy=policy,
-        manifest_dir=manifest_dir,
-        frozen_reports_dir=tmp_path / "out",
+        manifest_path=manifest_path,
+        frozen_reports_dir=reports_dir,
     )
-    assert record == frozen.record
 
 
-def test_audit_from_disk_detects_a_tampered_test_file(tmp_path):
+def _disk_reason(tmp_path, source, policy, manifest_path, reports_dir):
+    with pytest.raises(FreezeBlockedError) as excinfo:
+        _audit_disk(tmp_path, source, policy, manifest_path, reports_dir)
+    return excinfo.value.reason
+
+
+def test_end_to_end_freeze_keeps_the_candidate_and_audits_from_disk(tmp_path):
+    source, policy = _balanced_release(tmp_path)
+
+    frozen = _freeze_release(tmp_path, source, policy)
+    again = _freeze_release(tmp_path, source, policy)
+    manifest_path, reports_dir = _write(tmp_path, frozen)
+
+    assert frozen.manifest == again.manifest
+    assert _audit_disk(tmp_path, source, policy, manifest_path, reports_dir) == frozen.record
+
+
+def test_audit_from_disk_requires_the_dvc_pointer(tmp_path):
     source, policy = _balanced_release(tmp_path)
     frozen = _freeze_release(tmp_path, source, policy)
-    manifest_dir = tmp_path / "data" / "manifest_p3"
-    write_frozen_manifest(frozen, manifest_dir=manifest_dir, reports_dir=tmp_path / "out")
-    test_path = manifest_dir / "test.json"
-    test_path.write_bytes(test_path.read_bytes().replace(b'"dog"', b'"cat"', 1))
+    manifest_path, reports_dir = _write(tmp_path, frozen, dvc=False)
 
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        audit_frozen_on_disk(
-            "v0.1.1",
-            repo_root=tmp_path,
-            reports_dir=tmp_path / "reports",
-            sources={"v0.1.1": source},
-            policy=policy,
-            manifest_dir=manifest_dir,
-            frozen_reports_dir=tmp_path / "out",
-        )
-    assert excinfo.value.reason == "test_hash_mismatch"
+    assert _disk_reason(tmp_path, source, policy, manifest_path, reports_dir) == "dvc_mismatch"
+
+
+def test_audit_from_disk_detects_an_edit_after_dvc_add(tmp_path):
+    source, policy = _balanced_release(tmp_path)
+    manifest_path, reports_dir = _write(tmp_path, _freeze_release(tmp_path, source, policy))
+    manifest_path.write_bytes(manifest_path.read_bytes().replace(b"\n", b"\r\n"))
+
+    assert _disk_reason(tmp_path, source, policy, manifest_path, reports_dir) == "dvc_mismatch"
+
+
+def test_audit_from_disk_detects_a_moved_test_crop_even_with_dvc_updated(tmp_path):
+    """Un crop de test movido a train y el `.dvc` regenerado: el sha256 del registro
+    lo delata antes de interpretar el contenido."""
+    source, policy = _balanced_release(tmp_path)
+    manifest_path, reports_dir = _write(tmp_path, _freeze_release(tmp_path, source, policy))
+    doc = json.loads(manifest_path.read_bytes())
+    doc["assignments"]["train"].append(doc["assignments"]["test"].pop())
+    manifest_path.write_bytes(_dumps(doc))
+    _write_dvc(manifest_path)
+
+    reason = _disk_reason(tmp_path, source, policy, manifest_path, reports_dir)
+    assert reason == "artifact_hash_mismatch"
 
 
 def test_audit_from_disk_detects_a_consistent_manifest_that_is_not_the_candidate(tmp_path):
-    """Archivos, hashes y registro coherentes entre sí, pero con dos originales de la
-    misma clase intercambiados entre train y val: no es el candidato de D02-04."""
+    """Artefacto, `.dvc`, hashes y registro coherentes entre sí, pero con dos grupos
+    de la misma composición intercambiados entre train y val: no es el candidato."""
     source, policy = _balanced_release(tmp_path)
     frozen = _freeze_release(tmp_path, source, policy)
     inputs = _release_inputs(
@@ -438,8 +464,7 @@ def test_audit_from_disk_detects_a_consistent_manifest_that_is_not_the_candidate
         policy=policy,
     )
     by_id = {crop.crop_id: crop for crop in inputs.crops}
-    splits = {**json.loads(frozen.train_val)["splits"], **json.loads(frozen.test)["splits"]}
-    assignments = {name: [e["crop_id"] for e in splits[name]] for name in SPLITS}
+    assignments = {k: list(v) for k, v in json.loads(frozen.manifest)["assignments"].items()}
     split_of = {c: name for name in SPLITS for c in assignments[name]}
     crops_of_image = {}
     for crop in inputs.crops:
@@ -468,57 +493,15 @@ def test_audit_from_disk_detects_a_consistent_manifest_that_is_not_the_candidate
         frozen.summary.model_copy(update={"manifest_hash": swapped_hash, "frozen": False}),
         assignments,
         crops=inputs.crops,
-        file_names=inputs.file_names,
         duplicate_pairs=inputs.duplicate_pairs,
         images_md5=inputs.images_md5,
         annotations_md5=inputs.annotations_md5,
         min_originals_per_class=inputs.min_originals_per_class,
     )
     assert tampered.summary.manifest_hash != frozen.summary.manifest_hash
-    manifest_dir = tmp_path / "data" / "manifest_p3"
-    write_frozen_manifest(tampered, manifest_dir=manifest_dir, reports_dir=tmp_path / "out")
+    manifest_path, reports_dir = _write(tmp_path, tampered)
 
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        audit_frozen_on_disk(
-            "v0.1.1",
-            repo_root=tmp_path,
-            reports_dir=tmp_path / "reports",
-            sources={"v0.1.1": source},
-            policy=policy,
-            manifest_dir=manifest_dir,
-            frozen_reports_dir=tmp_path / "out",
-        )
-    assert excinfo.value.reason == "candidate_drift"
-
-
-def test_audit_from_disk_detects_an_altered_crop_even_with_its_sha256_updated(tmp_path):
-    """Una caja alterada en train_val.json y el sha256 del registro reescrito para
-    que cuadre: la auditoría contrasta cada entrada con los crops reales del release
-    (hueco detectado por la mutación M15)."""
-    source, policy = _balanced_release(tmp_path)
-    frozen = _freeze_release(tmp_path, source, policy)
-    manifest_dir, out = tmp_path / "data" / "manifest_p3", tmp_path / "out"
-    write_frozen_manifest(frozen, manifest_dir=manifest_dir, reports_dir=out)
-    payload = json.loads(frozen.train_val)
-    payload["splits"]["train"][0]["bbox_pixels"] = [0, 0, 9, 9]
-    altered = (json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
-    (manifest_dir / "train_val.json").write_bytes(altered)
-    record_path = out / "manifest_p3_freeze.json"
-    record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["train_val_sha256"] = hashlib.sha256(altered).hexdigest()
-    record_path.write_text(json.dumps(record), encoding="utf-8")
-
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        audit_frozen_on_disk(
-            "v0.1.1",
-            repo_root=tmp_path,
-            reports_dir=tmp_path / "reports",
-            sources={"v0.1.1": source},
-            policy=policy,
-            manifest_dir=manifest_dir,
-            frozen_reports_dir=out,
-        )
-    assert excinfo.value.reason == "crop_mismatch"
+    assert _disk_reason(tmp_path, source, policy, manifest_path, reports_dir) == "candidate_drift"
 
 
 def test_end_to_end_299_originals_after_exclusions_blocks_freeze(tmp_path):
@@ -544,32 +527,27 @@ def test_end_to_end_299_originals_after_exclusions_blocks_freeze(tmp_path):
         _freeze_release(tmp_path, source, _policy(tmp_path, threshold=300))
     assert excinfo.value.reason == "insufficient_originals"
     assert excinfo.value.classes_below_minimum == ["dog"]
-    assert not (tmp_path / "data" / "manifest_p3").exists()
+    assert not (tmp_path / "data" / "p3").exists()
 
 
-# --- etapa DVC --------------------------------------------------------------------------
+# --- artefactos versionados en el repo ------------------------------------------------
 
 
-def test_dvc_stage_versions_train_val_and_test_as_separate_outputs():
-    stage = yaml.safe_load((REPO_ROOT / "dvc.yaml").read_text(encoding="utf-8"))["stages"][
-        "manifest_p3"
-    ]
+def test_committed_dvc_pointer_is_the_recorded_frozen_manifest():
+    """`data/p3/manifest.json.dvc` (git) apunta exactamente al artefacto registrado
+    en `reports/manifest_p3_freeze.json`: un `dvc pull` recupera lo auditado."""
+    record = json.loads((REPO_ROOT / "reports" / "manifest_p3_freeze.json").read_text("utf-8"))
+    pointer = yaml.safe_load(
+        (REPO_ROOT / "data" / "p3" / "manifest.json.dvc").read_text(encoding="utf-8")
+    )
+    summary = ManifestSummary.model_validate_json(
+        (REPO_ROOT / "reports" / "manifest_p3.json").read_text(encoding="utf-8")
+    )
 
-    assert stage["wdir"] == "app"
-    assert stage["cmd"].endswith("dvc_manifest_p3_stage.py")
-    outs = {next(iter(o)) if isinstance(o, dict) else o: o for o in stage["outs"]}
-    # train_val y test: cacheados en DVC (remote prod), cada uno recuperable por separado.
-    assert "../data/manifest_p3/train_val.json" in outs
-    assert "../data/manifest_p3/test.json" in outs
-    for path in ("../reports/manifest_p3.json", "../reports/manifest_p3_freeze.json"):
-        assert outs[path][path]["cache"] is False  # pequeños, versionados en git
-    assert {"../data/raw/annotations", "../data/raw/images"} <= set(stage["deps"])
-    # Dependencias de código como archivos: una carpeta arrastra __pycache__ al md5
-    # y la etapa aparecería modificada en cada clon limpio.
-    code_deps = [d for d in stage["deps"] if not d.startswith("../")]
-    assert "presentation/manifest_freeze.py" in code_deps
-    assert all((REPO_ROOT / "app" / d).is_file() for d in code_deps), code_deps
-    assert stage["params"] == [{"manifest/manifest.yaml": ["train", "val", "test", "seed"]}]
+    assert record["frozen"] is True
+    assert pointer["outs"][0]["md5"] == record["manifest_md5"]
+    assert summary.frozen is True
+    assert summary.manifest_hash == record["manifest_hash"]
 
 
 # --- contra el dataset real (v0.1.1 recuperado de DVC) ---------------------------------
@@ -603,11 +581,14 @@ def test_real_v0_1_1_freezes_the_d02_04_candidate_unchanged():
     assert sum(frozen.record.crops.values()) == 668
     assert sum(frozen.record.originals.values()) == 600
     assert frozen.record.groups_crossing_splits == 0
+    # Reproducible: regenerar da exactamente el registro versionado en git.
+    stored = json.loads((REPO_ROOT / "reports" / "manifest_p3_freeze.json").read_text("utf-8"))
+    assert frozen.record.model_dump(mode="json") == stored
 
 
-def test_frozen_manifest_dataclass_is_immutable():
+def test_freeze_result_is_immutable():
     crops, assignments = _dataset()
     frozen = _freeze(crops, assignments)
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        frozen.test = b"{}"
+        frozen.manifest = b"{}"
