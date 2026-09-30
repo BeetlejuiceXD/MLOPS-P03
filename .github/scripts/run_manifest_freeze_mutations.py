@@ -5,7 +5,7 @@ original debe aparecer exactamente una vez), corre `tests/test_manifest_freeze.p
 completo, registra QUÉ tests fallaron y CÓMO, y restaura el archivo en `finally`.
 
 Clasificación de cada test que falla (del reporte JUnit de pytest):
-- `aserción`: veredicto explícito del test: `AssertionError`, `pytest.fail(...)` o
+- `aserción`: veredicto explícito del test: `AssertionError` (o `assert ...`), `pytest.fail(...)` o
   `pytest.raises` que no se cumplió (`Failed: ...`). El test esperaba un resultado
   concreto (p. ej. un motivo de bloqueo) y el mutante lo cambió.
 - `excepción <Tipo>`: el test terminó con una excepción no esperada.
@@ -163,9 +163,13 @@ class Failure:
 
 
 def _kind(message: str) -> str:
-    if message.startswith(("AssertionError", "Failed: ")):
+    """Solo la primera línea: pytest reporta un `assert` simple como "assert 5 == 4"
+    (sin el prefijo AssertionError) y a veces con varias líneas de detalle."""
+    lines = message.strip().splitlines()
+    first = lines[0] if lines else ""
+    if first.startswith(("AssertionError", "assert ", "Failed: ")):
         return "aserción"
-    return f"excepción {message.split(':', 1)[0].rsplit('.', 1)[-1] or '?'}"
+    return f"excepción {first.split(':', 1)[0].rsplit('.', 1)[-1] or '?'}"
 
 
 def run_pytest() -> tuple[int, list[Failure], int]:
