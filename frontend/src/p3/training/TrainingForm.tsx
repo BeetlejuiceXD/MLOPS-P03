@@ -192,7 +192,7 @@ export function TrainingForm({
             disabled={!realEnabled}
             onChange={() => setTask("training")}
           />
-          Entrenamiento real (D03-03: release aprobado + manifest oficial congelado)
+          Entrenamiento real (release aprobado + manifest oficial congelado; solo train/val)
         </label>
       </fieldset>
 

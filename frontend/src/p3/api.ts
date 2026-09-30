@@ -12,8 +12,11 @@ import {
   trainingJobListSchema,
 } from "./contracts";
 
-export const useReleases = () => useValidatedFetch("/releases", releasesResponseSchema);
-export const useManifest = () => useValidatedFetch("/manifest", manifestSummarySchema);
+// D03-03: el 503 de las fuentes trae el motivo que publicó trainer-worker; se muestra.
+const WITH_REASON = { showServerReason: true } as const;
+export const useReleases = () =>
+  useValidatedFetch("/releases", releasesResponseSchema, WITH_REASON);
+export const useManifest = () => useValidatedFetch("/manifest", manifestSummarySchema, WITH_REASON);
 export const useTrainingJobs = () => useValidatedFetch("/training/jobs", trainingJobListSchema);
 export const useExperimentRuns = () =>
   useValidatedFetch("/experiments/runs", experimentRunsResponseSchema);
