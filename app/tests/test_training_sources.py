@@ -25,6 +25,7 @@ from trainer_worker import sources
 from trainer_worker.sources import (
     SourcesNotEligibleError,
     build_training_dataset,
+    compute_sources_snapshot,
     verify_training_sources,
 )
 
@@ -314,3 +315,65 @@ def test_release_not_approved_is_rejected_even_with_a_valid_manifest(tmp_path):
     with pytest.raises(SourcesNotEligibleError) as excinfo:
         _verify(tmp_path, source, policy, path, doc)
     assert _reason(excinfo).startswith("release_")
+
+
+# --- snapshot que lee el backend (GET /api/releases, GET /api/manifest y la compuerta) ---
+
+
+def _snapshot(tmp_path, source, policy, path):
+    return compute_sources_snapshot(
+        manifest_path=path,
+        repo_root=tmp_path,
+        reports_dir=tmp_path / "reports",
+        sources={VERSION: source},
+        policy=policy,
+    )
+
+
+def test_snapshot_publishes_approved_releases_and_the_verified_frozen_manifest(tmp_path):
+    from presentation.contracts import ManifestSummary
+
+    source, policy = _release(tmp_path)
+    path, doc = _freeze(tmp_path, source, policy)
+
+    snapshot = _snapshot(tmp_path, source, policy, path)
+
+    releases = snapshot["releases"]
+    assert releases.status == "ok" and releases.detail is None
+    listing = json.loads(releases.payload)
+    assert [r["dataset_version"] for r in listing["approved"]] == [VERSION]
+    assert listing["rejected"] == []
+
+    manifest = snapshot["manifest"]
+    assert manifest.status == "ok" and manifest.detail is None
+    summary = ManifestSummary.model_validate_json(manifest.payload)
+    assert summary.frozen is True
+    assert summary.manifest_hash == doc["manifest_hash"]
+
+
+def test_snapshot_reports_the_manifest_as_unavailable_with_its_reason(tmp_path):
+    source, policy = _release(tmp_path)
+    path, _doc = _freeze(tmp_path, source, policy, frozen=False)
+
+    snapshot = _snapshot(tmp_path, source, policy, path)
+
+    assert snapshot["releases"].status == "ok"
+    manifest = snapshot["manifest"]
+    assert manifest.status == "unavailable" and manifest.payload is None
+    assert manifest.detail.startswith("manifest_not_frozen")
+
+
+def test_snapshot_without_release_data_reports_both_as_unavailable(tmp_path):
+    """Sin datos recuperados (p. ej. CI sin dvc pull): nada se inventa."""
+    source, policy = _release(tmp_path)
+    path, _doc = _freeze(tmp_path, source, policy)
+    for image in (tmp_path / "data" / VERSION / "images").iterdir():
+        image.unlink()
+
+    snapshot = _snapshot(tmp_path, source, policy, path)
+
+    releases = json.loads(snapshot["releases"].payload)
+    assert releases["approved"] == []
+    assert [r["reason"] for r in releases["rejected"]] == ["data_missing"]
+    assert snapshot["manifest"].status == "unavailable"
+    assert snapshot["manifest"].detail.startswith("release_data_missing")

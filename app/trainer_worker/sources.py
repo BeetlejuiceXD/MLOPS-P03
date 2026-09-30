@@ -284,3 +284,14 @@ def build_training_dataset(verified: VerifiedSources) -> TrainingDataset:
         )
 
     return TrainingDataset(train=samples("train"), val=samples("val"), test=())
+
+
+def compute_sources_snapshot(
+    *,
+    manifest_path: Path,
+    repo_root: Path,
+    reports_dir: Path,
+    sources: dict[str, ReleaseSource],
+    policy: QualityPolicy,
+):
+    raise NotImplementedError
