@@ -1,0 +1,43 @@
+{
+  "classes": [
+    "cat",
+    "dog"
+  ],
+  "dataset_version": "v0.1.1",
+  "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+  "frozen": true,
+  "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+  "manifest_version": "p3-v0.1.1-s42",
+  "seed": 42,
+  "splits": {
+    "test": {
+      "crops": 67,
+      "crops_per_class": {
+        "cat": 34,
+        "dog": 33
+      },
+      "originals": 52
+    },
+    "train": {
+      "crops": 467,
+      "crops_per_class": {
+        "cat": 240,
+        "dog": 227
+      },
+      "originals": 422
+    },
+    "val": {
+      "crops": 134,
+      "crops_per_class": {
+        "cat": 69,
+        "dog": 65
+      },
+      "originals": 126
+    }
+  },
+  "target_ratios": {
+    "test": 0.1,
+    "train": 0.7,
+    "val": 0.2
+  }
+}
