@@ -215,7 +215,8 @@ jobs:
     # D02-05: servicios reales (MariaDB, MinIO, MLflow, backend y trainer-worker). Recorre
     # validación (400), training real cerrado (409), éxito, fallo, cancelación, SIGTERM,
     # worker caído + reinicio sin reejecutar y down/up sin perder jobs ni logs.
-    # Todo con la tarea controlada: no entrena ni lee datos (eso es D03-03).
+    # Jobs con la tarea controlada (no entrena). D03-03: comprueba además que el worker
+    # publica las fuentes reales y que sin datos/manifest la API lo explica (503/409).
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:

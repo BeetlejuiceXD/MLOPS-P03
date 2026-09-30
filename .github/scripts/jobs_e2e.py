@@ -5,7 +5,9 @@ Requiere `docker compose` con mariadb, minio, mlflow, backend y trainer-worker a
 
 Escenarios (todos con la TAREA CONTROLADA, que no entrena ni lee datos):
   1. TrainingConfig inválido → 400 y no se encola.
-  2. Training real → 409 (release/manifest oficiales aún no disponibles en la API).
+  2. D03-03: trainer-worker publica las fuentes reales verificadas. En CI no hay datos
+     (sin `dvc pull`) ni manifest congelado: GET /releases → 200 sin aprobados (v0.1.1
+     rechazado con motivo), GET /manifest → 503 con el motivo, y training real → 409.
   3. Éxito: queued → running → succeeded, progreso N/N, logs y run de MLflow FINISHED.
   4. Fallo controlado en la época 3 → failed con error, no éxito; run FAILED.
   5. Cancelación en ejecución → cancel_requested → cancelled; run KILLED.
@@ -191,7 +193,21 @@ def main() -> None:
     check(len(after["jobs"]) == len(before["jobs"]), "un job inválido quedó encolado")
     EVIDENCE["invalid_config"] = {"status": status, "error": body["error"]}
 
-    # 2. Training real: 409.
+    # 2. Fuentes reales publicadas por el worker (D03-03) y training real cerrado: 409.
+    def manifest_published():
+        status, body = http("GET", f"{API}/manifest")
+        return status == 503 and "todavía no publicó" not in body.get("error", "")
+
+    wait_for("snapshot de fuentes publicado por trainer-worker", manifest_published, timeout=180)
+    status, manifest = http("GET", f"{API}/manifest")
+    check("manifest_missing" in manifest["error"], f"el 503 debía dar el motivo: {manifest}")
+    status, releases = http("GET", f"{API}/releases")
+    check(status == 200, f"GET /releases debía dar 200 y dio {status}: {releases}")
+    check(releases["approved"] == [], f"sin datos no puede haber releases aprobados: {releases}")
+    rejected = {r["dataset_version"]: r["reason"] for r in releases["rejected"]}
+    check(rejected.get("v0.1.1") == "data_missing", f"v0.1.1 debía estar data_missing: {rejected}")
+    EVIDENCE["sources"] = {"manifest": manifest["error"], "rejected": rejected}
+
     status, body = create(task="training")
     check(status == 409, f"training real debía dar 409 y dio {status}: {body}")
     EVIDENCE["real_training"] = {"status": status, "error": body["error"]}
