@@ -1,27 +1,71 @@
-"""D02-05 — Ejecución de un job: validación, run de MLflow y tarea controlada.
+"""Ejecución de un job: validación, run de MLflow y entrenamiento.
 
-La tarea controlada NO entrena ni lee datos: recorre las épocas de `max_epochs` con
-métricas sintéticas deterministas para demostrar estados, progreso, logs, cancelación,
-fallo y vínculo al run de MLflow. El entrenamiento real (`task=training`) se conecta en
-D03-03 con el trainer y el manifest oficial; este worker lo rechaza de forma explícita.
+- `controlled` (D02-05): NO entrena ni lee datos; recorre las épocas con métricas
+  sintéticas para demostrar estados, progreso, logs, cancelación, fallo y run.
+- `training` (D03-03): verifica las fuentes reales (release aprobado + manifest
+  congelado, `trainer_worker.sources`) ANTES de crear el run, entrena con el trainer
+  real (D02-03) solo sobre train/val y deja run de MLflow con los tags/hashes reales,
+  métricas por época, resumen y checkpoint verificado por SHA-256.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import os
+import platform
+import resource
+import subprocess
+import tempfile
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
+import torch
 from pydantic import ValidationError
 
 from tracking.settings import P3_EXPERIMENT, configure_client_env
+from trainer.engine import TrainingResult, train
+from trainer_worker.sources import SourcesNotEligibleError, VerifiedSources, build_training_dataset
 from trainer_worker.store import ClaimedJob, JobStore
+from training.class_map import CLASS_MAP
 from training.config import TrainingConfig
 
 RUN_KIND_TAG = "p3.run_kind"
 CONTROLLED_RUN_KIND = "controlled_task"
+TRAINING_RUN_KIND = "training"
+CHECKPOINT_DIR = "checkpoint"
+EPOCH_METRIC_FIELDS = (
+    "train_loss",
+    "train_accuracy",
+    "val_loss",
+    "val_accuracy",
+    "val_macro_f1",
+    "learning_rate",
+)
+
+
+def git_commit() -> str:
+    """Commit del código que entrena: `GIT_COMMIT` (imagen/Compose) o el checkout local."""
+    if os.environ.get("GIT_COMMIT"):
+        return os.environ["GIT_COMMIT"]
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, timeout=5
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _peak_memory_mb() -> float:
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
 class JobCancelledError(Exception):
@@ -43,6 +87,10 @@ class StopDuringFinalizationError(BaseException):
 
 class ControlledFailureError(Exception):
     """Fallo provocado a propósito por `controlled.fail_at_epoch`."""
+
+
+class CheckpointVerificationError(Exception):
+    """El checkpoint descargado del servidor no coincide con el guardado."""
 
 
 class MlflowTracker:
@@ -90,6 +138,98 @@ class MlflowTracker:
     def end(self, run_id: str, status: str) -> None:
         self._client().set_terminated(run_id, status)
 
+    def start_training(
+        self, job: ClaimedJob, config: TrainingConfig, verified: VerifiedSources
+    ) -> str:
+        """Run real de la campaña: tags de trazabilidad (#33) y params completos."""
+        client = self._client()
+        experiment = client.get_experiment_by_name(P3_EXPERIMENT)
+        experiment_id = (
+            experiment.experiment_id
+            if experiment is not None
+            else client.create_experiment(P3_EXPERIMENT)
+        )
+        classes = ",".join(sorted(CLASS_MAP))
+        manifest = verified.manifest
+        run = client.create_run(
+            experiment_id,
+            run_name=f"job-{job.id}-training",
+            tags={
+                RUN_KIND_TAG: TRAINING_RUN_KIND,
+                "p3.job_id": str(job.id),
+                "p3.task": job.task,
+                "job_id": str(job.id),
+                "git_commit": git_commit(),
+                "dvc_release": manifest.dataset_version,
+                "dvc_images_md5": manifest.images_md5,
+                "dvc_annotations_md5": manifest.annotations_md5,
+                "dvc_release_hash": manifest.dvc_release_hash,
+                "manifest_version": manifest.manifest_version,
+                "manifest_hash": manifest.manifest_hash,
+                "classes": classes,
+                "seed": str(config.seed),
+            },
+        )
+        run_id = run.info.run_id
+        for name, value in config.model_dump().items():
+            client.log_param(run_id, name, value)
+        client.log_param(run_id, "classes", classes)
+        return run_id
+
+    def log_training_summary(self, run_id: str, result: TrainingResult, duration: float) -> None:
+        client = self._client()
+        client.log_metric(run_id, "best_epoch", result.best.epoch)
+        client.log_metric(run_id, "best_val_accuracy", result.best.val_accuracy)
+        client.log_metric(run_id, "best_val_macro_f1", result.best.val_macro_f1)
+        client.log_metric(run_id, "best_val_loss", result.best.val_loss)
+        client.log_metric(run_id, "duration_seconds", duration)
+        client.log_metric(run_id, "peak_memory_mb", _peak_memory_mb())
+        client.set_tag(run_id, "stopped_early", str(result.stopped_early).lower())
+        client.set_tag(run_id, "device", next(result.model.parameters()).device.type)
+
+    def upload_checkpoint(
+        self, run_id: str, result: TrainingResult, config: TrainingConfig, verified: VerifiedSources
+    ) -> str:
+        """Sube el mejor checkpoint y lo verifica descargándolo del servidor."""
+        client = self._client()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            checkpoint = folder / "model.pt"
+            torch.save(result.model.state_dict(), checkpoint)
+            local_sha = _sha256(checkpoint)
+            files = {
+                "training_config.json": config.model_dump(),
+                "class_map.json": dict(CLASS_MAP),
+                "environment.json": {
+                    "python": platform.python_version(),
+                    "torch": torch.__version__,
+                },
+                "sources.json": {
+                    "dataset_version": verified.manifest.dataset_version,
+                    "manifest_version": verified.manifest.manifest_version,
+                    "manifest_hash": verified.manifest.manifest_hash,
+                    "dvc_release_hash": verified.manifest.dvc_release_hash,
+                    "best_epoch": result.best.epoch,
+                    "checkpoint_sha256": local_sha,
+                },
+            }
+            client.log_artifact(run_id, str(checkpoint), CHECKPOINT_DIR)
+            for name, content in files.items():
+                (folder / name).write_text(json.dumps(content, indent=2), encoding="utf-8")
+                client.log_artifact(run_id, str(folder / name), CHECKPOINT_DIR)
+        client.set_tag(run_id, "checkpoint_sha256", local_sha)
+        served = self._served_sha256(run_id, f"{CHECKPOINT_DIR}/model.pt")
+        if served != local_sha:
+            raise CheckpointVerificationError(
+                "El checkpoint descargado del servidor no coincide con el guardado"
+            )
+        return local_sha
+
+    def _served_sha256(self, run_id: str, artifact_path: str) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            local = self._client().download_artifacts(run_id, artifact_path, tmp)
+            return _sha256(Path(local))
+
 
 def controlled_metrics(seed: int, epoch: int) -> dict[str, float]:
     """Métricas sintéticas deterministas (prefijo `controlled_`: no son de entrenamiento)."""
@@ -111,6 +251,10 @@ class Worker:
     # Jobs cuyo cierre pendiente ya se avisó en su log (un aviso por job, no uno por intento).
     _close_warned: set[int] = field(default_factory=set, init=False, repr=False)
     _stop: threading.Event = field(default_factory=threading.Event)
+    # D03-03: verificador de fuentes reales (None = training real no configurado) y
+    # función de entrenamiento (inyectable en tests; producción usa el trainer real).
+    verify_sources: Callable[[str, str], VerifiedSources] | None = None
+    train_fn: Callable[..., TrainingResult] = train
     # True solo mientras se persiste `succeeded` (UPDATE + último check + COMMIT).
     _finalizing: bool = field(default=False, init=False, repr=False)
 
@@ -206,29 +350,16 @@ class Worker:
             fields = ", ".join(".".join(map(str, e["loc"])) for e in error.errors())
             return self._fail(job, f"TrainingConfig inválido en el worker ({fields}): {error}")
 
-        if job.task != "controlled":
-            return self._fail(
-                job,
-                "Este worker solo ejecuta tareas controladas; el training real con el trainer y "
-                "el manifest oficial se conecta en D03-03.",
-            )
+        if job.task == "controlled":
+            prepared = self._prepare_controlled(job, config)
+        else:
+            prepared = self._prepare_training(job, config)
+        if isinstance(prepared, str):
+            return prepared  # rechazado antes de crear el run
+        run_id, body, done_message = prepared
 
         try:
-            run_id = self.tracker.start(job, config)
-        except Exception as error:
-            return self._fail(
-                job, f"No se pudo crear el run en MLflow: {type(error).__name__}: {error}"
-            )
-        self.store.set_run_id(job.id, self.worker_id, run_id)
-        self.store.log(
-            job.id,
-            "info",
-            f"Tarea controlada (sin datos ni entrenamiento real): run MLflow {run_id}, "
-            f"{config.max_epochs} épocas",
-        )
-
-        try:
-            self._run_controlled(job, config, run_id)
+            body()
         except JobCancelledError:
             return self._cancelled(job, run_id)
         except WorkerStoppingError:
@@ -274,9 +405,111 @@ class Worker:
             if self.stopping:
                 return self._interrupted(job, run_id)
             return self._lost(job)
-        self.store.log(job.id, "info", "Tarea controlada terminada")
+        self.store.log(job.id, "info", done_message)
         self._close_run(job.id, run_id, "FINISHED")
         return "succeeded"
+
+    def _start_run(self, job: ClaimedJob, start: Callable[[], str]) -> str | None:
+        """Crea el run y lo vincula al job; si MLflow falla, el job termina failed."""
+        try:
+            run_id = start()
+        except Exception as error:
+            self._fail(job, f"No se pudo crear el run en MLflow: {type(error).__name__}: {error}")
+            return None
+        self.store.set_run_id(job.id, self.worker_id, run_id)
+        return run_id
+
+    def _prepare_controlled(self, job: ClaimedJob, config: TrainingConfig):
+        run_id = self._start_run(job, lambda: self.tracker.start(job, config))
+        if run_id is None:
+            return "failed"
+        self.store.log(
+            job.id,
+            "info",
+            f"Tarea controlada (sin datos ni entrenamiento real): run MLflow {run_id}, "
+            f"{config.max_epochs} épocas",
+        )
+        return (
+            run_id,
+            lambda: self._run_controlled(job, config, run_id),
+            "Tarea controlada terminada",
+        )
+
+    def _prepare_training(self, job: ClaimedJob, config: TrainingConfig):
+        """Verifica las fuentes reales y prepara train/val ANTES de crear el run: una
+        entrada no elegible nunca entrena ni deja un run de campaña."""
+        if self.verify_sources is None:
+            return self._fail(
+                job,
+                "Training real sin fuentes configuradas (release + manifest congelado de "
+                "D03-01): no se entrena.",
+            )
+        try:
+            verified = self.verify_sources(job.dataset_version, job.manifest_hash)
+        except SourcesNotEligibleError as error:
+            return self._fail(job, f"Fuentes no elegibles ({error.reason}): {error.detail}")
+        try:
+            dataset = build_training_dataset(verified)
+        except Exception as error:
+            message = f"No se pudieron cargar los crops train/val: {type(error).__name__}: {error}"
+            return self._fail(job, message)
+        self.store.log(
+            job.id,
+            "info",
+            f"Fuentes verificadas: {verified.manifest.dataset_version} / "
+            f"{verified.manifest.manifest_version} ({verified.manifest.manifest_hash[:12]}…); "
+            f"train={len(dataset.train)} val={len(dataset.val)} crops (test no se carga)",
+        )
+        run_id = self._start_run(job, lambda: self.tracker.start_training(job, config, verified))
+        if run_id is None:
+            return "failed"
+        self.store.log(
+            job.id,
+            "info",
+            f"Entrenamiento real: run MLflow {run_id}, hasta {config.max_epochs} épocas",
+        )
+        return (
+            run_id,
+            lambda: self._run_training(job, config, run_id, verified, dataset),
+            "Entrenamiento terminado",
+        )
+
+    def _run_training(self, job, config, run_id, verified, dataset) -> None:
+        if self.store.cancel_requested(job.id):
+            raise JobCancelledError
+        if self.stopping:
+            raise WorkerStoppingError
+
+        def on_epoch_end(metrics) -> None:
+            self.tracker.log_epoch(
+                run_id, metrics.epoch, {f: getattr(metrics, f) for f in EPOCH_METRIC_FIELDS}
+            )
+            self.store.set_progress(job.id, self.worker_id, metrics.epoch)
+            self.store.log(
+                job.id,
+                "info",
+                f"Época {metrics.epoch}/{config.max_epochs} "
+                f"train_loss={metrics.train_loss:.4f} val_loss={metrics.val_loss:.4f} "
+                f"val_accuracy={metrics.val_accuracy:.4f} val_macro_f1={metrics.val_macro_f1:.4f}",
+            )
+            self.after_epoch(metrics.epoch)
+            if self.store.cancel_requested(job.id):
+                raise JobCancelledError
+            if self.stopping:
+                raise WorkerStoppingError
+
+        started = time.monotonic()
+        result = self.train_fn(config, dataset, on_epoch_end=on_epoch_end)
+        duration = time.monotonic() - started
+        self.tracker.log_training_summary(run_id, result, duration)
+        sha = self.tracker.upload_checkpoint(run_id, result, config, verified)
+        self.store.log(
+            job.id,
+            "info",
+            f"Mejor época {result.best.epoch} (val_accuracy={result.best.val_accuracy:.4f}); "
+            f"checkpoint verificado sha256={sha[:12]}…"
+            + (" — early stopping" if result.stopped_early else ""),
+        )
 
     def _cancelled(self, job: ClaimedJob, run_id: str) -> str:
         self.store.log(job.id, "warning", "Cancelado a petición del usuario")
