@@ -237,13 +237,15 @@ def test_invalid_config_fails_in_the_worker_without_creating_a_run(engine, job_s
     assert row.mlflow_run_id is None
 
 
-def test_real_training_is_not_run_by_this_worker(engine, job_store, tracking):
+def test_real_training_without_configured_sources_is_rejected(engine, job_store, tracking):
+    """D03-03: el training real necesita fuentes verificables; sin ellas no se entrena
+    (el camino elegible se prueba en test_trainer_worker_training.py)."""
     job_id = _insert(engine, task="training")
 
     assert _worker(job_store, tracking).run_once() == "failed"
 
     row = _row(engine, job_id)
-    assert "D03-03" in row.error
+    assert "fuentes" in row.error.lower()
     assert row.mlflow_run_id is None
 
 
