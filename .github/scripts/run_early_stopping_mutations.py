@@ -1,13 +1,12 @@
-"""Mutation testing de D03-01 (#58): auditoría y congelación del manifest P3.
+"""Mutation testing de D03-02 (#59): early stopping y mejor checkpoint.
 
-Para cada mutante: aplica el cambio en `app/presentation/manifest_freeze.py` (el texto
-original debe aparecer exactamente una vez), corre `tests/test_manifest_freeze.py`
-completo, registra QUÉ tests fallaron y CÓMO, y restaura el archivo en `finally`.
+Para cada mutante: aplica el cambio en `app/trainer/engine.py` o `app/trainer/metrics.py`
+(el texto original debe aparecer exactamente una vez), corre los tests del área,
+registra QUÉ tests fallaron y CÓMO, y restaura el archivo en `finally`.
 
 Clasificación de cada test que falla (del reporte JUnit de pytest):
 - `aserción`: veredicto explícito del test: `AssertionError` (o `assert ...`), `pytest.fail(...)` o
-  `pytest.raises` que no se cumplió (`Failed: ...`). El test esperaba un resultado
-  concreto (p. ej. un motivo de bloqueo) y el mutante lo cambió.
+  `pytest.raises` que no se cumplió (`Failed: ...`).
 - `excepción <Tipo>`: el test terminó con una excepción no esperada.
 
 Resultado por mutante:
@@ -17,11 +16,10 @@ Resultado por mutante:
 - ERROR = objetivo no encontrado exactamente una vez, error de colección/setup o
   pytest roto (rc distinto de 0/1). Nunca cuenta como muerto.
 
-El test contra el v0.1.1 real se excluye para que el resultado no dependa de tener
-`data/raw` (en CI se salta igual). La base sin mutantes debe estar en verde.
+La base sin mutantes debe estar en verde. Sale con 0 solo si todos quedan KILLED.
 
-Uso (desde la raíz del repo; ~20-30 min en total):
-    cd app && uv run python ../.github/scripts/run_manifest_freeze_mutations.py
+Uso (desde la raíz del repo; ~15-20 min en total):
+    cd app && uv run python ../.github/scripts/run_early_stopping_mutations.py
 """
 
 from __future__ import annotations
@@ -35,123 +33,82 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP = Path(__file__).resolve().parents[2] / "app"
-TARGET = "presentation/manifest_freeze.py"
-TESTS = [
-    "tests/test_manifest_freeze.py",
-    "--deselect",
-    "tests/test_manifest_freeze.py::test_real_v0_1_1_freezes_the_d02_04_candidate_unchanged",
-]
+ENGINE, METRICS = "trainer/engine.py", "trainer/metrics.py"
+TESTS = ["tests/test_trainer_early_stopping.py", "tests/test_trainer_metrics.py"]
 
 
 @dataclass(frozen=True)
 class Mutant:
     id: str
     name: str
+    target: str
     original: str
     mutant: str
 
 
 MUTANTS = [
     Mutant(
-        "M01",
-        "sin sha256 registrado del artefacto",
-        "    if expected_sha256 is not None and _sha256(manifest) != expected_sha256:",
-        "    if False:",
-    ),
-    Mutant("M02", "sin chequeo de grupos que cruzan", "    if crossing:\n", "    if False:\n"),
-    Mutant(
-        "M03",
-        "grupos sin nodos puente",
-        '        a, b = find(pair["image_id_a"]), find(pair["image_id_b"])\n',
-        '        if not {pair["image_id_a"], pair["image_id_b"]} <= image_ids:\n'
-        "            continue\n"
-        '        a, b = find(pair["image_id_a"]), find(pair["image_id_b"])\n',
-    ),
-    Mutant("M04", "sin chequeo de clase ausente", "        if absent:\n", "        if False:\n"),
-    Mutant(
-        "M05",
-        "umbral de originales < -> <=",
-        "for name in SPLITS) < min_originals_per_class",
-        "for name in SPLITS) <= min_originals_per_class",
+        "E01",
+        "no restaura el mejor estado al terminar",
+        ENGINE,
+        "    model.load_state_dict(best_state)\n",
+        "    pass\n",
     ),
     Mutant(
-        "M06",
-        "sin tolerancia de proporciones",
-        "> MANIFEST_SPLIT_TOLERANCE + 1e-12:",
-        "> 1.0:",
+        "E02",
+        "mejor estado sin copiar (referencia a los pesos vivos)",
+        ENGINE,
+        "best, best_state = metrics, copy.deepcopy(model.state_dict())",
+        "best, best_state = metrics, model.state_dict()",
     ),
     Mutant(
-        "M07",
-        "sin recalcular manifest_hash",
-        "    if recomputed != summary.manifest_hash:",
-        "    if False:",
+        "E03",
+        "la paciencia se reinicia con macro-F1/loss (is_better)",
+        ENGINE,
+        "if accuracy_baseline is None or accuracy_improved(metrics, accuracy_baseline):",
+        "if accuracy_baseline is None or is_better(metrics, accuracy_baseline):",
     ),
     Mutant(
-        "M08",
-        "sin verificar dvc_release_hash",
-        "    if summary.dvc_release_hash != _dvc_release_hash(images_md5, annotations_md5):",
-        "    if False:",
+        "E04",
+        "el contador de paciencia no se reinicia al mejorar",
+        ENGINE,
+        "            epochs_without_improvement = 0\n",
+        "            pass\n",
     ),
     Mutant(
-        "M09",
-        "sin summary_mismatch",
-        '            raise FreezeBlockedError("summary_mismatch", '
-        'f"conteos de {name} no coinciden")',
-        "            pass",
+        "E05",
+        "parada con > patience en vez de >=",
+        METRICS,
+        "return epochs_without_improvement >= patience",
+        "return epochs_without_improvement > patience",
     ),
     Mutant(
-        "M10", "sin chequeo de cobertura", "    if set(assigned) != set(by_id):", "    if False:"
+        "E06",
+        "mejora de accuracy sin redondear a 4 decimales",
+        METRICS,
+        "return round(candidate.val_accuracy, 4) > round(reference.val_accuracy, 4)",
+        "return candidate.val_accuracy > reference.val_accuracy",
     ),
     Mutant(
-        "M11", "sin candidate_drift", "    if regenerated.manifest != manifest:", "    if False:"
+        "E07",
+        "desempate por val_loss sin redondear a 4 decimales",
+        METRICS,
+        "if round(candidate.val_loss, 4) != round(current_best.val_loss, 4):",
+        "if candidate.val_loss != current_best.val_loss:",
     ),
     Mutant(
-        "M12",
-        "sin recalcular test_split_hash",
-        '    if frozen_test_split_hash(assignments["test"]) != artifact.test_split_hash:',
-        "    if False:",
+        "E08",
+        "checkpoint solo por accuracy (sin desempate macro-F1/loss)",
+        ENGINE,
+        "if best is None or is_better(metrics, best):",
+        "if best is None or accuracy_improved(metrics, best):",
     ),
     Mutant(
-        "M13",
-        "sin verificar el .dvc",
-        "    if _dvc_md5(manifest_path) != hashlib.md5(manifest).hexdigest():",
-        "    if False:",
-    ),
-    Mutant(
-        "M14",
-        "frozen queda en False al congelar",
-        'summary.model_copy(update={"frozen": True})',
-        'summary.model_copy(update={"frozen": False})',
-    ),
-    Mutant(
-        "M15",
-        "sin md5 DVC del artefacto vs release",
-        "    if (artifact.images_md5, artifact.annotations_md5) != (images_md5, annotations_md5):",
-        "    if False:",
-    ),
-    Mutant(
-        "M16",
-        "sin overlap de originales",
-        "            if split_of_image.setdefault(image_id, name) != name:",
-        "            if split_of_image.setdefault(image_id, name) != name and False:",
-    ),
-    Mutant(
-        "M17",
-        "sin identidad artefacto vs resumen",
-        "        if getattr(artifact, key) != getattr(summary, key):",
-        "        if False:",
-    ),
-    Mutant(
-        "M18",
-        "artefacto sin validar contrato",
-        "        artifact = FrozenManifest.model_validate_json(manifest)",
-        "        artifact = FrozenManifest.model_construct(**json.loads(manifest))",
-    ),
-    Mutant(
-        "M19",
-        "resumen publicado sin exigir frozen: true",
-        "    if summary.frozen is not True:",
-        "    if False:",
+        "E09",
+        "best reportado = última época",
+        ENGINE,
+        "return TrainingResult(tuple(history), best, model, stopped_early)",
+        "return TrainingResult(tuple(history), history[-1], model, stopped_early)",
     ),
 ]
 
@@ -226,9 +183,9 @@ def main() -> int:
         return 2
     print(f"Base limpia: tests en verde. Mutantes: {len(MUTANTS)}\n")
 
-    path = APP / TARGET
     results, exit_code = [], 0
     for m in MUTANTS:
+        path = APP / m.target
         source = path.read_bytes()
         if source.count(m.original.encode()) != 1:
             results.append((m, "ERROR", [], "objetivo no encontrado exactamente una vez"))
@@ -245,19 +202,16 @@ def main() -> int:
         elif any(f.kind == "aserción" for f in failures):
             status, note = "KILLED", _detection(failures)
         elif failures:
-            status, note, exit_code = (
-                "KILLED (solo excepción)",
-                _detection(failures),
-                max(exit_code, 1),
-            )
+            status, note = "KILLED (solo excepción)", _detection(failures)
+            exit_code = max(exit_code, 1)
         else:
             status, note, exit_code = "SURVIVED", "—", max(exit_code, 1)
         results.append((m, status, failures, note))
         print(f"{status:9} {m.id} {m.name}  ->  {len(failures)} test(s): {note}")
 
     print(
-        "\n| # | Mutación | Resultado | Tipo de detección | Tests que la detectan |"
-        "\n|---|---|---|---|---|"
+        "\n| # | Archivo | Mutación | Resultado | Tipo de detección | Tests que la detectan |"
+        "\n|---|---|---|---|---|---|"
     )
     for m, status, failures, note in results:
         asserted = [f.test for f in failures if f.kind == "aserción"]
@@ -266,7 +220,7 @@ def main() -> int:
         tests = "<br>".join(f"`{t}`" for t in shown)
         if len(failures) > len(shown):
             tests += f"<br>(+{len(failures) - len(shown)} más)"
-        print(f"| {m.id} | {m.name} | {status} | {note} | {tests or '—'} |")
+        print(f"| {m.id} | `{m.target}` | {m.name} | {status} | {note} | {tests or '—'} |")
     killed = sum(1 for _, s, _, _ in results if s == "KILLED")
     print(f"\nKILLED por aserción {killed}/{len(results)}")
     return exit_code
