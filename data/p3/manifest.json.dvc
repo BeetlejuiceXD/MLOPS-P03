@@ -1,0 +1,5 @@
+outs:
+- md5: 3c01b001d630e9655b8eeddb270e3873
+  size: 7887
+  hash: md5
+  path: manifest.json

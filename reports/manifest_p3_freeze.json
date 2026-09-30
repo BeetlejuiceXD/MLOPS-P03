@@ -29,6 +29,8 @@
   "groups_multi_image": 0,
   "groups_total": 600,
   "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+  "manifest_md5": "3c01b001d630e9655b8eeddb270e3873",
+  "manifest_sha256": "9a56814cd568954dea7782d9f8bc96182822f08d49900de2f76f31a0ea1d93ab",
   "manifest_version": "p3-v0.1.1-s42",
   "min_originals_per_class": 300,
   "originals": {
@@ -51,6 +53,5 @@
     }
   },
   "seed": 42,
-  "test_sha256": "ace604f049e4b09f0253d06c22000a8c0bb6a0629d3b877aedd0df81ab82e81d",
-  "train_val_sha256": "16ed5dd71887c24cfdb03bbef6c9bbfafc88276581030c097f4ecabeb9ed385e"
+  "test_split_hash": "66068afd57c1d5827a633b321fee0c039db730f05196237464b35e80614f7ea0"
 }

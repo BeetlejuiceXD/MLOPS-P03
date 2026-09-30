@@ -64,33 +64,36 @@ mismo split, `frozen: true`. `manifest_hash` no incluye `frozen`, así que la
 identidad del candidato y la del manifest congelado es la misma.
 
 ```bash
-# Congelar (etapa DVC; falla sin escribir nada si la auditoría bloquea)
-dvc repro manifest_p3
-dvc push -r prod data/manifest_p3/train_val.json data/manifest_p3/test.json
-
-# Reauditar lo congelado (p. ej. tras un dvc pull): sha256, reglas y regeneración
 cd app
-uv run python -m presentation.manifest_freeze audit v0.1.1
+# Congelar (falla sin escribir nada si la auditoría bloquea)
+uv run python -m presentation.manifest_freeze freeze v0.1.1
+cd .. && dvc add data/p3/manifest.json && dvc push -r prod data/p3/manifest.json
+
+# Reauditar lo congelado (p. ej. tras un dvc pull): .dvc, sha256, reglas y regeneración
+cd app && uv run python -m presentation.manifest_freeze audit v0.1.1
 ```
 
 | Archivo | Dónde vive | Quién lo usa |
 |---|---|---|
-| `data/manifest_p3/train_val.json` | caché DVC (remote `prod`) | trainer (D03-03), vía `manifest.frozen.load_train_val` |
-| `data/manifest_p3/test.json` | caché DVC (remote `prod`) | solo Ale (custodia del frozen test, #33) |
-| `reports/manifest_p3.json` | git | `ManifestSummary` (D01-05) con `frozen: true`, para `GET /api/manifest` |
-| `reports/manifest_p3_freeze.json` | git | identidad del release, sha256 de `train_val.json` y `test.json`, conteos por clase y grupos |
+| `data/p3/manifest.json` | caché DVC (remote `prod`); `manifest.json.dvc` en git | Training (D03-03, `trainer_worker.sources.verify_training_sources`) |
+| `reports/manifest_p3.json` | git | `ManifestSummary` (D01-05) con `frozen: true` |
+| `reports/manifest_p3_freeze.json` | git | identidad del release, sha256/md5 del artefacto, `test_split_hash`, conteos por clase y grupos |
 
-train/val y test son salidas DVC separadas: el trainer descarga solo
-`dvc pull data/manifest_p3/train_val.json`. `load_train_val` rechaza el archivo si
-el registro no dice `frozen: true` o si su sha256 no es el registrado.
+`data/p3/manifest.json` sigue el contrato `FrozenManifest` de
+`presentation/contracts.py`: identidad DVC del release, `seed`, `target_ratios`,
+`frozen: true`, `test_split_hash` (sha256 de los `crop_id` de test ordenados) y los
+`crop_id` de cada partición. Solo IDs: Training usa los de test para verificar
+cobertura y fuga, y nunca recorta ni carga sus píxeles.
 
 La auditoría (`FreezeBlockedError.reason`) es independiente del generador y bloquea
-la congelación ante: hash del release o del candidato adulterado, sha256 de
-`train_val.json`/`test.json` distinto del registrado, crops sin asignar o
-alterados, originales o grupos near-duplicate que cruzan particiones (incluidos
+la congelación ante: artefacto que no cumple el contrato o que no coincide con su
+`.dvc` o con el sha256 registrado, hash del release, del candidato o del split test
+adulterado, identidad distinta entre artefacto y resumen, crops sin asignar o
+desconocidos, originales o grupos near-duplicate que cruzan particiones (incluidos
 los puentes sin crops), proporciones fuera de ±5 pp sobre crops, clase ausente en
-cualquier partición, menos de 300 originales por clase tras exclusiones, o un
-resumen cuyos conteos no coinciden con las asignaciones.
+cualquier partición, menos de 300 originales por clase tras exclusiones, un resumen
+cuyos conteos no coinciden con las asignaciones, o un artefacto coherente que no es
+el candidato regenerado (`candidate_drift`).
 
 ## Qué no hace (todavía)
 
