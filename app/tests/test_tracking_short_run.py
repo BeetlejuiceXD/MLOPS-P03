@@ -273,6 +273,26 @@ def test_run_leaves_status_failed_if_training_itself_raises(file_store, tmp_path
     assert run.info.status == "FAILED"
 
 
+def test_run_leaves_status_failed_if_param_logging_raises(file_store, tmp_path, monkeypatch):
+    # El bug reportado en la reauditoria: log_param corria antes del try, asi
+    # que si fallaba, ningun `except` lo atrapaba y el run quedaba RUNNING
+    # para siempre (set_terminated nunca se llamaba).
+    from mlflow.tracking import MlflowClient
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("log_param simulado roto")
+
+    monkeypatch.setattr(MlflowClient, "log_param", _boom)
+    evidence_path = tmp_path / "evidence.json"
+
+    exit_code = short_run.main(["run", "--evidence", str(evidence_path), "--seed", "1"])
+
+    assert exit_code == short_run.UNAVAILABLE
+    assert not evidence_path.exists()
+    run = _latest_run(file_store)
+    assert run.info.status == "FAILED"
+
+
 def test_run_leaves_status_failed_if_metric_logging_raises(file_store, tmp_path, monkeypatch):
     from mlflow.tracking import MlflowClient
 

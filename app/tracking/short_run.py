@@ -25,6 +25,7 @@ ilegible. Nunca reporta éxito sin haber leído del servidor.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import platform
@@ -217,14 +218,15 @@ def run_short_training(
             "seed": str(seed),
         },
     )
-    run_id = run.info.run_id
-    for name, value in config.model_dump().items():
-        client.log_param(run_id, name, value)
-    client.log_param(run_id, "classes", ",".join(classes))
 
-    status = "FAILED"
+    run_id = run.info.run_id
+
     duration = 0.0
     try:
+        for name, value in config.model_dump().items():
+            client.log_param(run_id, name, value)
+        client.log_param(run_id, "classes", ",".join(classes))
+
         dataset = build_fixture_dataset(seed=123)
         start = time.monotonic()
         result = train(config, dataset)
@@ -273,11 +275,14 @@ def run_short_training(
         if served_sha != checkpoint_sha_local:
             raise RuntimeError("El checkpoint descargado del servidor no coincide con el guardado")
 
-        status = "FINISHED"
+        client.set_terminated(run_id, "FINISHED")
     except Exception as error:
-        client.set_terminated(run_id, "FAILED")
+        # Best-effort: si el propio cierre FAILED también falla (p. ej. MLflow
+        # cayó justo entonces), no debe ocultar el error original — solo se
+        # intenta, nunca se garantiza (#56 B2).
+        with contextlib.suppress(Exception):
+            client.set_terminated(run_id, "FAILED")
         raise RuntimeError(f"Entrenamiento corto falló; run {run_id} quedó FAILED") from error
-    client.set_terminated(run_id, status)
 
     evidence = Evidence(
         tracking_uri=settings.mlflow_tracking_uri,
