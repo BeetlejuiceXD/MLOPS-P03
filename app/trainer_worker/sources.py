@@ -41,9 +41,11 @@ from presentation.release_resolver import (
     ReleaseRejectedError,
     ReleaseSource,
     ResolvedRelease,
+    resolve_all_releases,
     resolve_release,
 )
 from trainer.dataset import TrainingDataset, TrainingSample
+from trainer_worker.store import SourceSnapshot
 
 SPLITS = ("train", "val", "test")
 
@@ -293,5 +295,29 @@ def compute_sources_snapshot(
     reports_dir: Path,
     sources: dict[str, ReleaseSource],
     policy: QualityPolicy,
-):
-    raise NotImplementedError
+) -> dict[str, SourceSnapshot]:
+    """Lo que el backend publica en `GET /api/releases` y `GET /api/manifest`.
+
+    El manifest solo sale `ok` si pasa la misma verificación completa que se exige
+    antes de entrenar (contra su propia identidad); si no, `unavailable` con motivo."""
+    listing = resolve_all_releases(
+        repo_root=repo_root, reports_dir=reports_dir, sources=sources, policy=policy
+    )
+    releases = SourceSnapshot("ok", listing.model_dump_json(), None)
+
+    try:
+        manifest = _read_frozen_manifest(manifest_path)
+        verified = verify_training_sources(
+            manifest.dataset_version,
+            manifest.manifest_hash,
+            manifest_path=manifest_path,
+            repo_root=repo_root,
+            reports_dir=reports_dir,
+            sources=sources,
+            policy=policy,
+        )
+    except SourcesNotEligibleError as error:
+        manifest_snapshot = SourceSnapshot("unavailable", None, f"{error.reason}: {error.detail}")
+    else:
+        manifest_snapshot = SourceSnapshot("ok", verified.summary.model_dump_json(), None)
+    return {"releases": releases, "manifest": manifest_snapshot}

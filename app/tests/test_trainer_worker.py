@@ -794,6 +794,16 @@ def test_settings_need_database_and_tracking(monkeypatch):
     assert settings.poll_seconds > 0
     assert settings.stale_after_seconds >= 30
     assert "u:p@" not in repr(settings)  # la URL con contraseña no se imprime
+    # D03-03: por defecto, datos/reportes del repo y el manifest congelado de D03-01.
+    assert settings.resolved_manifest_path() == settings.repo_root / "data/p3/manifest.json"
+    assert settings.sources_refresh_seconds > 0
+    monkeypatch.setenv("TRAINER_REPO_ROOT", "/app")
+    monkeypatch.setenv("P3_MANIFEST_PATH", "/app/data/p3/otro.json")
+    settings = worker_main.WorkerSettings()
+    kwargs = settings.sources_kwargs()
+    assert kwargs["repo_root"] == Path("/app") and kwargs["reports_dir"] == Path("/app/reports")
+    assert kwargs["manifest_path"] == Path("/app/data/p3/otro.json")
+    assert "v0.1.1" in kwargs["sources"]
 
 
 # --- D03-03: snapshot de fuentes que lee el backend ------------------------------------

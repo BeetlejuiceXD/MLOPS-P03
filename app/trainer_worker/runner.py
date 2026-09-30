@@ -30,7 +30,7 @@ from pydantic import ValidationError
 from tracking.settings import P3_EXPERIMENT, configure_client_env
 from trainer.engine import TrainingResult, train
 from trainer_worker.sources import SourcesNotEligibleError, VerifiedSources, build_training_dataset
-from trainer_worker.store import ClaimedJob, JobStore
+from trainer_worker.store import ClaimedJob, JobStore, SourceSnapshot
 from training.class_map import CLASS_MAP
 from training.config import TrainingConfig
 
@@ -255,6 +255,8 @@ class Worker:
     # función de entrenamiento (inyectable en tests; producción usa el trainer real).
     verify_sources: Callable[[str, str], VerifiedSources] | None = None
     train_fn: Callable[..., TrainingResult] = train
+    # Snapshot de fuentes para el backend (None = no se publica nada).
+    snapshot_sources: Callable[[], dict[str, SourceSnapshot]] | None = None
     # True solo mientras se persiste `succeeded` (UPDATE + último check + COMMIT).
     _finalizing: bool = field(default=False, init=False, repr=False)
 
@@ -280,6 +282,13 @@ class Worker:
         if job is None:
             return None
         return self._execute(job)
+
+    def refresh_sources(self) -> None:
+        """Publica el snapshot de fuentes (releases + manifest verificado) para el backend."""
+        if self.snapshot_sources is None:
+            return
+        for name, snapshot in self.snapshot_sources().items():
+            self.store.publish_source(name, snapshot)
 
     def retry_pending_run_closes(self) -> list[int]:
         """Aplica en MLflow los cierres pendientes (p. ej. MLflow estaba caído).

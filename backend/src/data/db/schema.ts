@@ -263,6 +263,21 @@ export const trainingJobs = mysqlTable(
   (table) => [index('training_jobs_status_created_idx').on(table.status, table.createdAt)],
 );
 
+/**
+ * D03-03 — Snapshot de las fuentes oficiales de Training que publica `trainer-worker`
+ * (Python: resolver de releases + manifest congelado de D03-01 verificado contra los
+ * datos). El backend lo lee para `GET /api/releases`, `GET /api/manifest` y la
+ * compuerta de training real; el worker vuelve a verificar contra los archivos antes
+ * de cada entrenamiento, así que este snapshot solo no basta para entrenar.
+ */
+export const p3TrainingSources = mysqlTable('p3_training_sources', {
+  name: mysqlEnum('name', ['releases', 'manifest']).primaryKey(),
+  status: mysqlEnum('status', ['ok', 'unavailable']).notNull(),
+  payload: text('payload'),
+  detail: text('detail'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+});
+
 export const trainingJobLogs = mysqlTable(
   'training_job_logs',
   {
