@@ -1,4 +1,5 @@
-"""Mutation testing de D02-05 (#45): jobs persistentes, trainer-worker y compuerta de training.
+"""Mutation testing de D02-05 (#45) y D03-03 (#60): jobs persistentes, trainer-worker,
+compuerta de training y entrenamiento real sobre fuentes verificadas.
 
 Para cada mutante: aplica un cambio en una línea concreta (debe aparecer exactamente una
 vez), corre SOLO los tests del área, registra QUÉ tests fallaron y restaura el archivo en
@@ -31,6 +32,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 WORKER_TESTS = ["tests/test_trainer_worker.py"]
 BACKEND_TESTS = ["tests/training-jobs.test.ts"]
+SOURCES_TESTS = ["tests/test_training_sources.py", "tests/test_trainer_worker_training.py"]
+P3_SOURCES_TESTS = ["tests/p3-sources.test.ts"]
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,8 @@ class Mutant:
 
 STORE, RUNNER = "app/trainer_worker/store.py", "app/trainer_worker/runner.py"
 SERVICE = "backend/src/logic/training-jobs.service.ts"
+SOURCES = "app/trainer_worker/sources.py"
+P3_SOURCES = "backend/src/logic/p3-sources.service.ts"
 
 MUTANTS = [
     # --- Las 5 mutaciones citadas en la descripción de #53 ---
@@ -112,6 +117,70 @@ MUTANTS = [
         "            if updated != 1 or (abort_if is not None and abort_if()):\n",
         "            if updated != 1:\n",
         WORKER_TESTS,
+    ),
+    # --- D03-03: fuentes reales verificadas y entrenamiento real ---
+    Mutant(
+        "app",
+        "D03-03 manifest",
+        "aceptar un artefacto que no coincide con el md5 versionado en DVC",
+        SOURCES,
+        "    if hashlib.md5(content).hexdigest() != declared_md5:",
+        "    if False:",
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-03 manifest",
+        "no recalcular manifest_hash (artefacto adulterado pasa)",
+        SOURCES,
+        "    if recomputed != manifest.manifest_hash:",
+        "    if False:",
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-03 identidad",
+        "no comparar dvc_release_hash con el release resuelto",
+        SOURCES,
+        "        or manifest.dvc_release_hash != expected_release_hash",
+        "        or False",
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-03 partición",
+        "no verificar la asignación contra los grupos reales (fuga entre splits)",
+        SOURCES,
+        "        verify_manifest_assignment(",
+        "        (lambda *_a, **_k: None)(",
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-03 test",
+        "cargar los píxeles de test en el dataset del trainer",
+        SOURCES,
+        'test=())',
+        'test=samples("test"))',
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-03 checkpoint",
+        "aceptar un checkpoint servido distinto del subido",
+        RUNNER,
+        "        if served != local_sha:",
+        "        if False:",
+        SOURCES_TESTS,
+    ),
+    Mutant(
+        "backend",
+        "D03-03 API",
+        "servir un payload publicado fuera de contrato",
+        P3_SOURCES,
+        "    if (!parsed.success) {",
+        "    if (false) {",
+        P3_SOURCES_TESTS,
     ),
 ]
 

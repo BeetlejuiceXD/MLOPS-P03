@@ -280,13 +280,22 @@ def test_leak_of_an_indivisible_group_across_splits_is_rejected(tmp_path):
     assert "Leakage" in excinfo.value.detail
 
 
-def test_artifact_of_another_data_identity_is_rejected(tmp_path):
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("images_md5", "f" * 32 + ".dir"),
+        ("annotations_md5", "e" * 32 + ".dir"),
+        # md5 correctos pero el hash de release declarado no es el de esos md5.
+        ("dvc_release_hash", "d" * 64),
+    ],
+)
+def test_artifact_of_another_data_identity_is_rejected(tmp_path, field, value):
     source, policy = _release(tmp_path)
 
-    def other_images(doc):
-        doc["images_md5"] = "f" * 32 + ".dir"
+    def other_identity(doc):
+        doc[field] = value
 
-    path, doc = _freeze(tmp_path, source, policy, mutate=other_images)
+    path, doc = _freeze(tmp_path, source, policy, mutate=other_identity)
 
     with pytest.raises(SourcesNotEligibleError) as excinfo:
         _verify(tmp_path, source, policy, path, doc)
