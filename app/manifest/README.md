@@ -95,6 +95,32 @@ cualquier partición, menos de 300 originales por clase tras exclusiones, un res
 cuyos conteos no coinciden con las asignaciones, o un artefacto coherente que no es
 el candidato regenerado (`candidate_drift`).
 
+**Mutation testing (D03-01).** `.github/scripts/run_manifest_freeze_mutations.py`
+aplica 19 mutantes (M01–M19) a `presentation/manifest_freeze.py`, uno por uno. Con cada
+uno corre `tests/test_manifest_freeze.py` completo y restaura el archivo al terminar.
+El test contra v0.1.1 real se excluye para que el resultado no dependa de `data/raw`.
+La base sin mutantes tiene que estar en verde.
+
+Del reporte JUnit de pytest el script saca qué tests fallan y cómo:
+
+- **aserción**: veredicto explícito del test: `AssertionError`, `pytest.fail` o `pytest.raises` que no se cumplió.
+- **excepción**: el test terminó con una excepción no esperada.
+
+Con eso clasifica cada mutante:
+
+| Estado | Cuándo |
+|---|---|
+| **KILLED** | Al menos un test falló por aserción y no hubo errores de colección o setup. |
+| **KILLED (solo excepción)** | Hubo fallos, pero ninguno fue por aserción. |
+| **SURVIVED** | Todos los tests pasaron. |
+| **ERROR** | Hubo un error de colección o setup, `rc` no fue 0 ni 1, o el texto a mutar no aparece exactamente una vez. |
+
+Un ERROR nunca cuenta como muerto. El script sale con 0 solo si todos los mutantes quedan KILLED.
+
+```bash
+cd app && uv run python ../.github/scripts/run_manifest_freeze_mutations.py   # ~20-30 min
+```
+
 ## Qué no hace (todavía)
 
 - `build_manifest_candidate` (D02-04) sigue entregando `frozen=False`: congelar y

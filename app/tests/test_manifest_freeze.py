@@ -28,6 +28,7 @@ from presentation.contracts import (
 from presentation.manifest_candidate import _dvc_release_hash, _manifest_hash
 from presentation.manifest_freeze import (
     FreezeBlockedError,
+    _artifact,
     _audit,
     _image_groups,
     _release_inputs,
@@ -121,16 +122,27 @@ def _freeze(crops, assignments, *, duplicate_pairs=(), min_originals=2, summary=
     )
 
 
+def _expect_block(reason, call):
+    """Exige que la AUDITORÍA bloquee con `reason`. Cualquier otro desenlace (no
+    bloquear, otro motivo o una excepción ajena como el `ValidationError` del contrato
+    final) es un fallo explícito del test, no un crash que lo mate por accidente."""
+    try:
+        call()
+    except FreezeBlockedError as error:
+        assert error.reason == reason, str(error)
+        return error
+    except Exception as error:
+        pytest.fail(f"se esperaba FreezeBlockedError({reason}), llegó {type(error).__name__}")
+    pytest.fail(f"se esperaba FreezeBlockedError({reason}) y la auditoría no bloqueó")
+
+
 def _blocked(reason, **kwargs):
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        _freeze(**kwargs)
-    assert excinfo.value.reason == reason, str(excinfo.value)
-    return excinfo.value
+    return _expect_block(reason, lambda: _freeze(**kwargs))
 
 
-def _audit_bytes(frozen, manifest, crops):
+def _audit_bytes(summary, manifest, crops):
     return _audit(
-        frozen.summary,
+        summary,
         manifest,
         crops=crops,
         duplicate_pairs=[],
@@ -262,7 +274,11 @@ def test_299_originals_of_a_class_blocks_freeze():
 def test_exactly_the_minimum_originals_still_freezes():
     crops, assignments = _dataset()  # 10 cat, 10 dog: justo en el umbral
 
-    assert _freeze(crops, assignments, min_originals=10).record.min_originals_per_class == 10
+    try:
+        frozen = _freeze(crops, assignments, min_originals=10)
+    except FreezeBlockedError as error:
+        pytest.fail(f"el borde exacto (10 = mínimo) debe congelar, pero bloqueó: {error}")
+    assert frozen.record.min_originals_per_class == 10
 
 
 def test_ratio_outside_tolerance_blocks_freeze():
@@ -340,13 +356,15 @@ def test_summary_counts_disagreeing_with_assignments_block_freeze():
 )
 def test_tampered_artifact_fields_are_rejected(mutate, reason):
     crops, assignments = _dataset()
-    frozen = _freeze(crops, assignments)
-    doc = json.loads(frozen.manifest)
+    # Artefacto armado sin pasar por la auditoría: el test llega a `_audit` aunque la
+    # validación del contrato sea justo lo que está roto.
+    summary = _summary(crops, assignments).model_copy(update={"frozen": True})
+    doc = json.loads(
+        _artifact(summary, assignments, images_md5=IMAGES_MD5, annotations_md5=ANNOTATIONS_MD5)
+    )
     mutate(doc)
 
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        _audit_bytes(frozen, _dumps(doc), crops)
-    assert excinfo.value.reason == reason, str(excinfo.value)
+    _expect_block(reason, lambda: _audit_bytes(summary, _dumps(doc), crops))
 
 
 # --- escritura y auditoría desde disco ------------------------------------------------
@@ -405,9 +423,13 @@ def _audit_disk(tmp_path, source, policy, manifest_path, reports_dir):
 
 
 def _disk_reason(tmp_path, source, policy, manifest_path, reports_dir):
-    with pytest.raises(FreezeBlockedError) as excinfo:
+    try:
         _audit_disk(tmp_path, source, policy, manifest_path, reports_dir)
-    return excinfo.value.reason
+    except FreezeBlockedError as error:
+        return error.reason
+    except Exception as error:
+        pytest.fail(f"se esperaba FreezeBlockedError, llegó {type(error).__name__}: {error}")
+    pytest.fail("la reauditoría desde disco no bloqueó")
 
 
 def test_end_to_end_freeze_keeps_the_candidate_and_audits_from_disk(tmp_path):
@@ -459,9 +481,9 @@ def test_unfrozen_summary_is_rejected_by_the_audit():
         frozen, summary=frozen.summary.model_copy(update={"frozen": False})
     )
 
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        _audit_bytes(unfrozen, frozen.manifest, crops)
-    assert excinfo.value.reason == "summary_not_frozen"
+    _expect_block(
+        "summary_not_frozen", lambda: _audit_bytes(unfrozen.summary, frozen.manifest, crops)
+    )
 
 
 def test_audit_from_disk_detects_a_moved_test_crop_even_with_dvc_updated(tmp_path):
@@ -550,10 +572,11 @@ def test_end_to_end_299_originals_after_exclusions_blocks_freeze(tmp_path):
         image_bytes={"dog_bad.jpg": _solid_jpeg(20, 20)},
     )
 
-    with pytest.raises(FreezeBlockedError) as excinfo:
-        _freeze_release(tmp_path, source, _policy(tmp_path, threshold=300))
-    assert excinfo.value.reason == "insufficient_originals"
-    assert excinfo.value.classes_below_minimum == ["dog"]
+    error = _expect_block(
+        "insufficient_originals",
+        lambda: _freeze_release(tmp_path, source, _policy(tmp_path, threshold=300)),
+    )
+    assert error.classes_below_minimum == ["dog"]
     assert not (tmp_path / "data" / "p3").exists()
 
 
