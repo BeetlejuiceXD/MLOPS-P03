@@ -1,5 +1,7 @@
 """Frozen JSON v1.0 contracts; validation only, without pipeline execution or I/O."""
 
+import hashlib
+import json
 from math import isclose
 from re import fullmatch
 from typing import Annotated, Literal, Self
@@ -218,3 +220,44 @@ class ManifestSummary(ContractModel):
                 if split.crops_per_class.get(class_name, 0) == 0:
                     raise ValueError(f"La clase {class_name} debe estar presente en {name}")
         return self
+
+
+# ---------------------------------------------------------------------------
+# D03-03 — Artefacto del manifest P3 CONGELADO (lo produce D03-01, lo consume Training).
+# ---------------------------------------------------------------------------
+
+
+class FrozenAssignments(ContractModel):
+    """crop_id por partición. El trainer solo recibe `train`/`val`; `test` se incluye
+    para poder verificar integridad (hash, cobertura, fuga), nunca para entrenar."""
+
+    train: Annotated[list[Count], Field(min_length=1)]
+    val: Annotated[list[Count], Field(min_length=1)]
+    test: Annotated[list[Count], Field(min_length=1)]
+
+
+class FrozenManifest(ContractModel):
+    """Manifest oficial congelado de D03-01 (versionado con DVC).
+
+    No basta `frozen: true`: Training recalcula `manifest_hash` desde el contenido,
+    `test_split_hash` desde la partición test, compara la identidad DVC contra el
+    release resuelto y vuelve a comprobar cobertura/fuga contra los crops reales
+    (`trainer_worker.sources.verify_training_sources`)."""
+
+    manifest_version: Annotated[str, Field(min_length=1)]
+    manifest_hash: Sha256Hex
+    dataset_version: DatasetVersion
+    dvc_release_hash: Sha256Hex
+    images_md5: Annotated[str, Field(min_length=1)]
+    annotations_md5: Annotated[str, Field(min_length=1)]
+    seed: Literal[42]
+    target_ratios: ManifestTargetRatios
+    frozen: Literal[True]
+    test_split_hash: Sha256Hex
+    assignments: FrozenAssignments
+
+
+def frozen_test_split_hash(test_crop_ids: list[int] | tuple[int, ...]) -> str:
+    """Hash de la partición test: SHA-256 del JSON canónico de sus crop_id ordenados."""
+    canonical = json.dumps(sorted(test_crop_ids), separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
