@@ -8,6 +8,7 @@ proporciones, clases y el mínimo de originales, y bloquea la congelación ante
 cualquier violación."""
 
 import dataclasses
+import hashlib
 import json
 from pathlib import Path
 
@@ -488,6 +489,36 @@ def test_audit_from_disk_detects_a_consistent_manifest_that_is_not_the_candidate
             frozen_reports_dir=tmp_path / "out",
         )
     assert excinfo.value.reason == "candidate_drift"
+
+
+def test_audit_from_disk_detects_an_altered_crop_even_with_its_sha256_updated(tmp_path):
+    """Una caja alterada en train_val.json y el sha256 del registro reescrito para
+    que cuadre: la auditoría contrasta cada entrada con los crops reales del release
+    (hueco detectado por la mutación M15)."""
+    source, policy = _balanced_release(tmp_path)
+    frozen = _freeze_release(tmp_path, source, policy)
+    manifest_dir, out = tmp_path / "data" / "manifest_p3", tmp_path / "out"
+    write_frozen_manifest(frozen, manifest_dir=manifest_dir, reports_dir=out)
+    payload = json.loads(frozen.train_val)
+    payload["splits"]["train"][0]["bbox_pixels"] = [0, 0, 9, 9]
+    altered = (json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
+    (manifest_dir / "train_val.json").write_bytes(altered)
+    record_path = out / "manifest_p3_freeze.json"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["train_val_sha256"] = hashlib.sha256(altered).hexdigest()
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(FreezeBlockedError) as excinfo:
+        audit_frozen_on_disk(
+            "v0.1.1",
+            repo_root=tmp_path,
+            reports_dir=tmp_path / "reports",
+            sources={"v0.1.1": source},
+            policy=policy,
+            manifest_dir=manifest_dir,
+            frozen_reports_dir=out,
+        )
+    assert excinfo.value.reason == "crop_mismatch"
 
 
 def test_end_to_end_299_originals_after_exclusions_blocks_freeze(tmp_path):
