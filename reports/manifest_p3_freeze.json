@@ -1,0 +1,56 @@
+{
+  "candidate_manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+  "crops": {
+    "test": 67,
+    "train": 467,
+    "val": 134
+  },
+  "crops_per_class": {
+    "test": {
+      "cat": 34,
+      "dog": 33
+    },
+    "train": {
+      "cat": 240,
+      "dog": 227
+    },
+    "val": {
+      "cat": 69,
+      "dog": 65
+    }
+  },
+  "dataset_version": "v0.1.1",
+  "duplicate_pairs": 0,
+  "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+  "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+  "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+  "frozen": true,
+  "groups_crossing_splits": 0,
+  "groups_multi_image": 0,
+  "groups_total": 600,
+  "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+  "manifest_version": "p3-v0.1.1-s42",
+  "min_originals_per_class": 300,
+  "originals": {
+    "test": 52,
+    "train": 422,
+    "val": 126
+  },
+  "originals_per_class": {
+    "test": {
+      "cat": 34,
+      "dog": 18
+    },
+    "train": {
+      "cat": 198,
+      "dog": 225
+    },
+    "val": {
+      "cat": 69,
+      "dog": 57
+    }
+  },
+  "seed": 42,
+  "test_sha256": "ace604f049e4b09f0253d06c22000a8c0bb6a0629d3b877aedd0df81ab82e81d",
+  "train_val_sha256": "16ed5dd71887c24cfdb03bbef6c9bbfafc88276581030c097f4ecabeb9ed385e"
+}
