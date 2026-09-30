@@ -77,6 +77,7 @@ FreezeBlockReason = Literal[
     "artifact_hash_mismatch",
     "artifact_invalid",
     "dvc_mismatch",
+    "summary_not_frozen",
     "test_hash_mismatch",
     "identity_mismatch",
     "candidate_drift",
@@ -220,7 +221,13 @@ def _audit(
     except ValidationError as error:
         raise FreezeBlockedError("artifact_invalid", str(error)) from error
 
-    # 2) Identidad: release, resumen publicado y hashes recalculados del contenido.
+    # 2) Identidad: resumen publicado congelado, release y hashes recalculados del
+    #    contenido. El artefacto ya exige `frozen: true` por contrato; el resumen
+    #    (reports/manifest_p3.json) también, o describiría un manifest no congelado.
+    if summary.frozen is not True:
+        raise FreezeBlockedError(
+            "summary_not_frozen", "el resumen publicado no declara frozen: true"
+        )
     if summary.dvc_release_hash != _dvc_release_hash(images_md5, annotations_md5):
         raise FreezeBlockedError(
             "release_hash_mismatch", "dvc_release_hash no corresponde a los md5 DVC del release"

@@ -87,7 +87,7 @@ cobertura y fuga, y nunca recorta ni carga sus píxeles.
 
 La auditoría (`FreezeBlockedError.reason`) es independiente del generador y bloquea
 la congelación ante: artefacto que no cumple el contrato o que no coincide con su
-`.dvc` o con el sha256 registrado, hash del release, del candidato o del split test
+`.dvc` o con el sha256 registrado, resumen publicado sin `frozen: true`, hash del release, del candidato o del split test
 adulterado, identidad distinta entre artefacto y resumen, crops sin asignar o
 desconocidos, originales o grupos near-duplicate que cruzan particiones (incluidos
 los puentes sin crops), proporciones fuera de ±5 pp sobre crops, clase ausente en
