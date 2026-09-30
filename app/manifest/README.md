@@ -57,13 +57,45 @@ política — 0.94 hoy). No se repite la deduplicación por bytes idénticos/`fi
 de `splits.stratified` (un bug de ingesta distinto, P2-22/23/24): un pHash de bytes
 idénticos ya da similitud 1.0, por encima de cualquier umbral razonable.
 
+## Manifest congelado (D03-01)
+
+`presentation.manifest_freeze` congela el candidato de D02-04 **sin reconstruirlo**:
+mismo split, `frozen: true`. `manifest_hash` no incluye `frozen`, así que la
+identidad del candidato y la del manifest congelado es la misma.
+
+```bash
+# Congelar (etapa DVC; falla sin escribir nada si la auditoría bloquea)
+dvc repro manifest_p3
+dvc push -r prod data/manifest_p3/train_val.json data/manifest_p3/test.json
+
+# Reauditar lo congelado (p. ej. tras un dvc pull): sha256, reglas y regeneración
+cd app
+uv run python -m presentation.manifest_freeze audit v0.1.1
+```
+
+| Archivo | Dónde vive | Quién lo usa |
+|---|---|---|
+| `data/manifest_p3/train_val.json` | caché DVC (remote `prod`) | trainer (D03-03), vía `manifest.frozen.load_train_val` |
+| `data/manifest_p3/test.json` | caché DVC (remote `prod`) | solo Ale (custodia del frozen test, #33) |
+| `reports/manifest_p3.json` | git | `ManifestSummary` (D01-05) con `frozen: true`, para `GET /api/manifest` |
+| `reports/manifest_p3_freeze.json` | git | identidad del release, sha256 de `train_val.json` y `test.json`, conteos por clase y grupos |
+
+train/val y test son salidas DVC separadas: el trainer descarga solo
+`dvc pull data/manifest_p3/train_val.json`. `load_train_val` rechaza el archivo si
+el registro no dice `frozen: true` o si su sha256 no es el registrado.
+
+La auditoría (`FreezeBlockedError.reason`) es independiente del generador y bloquea
+la congelación ante: hash del release o del candidato adulterado, sha256 de
+`train_val.json`/`test.json` distinto del registrado, crops sin asignar o
+alterados, originales o grupos near-duplicate que cruzan particiones (incluidos
+los puentes sin crops), proporciones fuera de ±5 pp sobre crops, clase ausente en
+cualquier partición, menos de 300 originales por clase tras exclusiones, o un
+resumen cuyos conteos no coinciden con las asignaciones.
+
 ## Qué no hace (todavía)
 
-- No decide si el manifest se congela — D03-01 hace la auditoría y congelación
-  oficial; este ticket entrega un candidato auditable, siempre con `frozen=False`.
-- No persiste el candidato en `reports/` ni agrega una etapa a `dvc.yaml`: sigue el
-  mismo patrón que `presentation.release_resolver`/`presentation.crops_report`
-  (CLI manual, reproducible, no integrado al pipeline DVC).
+- `build_manifest_candidate` (D02-04) sigue entregando `frozen=False`: congelar y
+  persistir es responsabilidad de `presentation.manifest_freeze` (D03-01).
 - No distribuye las etiquetas del test al trainer: `build_manifest_candidate`
   puede validar la integridad de la partición test (IDs, cobertura), pero no
   evalúa modelos ni expone resultados del frozen test.

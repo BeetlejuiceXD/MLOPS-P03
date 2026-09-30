@@ -89,3 +89,66 @@ stages:
     outs:
       - ../reports/projections.json:
           cache: false
+
+  manifest_p3:
+    wdir: app
+    cmd: uv run python dvc_manifest_p3_stage.py
+    deps:
+      # Cierre real de imports de la etapa (archivos, no carpetas: una carpeta
+      # arrastraría __pycache__ al md5 y dvc status cambiaría en cada clon).
+      - ../data/raw/annotations
+      - ../data/raw/images
+      - ../reports/versions.json
+      - ../reports/releases
+      - dvc_manifest_p3_stage.py
+      - analyzers/__init__.py
+      - analyzers/base.py
+      - analyzers/cross_split_leakage.py
+      - analyzers/duplicates.py
+      - analyzers/imbalance.py
+      - analyzers/invalid_boxes.py
+      - analyzers/small_objects.py
+      - analyzers/spatial_bias.py
+      - crops/__init__.py
+      - crops/engine.py
+      - crops/models.py
+      - ingestion/__init__.py
+      - ingestion/loader.py
+      - ingestion/models.py
+      - ingestion/release_sources.yaml
+      - manifest/__init__.py
+      - manifest/generator.py
+      - manifest/models.py
+      - policies/__init__.py
+      - policies/duplicates.py
+      - policies/models.py
+      - policies/quality.yaml
+      - presentation/__init__.py
+      - presentation/contracts.py
+      - presentation/crops_report.py
+      - presentation/gate.py
+      - presentation/manifest_candidate.py
+      - presentation/manifest_freeze.py
+      - presentation/release.py
+      - presentation/release_resolver.py
+      - presentation/splits.py
+      - splits/__init__.py
+      - splits/models.py
+      - splits/stratified.py
+      - storage/__init__.py
+      - storage/settings.py
+      - pyproject.toml
+      - uv.lock
+    params:
+      - manifest/manifest.yaml:
+          - train
+          - val
+          - test
+          - seed
+    outs:
+      - ../data/manifest_p3/train_val.json
+      - ../data/manifest_p3/test.json
+      - ../reports/manifest_p3.json:
+          cache: false
+      - ../reports/manifest_p3_freeze.json:
+          cache: false

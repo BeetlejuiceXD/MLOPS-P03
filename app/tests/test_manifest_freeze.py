@@ -26,12 +26,15 @@ from presentation.contracts import (
 from presentation.manifest_candidate import _dvc_release_hash, _manifest_hash
 from presentation.manifest_freeze import (
     FreezeBlockedError,
+    _image_groups,
+    _release_inputs,
     audit_frozen_on_disk,
     freeze_candidate,
     freeze_manifest,
     write_frozen_manifest,
 )
 from presentation.release_resolver import load_release_sources
+from tests.test_crops_report import CATEGORIES, _annotation, _policy, _prepare_release, _solid_jpeg
 from tests.test_manifest_candidate import _balanced_release
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -246,6 +249,12 @@ def test_299_originals_of_a_class_blocks_freeze():
     assert error.classes_below_minimum == ["cat", "dog"]
 
 
+def test_exactly_the_minimum_originals_still_freezes():
+    crops, assignments = _dataset()  # 10 cat, 10 dog: justo en el umbral
+
+    assert _freeze(crops, assignments, min_originals=10).record.min_originals_per_class == 10
+
+
 def test_ratio_outside_tolerance_blocks_freeze():
     crops, assignments = _dataset(n_train=10, n_val=6, n_test=4)  # 50/30/20
 
@@ -415,12 +424,95 @@ def test_audit_from_disk_detects_a_tampered_test_file(tmp_path):
     assert excinfo.value.reason == "test_hash_mismatch"
 
 
-def test_end_to_end_299_originals_blocks_freeze(tmp_path):
-    source, policy = _balanced_release(tmp_path, n_per_class=299, threshold=300)
+def test_audit_from_disk_detects_a_consistent_manifest_that_is_not_the_candidate(tmp_path):
+    """Archivos, hashes y registro coherentes entre sí, pero con dos originales de la
+    misma clase intercambiados entre train y val: no es el candidato de D02-04."""
+    source, policy = _balanced_release(tmp_path)
+    frozen = _freeze_release(tmp_path, source, policy)
+    inputs = _release_inputs(
+        "v0.1.1",
+        repo_root=tmp_path,
+        reports_dir=tmp_path / "reports",
+        sources={"v0.1.1": source},
+        policy=policy,
+    )
+    by_id = {crop.crop_id: crop for crop in inputs.crops}
+    splits = {**json.loads(frozen.train_val)["splits"], **json.loads(frozen.test)["splits"]}
+    assignments = {name: [e["crop_id"] for e in splits[name]] for name in SPLITS}
+    split_of = {c: name for name in SPLITS for c in assignments[name]}
+    crops_of_image = {}
+    for crop in inputs.crops:
+        crops_of_image.setdefault(crop.image_id, []).append(crop.crop_id)
+    # Grupos near-duplicate completos (indivisibles) con la misma composición de
+    # clases, uno en train y otro en val: intercambiarlos respeta todas las reglas.
+    groups = {}
+    for group in _image_groups(set(crops_of_image), inputs.duplicate_pairs):
+        ids = [c for i in group for c in crops_of_image[i]]
+        key = (split_of[ids[0]], tuple(sorted(by_id[c].category_name for c in ids)))
+        groups.setdefault(key, []).append(ids)
+    train_group, val_group = next(
+        (groups[key][0], groups[("val", key[1])][0])
+        for key in groups
+        if key[0] == "train" and ("val", key[1]) in groups
+    )
+    assignments["train"] = [c for c in assignments["train"] if c not in train_group] + val_group
+    assignments["val"] = [c for c in assignments["val"] if c not in val_group] + train_group
+    swapped_hash = _manifest_hash(
+        dataset_version="v0.1.1",
+        seed=42,
+        target_ratios={"train": 0.7, "val": 0.2, "test": 0.1},
+        assignments={name: tuple(sorted(ids)) for name, ids in assignments.items()},
+    )
+    tampered = freeze_candidate(
+        frozen.summary.model_copy(update={"manifest_hash": swapped_hash, "frozen": False}),
+        assignments,
+        crops=inputs.crops,
+        file_names=inputs.file_names,
+        duplicate_pairs=inputs.duplicate_pairs,
+        images_md5=inputs.images_md5,
+        annotations_md5=inputs.annotations_md5,
+        min_originals_per_class=inputs.min_originals_per_class,
+    )
+    assert tampered.summary.manifest_hash != frozen.summary.manifest_hash
+    manifest_dir = tmp_path / "data" / "manifest_p3"
+    write_frozen_manifest(tampered, manifest_dir=manifest_dir, reports_dir=tmp_path / "out")
 
     with pytest.raises(FreezeBlockedError) as excinfo:
-        _freeze_release(tmp_path, source, policy)
+        audit_frozen_on_disk(
+            "v0.1.1",
+            repo_root=tmp_path,
+            reports_dir=tmp_path / "reports",
+            sources={"v0.1.1": source},
+            policy=policy,
+            manifest_dir=manifest_dir,
+            frozen_reports_dir=tmp_path / "out",
+        )
+    assert excinfo.value.reason == "candidate_drift"
+
+
+def test_end_to_end_299_originals_after_exclusions_blocks_freeze(tmp_path):
+    """El release tiene 300+300 originales (D01-02 lo acepta), pero una caja de dog
+    cae fuera del binario real: tras la exclusión de crops quedan 299 dog."""
+    images = [
+        {"id": i, "file_name": f"img{i}.jpg", "width": 64, "height": 64} for i in range(1, 601)
+    ]
+    images[599] = {"id": 600, "file_name": "dog_bad.jpg", "width": 100, "height": 100}
+    annotations = [
+        _annotation(i, i, 4 if i <= 300 else 3, [0, 0, 10, 10]) for i in range(1, 600)
+    ] + [_annotation(600, 600, 3, [50, 50, 10, 10])]  # fuera del binario real 20x20
+    source = _prepare_release(
+        tmp_path,
+        "v0.1.1",
+        images=images,
+        annotations=annotations,
+        categories=CATEGORIES,
+        image_bytes={"dog_bad.jpg": _solid_jpeg(20, 20)},
+    )
+
+    with pytest.raises(FreezeBlockedError) as excinfo:
+        _freeze_release(tmp_path, source, _policy(tmp_path, threshold=300))
     assert excinfo.value.reason == "insufficient_originals"
+    assert excinfo.value.classes_below_minimum == ["dog"]
     assert not (tmp_path / "data" / "manifest_p3").exists()
 
 
@@ -441,6 +533,11 @@ def test_dvc_stage_versions_train_val_and_test_as_separate_outputs():
     for path in ("../reports/manifest_p3.json", "../reports/manifest_p3_freeze.json"):
         assert outs[path][path]["cache"] is False  # pequeños, versionados en git
     assert {"../data/raw/annotations", "../data/raw/images"} <= set(stage["deps"])
+    # Dependencias de código como archivos: una carpeta arrastra __pycache__ al md5
+    # y la etapa aparecería modificada en cada clon limpio.
+    code_deps = [d for d in stage["deps"] if not d.startswith("../")]
+    assert "presentation/manifest_freeze.py" in code_deps
+    assert all((REPO_ROOT / "app" / d).is_file() for d in code_deps), code_deps
     assert stage["params"] == [{"manifest/manifest.yaml": ["train", "val", "test", "seed"]}]
 
 
