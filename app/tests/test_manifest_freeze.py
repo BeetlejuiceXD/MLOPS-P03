@@ -437,6 +437,33 @@ def test_audit_from_disk_detects_an_edit_after_dvc_add(tmp_path):
     assert _disk_reason(tmp_path, source, policy, manifest_path, reports_dir) == "dvc_mismatch"
 
 
+def test_audit_from_disk_rejects_a_summary_that_is_no_longer_frozen(tmp_path):
+    """Solo `frozen: true -> false` en reports/manifest_p3.json (artefacto, `.dvc` y
+    registro intactos): el resumen publicado debe seguir congelado (auditoría #66)."""
+    source, policy = _balanced_release(tmp_path)
+    manifest_path, reports_dir = _write(tmp_path, _freeze_release(tmp_path, source, policy))
+    summary_path = reports_dir / "manifest_p3.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["frozen"] is True
+    summary["frozen"] = False
+    summary_path.write_bytes(_dumps(summary))
+
+    reason = _disk_reason(tmp_path, source, policy, manifest_path, reports_dir)
+    assert reason == "summary_not_frozen"
+
+
+def test_unfrozen_summary_is_rejected_by_the_audit():
+    crops, assignments = _dataset()
+    frozen = _freeze(crops, assignments)
+    unfrozen = dataclasses.replace(
+        frozen, summary=frozen.summary.model_copy(update={"frozen": False})
+    )
+
+    with pytest.raises(FreezeBlockedError) as excinfo:
+        _audit_bytes(unfrozen, frozen.manifest, crops)
+    assert excinfo.value.reason == "summary_not_frozen"
+
+
 def test_audit_from_disk_detects_a_moved_test_crop_even_with_dvc_updated(tmp_path):
     """Un crop de test movido a train y el `.dvc` regenerado: el sha256 del registro
     lo delata antes de interpretar el contenido."""
