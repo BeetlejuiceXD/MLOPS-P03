@@ -57,13 +57,74 @@ política — 0.94 hoy). No se repite la deduplicación por bytes idénticos/`fi
 de `splits.stratified` (un bug de ingesta distinto, P2-22/23/24): un pHash de bytes
 idénticos ya da similitud 1.0, por encima de cualquier umbral razonable.
 
+## Manifest congelado (D03-01)
+
+`presentation.manifest_freeze` congela el candidato de D02-04 **sin reconstruirlo**:
+mismo split, `frozen: true`. `manifest_hash` no incluye `frozen`, así que la
+identidad del candidato y la del manifest congelado es la misma.
+
+```bash
+cd app
+# Congelar (falla sin escribir nada si la auditoría bloquea)
+uv run python -m presentation.manifest_freeze freeze v0.1.1
+cd .. && dvc add data/p3/manifest.json && dvc push -r prod data/p3/manifest.json
+
+# Reauditar lo congelado (p. ej. tras un dvc pull): .dvc, sha256, reglas y regeneración
+cd app && uv run python -m presentation.manifest_freeze audit v0.1.1
+```
+
+| Archivo | Dónde vive | Quién lo usa |
+|---|---|---|
+| `data/p3/manifest.json` | caché DVC (remote `prod`); `manifest.json.dvc` en git | Training (D03-03, `trainer_worker.sources.verify_training_sources`) |
+| `reports/manifest_p3.json` | git | `ManifestSummary` (D01-05) con `frozen: true` |
+| `reports/manifest_p3_freeze.json` | git | identidad del release, sha256/md5 del artefacto, `test_split_hash`, conteos por clase y grupos |
+
+`data/p3/manifest.json` sigue el contrato `FrozenManifest` de
+`presentation/contracts.py`: identidad DVC del release, `seed`, `target_ratios`,
+`frozen: true`, `test_split_hash` (sha256 de los `crop_id` de test ordenados) y los
+`crop_id` de cada partición. Solo IDs: Training usa los de test para verificar
+cobertura y fuga, y nunca recorta ni carga sus píxeles.
+
+La auditoría (`FreezeBlockedError.reason`) es independiente del generador y bloquea
+la congelación ante: artefacto que no cumple el contrato o que no coincide con su
+`.dvc` o con el sha256 registrado, resumen publicado sin `frozen: true`, hash del release, del candidato o del split test
+adulterado, identidad distinta entre artefacto y resumen, crops sin asignar o
+desconocidos, originales o grupos near-duplicate que cruzan particiones (incluidos
+los puentes sin crops), proporciones fuera de ±5 pp sobre crops, clase ausente en
+cualquier partición, menos de 300 originales por clase tras exclusiones, un resumen
+cuyos conteos no coinciden con las asignaciones, o un artefacto coherente que no es
+el candidato regenerado (`candidate_drift`).
+
+**Mutation testing (D03-01).** `.github/scripts/run_manifest_freeze_mutations.py`
+aplica 19 mutantes (M01–M19) a `presentation/manifest_freeze.py`, uno por uno. Con cada
+uno corre `tests/test_manifest_freeze.py` completo y restaura el archivo al terminar.
+El test contra v0.1.1 real se excluye para que el resultado no dependa de `data/raw`.
+La base sin mutantes tiene que estar en verde.
+
+Del reporte JUnit de pytest el script saca qué tests fallan y cómo:
+
+- **aserción**: veredicto explícito del test: `AssertionError`, `pytest.fail` o `pytest.raises` que no se cumplió.
+- **excepción**: el test terminó con una excepción no esperada.
+
+Con eso clasifica cada mutante:
+
+| Estado | Cuándo |
+|---|---|
+| **KILLED** | Al menos un test falló por aserción y no hubo errores de colección o setup. |
+| **KILLED (solo excepción)** | Hubo fallos, pero ninguno fue por aserción. |
+| **SURVIVED** | Todos los tests pasaron. |
+| **ERROR** | Hubo un error de colección o setup, `rc` no fue 0 ni 1, o el texto a mutar no aparece exactamente una vez. |
+
+Un ERROR nunca cuenta como muerto. El script sale con 0 solo si todos los mutantes quedan KILLED.
+
+```bash
+cd app && uv run python ../.github/scripts/run_manifest_freeze_mutations.py   # ~20-30 min
+```
+
 ## Qué no hace (todavía)
 
-- No decide si el manifest se congela — D03-01 hace la auditoría y congelación
-  oficial; este ticket entrega un candidato auditable, siempre con `frozen=False`.
-- No persiste el candidato en `reports/` ni agrega una etapa a `dvc.yaml`: sigue el
-  mismo patrón que `presentation.release_resolver`/`presentation.crops_report`
-  (CLI manual, reproducible, no integrado al pipeline DVC).
+- `build_manifest_candidate` (D02-04) sigue entregando `frozen=False`: congelar y
+  persistir es responsabilidad de `presentation.manifest_freeze` (D03-01).
 - No distribuye las etiquetas del test al trainer: `build_manifest_candidate`
   puede validar la integridad de la partición test (IDs, cobertura), pero no
   evalúa modelos ni expone resultados del frozen test.
