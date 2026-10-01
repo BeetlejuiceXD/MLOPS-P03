@@ -25,13 +25,15 @@ COPY copilot/ ./copilot/
 COPY tracking/ ./tracking/
 COPY trainer_worker/ ./trainer_worker/
 COPY trainer/ ./trainer/
+COPY manifest/ ./manifest/
 
 # El volumen nombrado reports_data (docker-compose.yml) se inicializa la
 # primera vez con el contenido/dueño de este directorio si ya existe en la
 # imagen — por eso se crea y se le da dueño ANTES de montar el volumen y de
 # bajar a appuser, si no, la primera escritura de gate.py truena con
-# PermissionError (el volumen nace root:root).
-RUN mkdir -p /app/reports && chown appuser:appuser /app/reports
+# PermissionError (el volumen nace root:root). Igual /app/.torch: caché de pesos
+# preentrenados del trainer-worker (D03-03, volumen torch_cache).
+RUN mkdir -p /app/reports /app/.torch && chown appuser:appuser /app/reports /app/.torch
 
 ENV PATH="/app/.venv/bin:$PATH"
 USER appuser

@@ -115,7 +115,7 @@ def _migration_columns(table: str) -> set[str]:
 
 def test_worker_tables_match_the_backend_migrations():
     assert MIGRATION.is_file()
-    for table in (training_jobs, training_job_logs):
+    for table in (training_jobs, training_job_logs, store.p3_training_sources):
         assert _migration_columns(table.name) == {column.name for column in table.columns}
 
 
@@ -237,13 +237,15 @@ def test_invalid_config_fails_in_the_worker_without_creating_a_run(engine, job_s
     assert row.mlflow_run_id is None
 
 
-def test_real_training_is_not_run_by_this_worker(engine, job_store, tracking):
+def test_real_training_without_configured_sources_is_rejected(engine, job_store, tracking):
+    """D03-03: el training real necesita fuentes verificables; sin ellas no se entrena
+    (el camino elegible se prueba en test_trainer_worker_training.py)."""
     job_id = _insert(engine, task="training")
 
     assert _worker(job_store, tracking).run_once() == "failed"
 
     row = _row(engine, job_id)
-    assert "D03-03" in row.error
+    assert "fuentes" in row.error.lower()
     assert row.mlflow_run_id is None
 
 
@@ -679,6 +681,8 @@ class _FakeWorker:
         self.stopped = False
         self.worker_id = "worker-test"
         self.retries = 0
+        self.refreshes = 0
+        self.refresh_error: Exception | None = None
 
     def run_once(self):
         self.calls += 1
@@ -692,6 +696,11 @@ class _FakeWorker:
 
     def retry_pending_run_closes(self):
         self.retries += 1
+
+    def refresh_sources(self):
+        self.refreshes += 1
+        if self.refresh_error is not None:
+            raise self.refresh_error
 
     @property
     def stopping(self):
@@ -785,3 +794,78 @@ def test_settings_need_database_and_tracking(monkeypatch):
     assert settings.poll_seconds > 0
     assert settings.stale_after_seconds >= 30
     assert "u:p@" not in repr(settings)  # la URL con contraseña no se imprime
+    # D03-03: por defecto, datos/reportes del repo y el manifest congelado de D03-01.
+    assert settings.resolved_manifest_path() == settings.repo_root / "data/p3/manifest.json"
+    assert settings.sources_refresh_seconds > 0
+    monkeypatch.setenv("TRAINER_REPO_ROOT", "/app")
+    monkeypatch.setenv("P3_MANIFEST_PATH", "/app/data/p3/otro.json")
+    settings = worker_main.WorkerSettings()
+    kwargs = settings.sources_kwargs()
+    assert kwargs["repo_root"] == Path("/app") and kwargs["reports_dir"] == Path("/app/reports")
+    assert kwargs["manifest_path"] == Path("/app/data/p3/otro.json")
+    assert "v0.1.1" in kwargs["sources"]
+
+
+# --- D03-03: snapshot de fuentes que lee el backend ------------------------------------
+
+
+def test_store_publishes_and_replaces_the_sources_snapshot(job_store):
+    job_store.publish_source("manifest", store.SourceSnapshot("unavailable", None, "missing"))
+    job_store.publish_source("manifest", store.SourceSnapshot("ok", '{"a": 1}', None))
+    job_store.publish_source("releases", store.SourceSnapshot("ok", '{"approved": []}', None))
+
+    snapshot = job_store.read_sources()
+
+    assert set(snapshot) == {"manifest", "releases"}
+    assert snapshot["manifest"] == store.SourceSnapshot("ok", '{"a": 1}', None)
+    assert snapshot["releases"].payload == '{"approved": []}'
+
+
+def test_worker_publishes_the_snapshot_it_computes(job_store, tracking):
+    snapshot = {"releases": store.SourceSnapshot("ok", "{}", None)}
+    worker = _worker(job_store, tracking, snapshot_sources=lambda: snapshot)
+
+    worker.refresh_sources()
+
+    assert job_store.read_sources() == snapshot
+
+
+def test_worker_without_sources_configured_publishes_nothing(job_store, tracking):
+    _worker(job_store, tracking).refresh_sources()
+    assert job_store.read_sources() == {}
+
+
+def test_serve_refreshes_sources_at_start_and_then_every_interval():
+    fake = _FakeWorker([None] * 5)
+    times = iter([0.0, 10.0, 299.0, 300.0, 310.0])
+
+    worker_main.serve(
+        fake,
+        _FakeStore(),
+        poll_seconds=1.0,
+        stale_after=timedelta(seconds=60),
+        sleep=lambda _s: None,
+        max_iterations=5,
+        sources_refresh_seconds=300,
+        clock=lambda: next(times),
+    )
+
+    assert fake.refreshes == 2  # t=0 (arranque) y t=300
+
+
+def test_a_failing_sources_refresh_does_not_stop_the_worker():
+    fake = _FakeWorker(["succeeded", None])
+    fake.refresh_error = RuntimeError("MariaDB caída")
+
+    worker_main.serve(
+        fake,
+        _FakeStore(),
+        poll_seconds=1.0,
+        stale_after=timedelta(seconds=60),
+        sleep=lambda _s: None,
+        max_iterations=2,
+        sources_refresh_seconds=0,
+        clock=lambda: 0.0,
+    )
+
+    assert fake.calls == 2

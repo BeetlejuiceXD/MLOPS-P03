@@ -176,7 +176,16 @@ describe("entrenamiento real (compuerta)", () => {
   it.each([
     ["sin release aprobado", { "/api/releases": ok("releases_response", "valid-none-approved") }, /release aprobado/],
     ["manifest sin congelar", { "/api/manifest": ok("manifest_summary", "valid-not-frozen") }, /no está congelado/],
-    ["manifest no disponible", { "/api/manifest": { status: 503, body: { error: "x" } } }, /503/],
+    [
+      "manifest no disponible (503 con el motivo que publicó trainer-worker)",
+      { "/api/manifest": { status: 503, body: { error: "Fuente manifest no disponible: manifest_missing: sin data/p3" } } },
+      /503.*manifest_missing: sin data\/p3/,
+    ],
+    [
+      "releases no publicados todavía",
+      { "/api/releases": { status: 503, body: { error: "trainer-worker todavía no publicó la fuente releases" } } },
+      /todavía no publicó la fuente releases/,
+    ],
   ])("queda deshabilitado %s, pero la tarea controlada sigue disponible", async (_c, over, reason) => {
     mockApi({ ...SOURCES, ...over, "/api/training/jobs": { body: { jobs: [] } } });
     renderPage();
@@ -186,6 +195,34 @@ describe("entrenamiento real (compuerta)", () => {
     expect(screen.getByTestId("p3-state-blocked")).toHaveTextContent(reason);
     expect(screen.getByLabelText(/Tarea controlada/)).toBeChecked();
     expect(screen.getByRole("button", { name: "Encolar job" })).toBeEnabled();
+  });
+
+  it("con fuentes elegibles encola training real con el release y el hash del manifest congelado", async () => {
+    const manifest = fixturePayload("manifest_summary", "valid-frozen") as Record<string, unknown>;
+    const fetchMock = mockApi({
+      ...SOURCES,
+      "GET /api/training/jobs": { body: { jobs: [] } },
+      "POST /api/training/jobs": { status: 201, body: job("valid-queued") },
+    });
+    renderPage();
+    const real = await screen.findByLabelText(/Entrenamiento real/);
+    await waitFor(() => expect(field("Hash del manifest 70/20/10").value).toBe(manifest.manifest_hash));
+    expect(field("Release (dataset)").value).toBe(manifest.dataset_version);
+    fireEvent.click(real);
+    fireEvent.change(field("Seed"), { target: { value: "21" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Encolar job" }));
+
+    await waitFor(() => expect(posts(fetchMock, "/api/training/jobs")).toHaveLength(1));
+    const [, init] = posts(fetchMock, "/api/training/jobs")[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({
+      task: "training",
+      dataset_version: manifest.dataset_version,
+      manifest_hash: manifest.manifest_hash,
+      config: { seed: 21 },
+    });
+    expect(body.controlled).toBeUndefined();
   });
 
   it("con release y manifest elegibles se puede elegir; un 409 de la API se muestra", async () => {

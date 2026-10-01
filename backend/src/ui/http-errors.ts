@@ -1,5 +1,10 @@
 import type express from 'express';
-import { ConflictError, NotFoundError, ValidationError } from '../logic/errors.js';
+import {
+  ConflictError,
+  NotFoundError,
+  ServiceUnavailableError,
+  ValidationError,
+} from '../logic/errors.js';
 
 /**
  * SPEC-VALID-001 — Traduce un error de la capa Logic al código HTTP correcto.
@@ -20,6 +25,11 @@ export function sendError(res: express.Response, error: unknown, fallback: strin
 
   if (error instanceof ConflictError) {
     res.status(409).json({ error: error.message });
+    return;
+  }
+
+  if (error instanceof ServiceUnavailableError) {
+    res.status(503).json({ error: error.message });
     return;
   }
 

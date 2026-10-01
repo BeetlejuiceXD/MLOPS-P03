@@ -112,10 +112,16 @@ def train(
     dataset: TrainingDataset,
     *,
     after_step: Callable[[list[int]], None] = lambda _labels: None,
+    on_epoch_end: Callable[[EpochMetrics], None] = lambda _metrics: None,
 ) -> TrainingResult:
     """`after_step` es un gancho de prueba (cuenta pasos, captura orden de
     muestras); producción nunca lo usa — mismo patrón que `Worker.after_epoch`
-    en `trainer_worker`."""
+    en `trainer_worker`.
+
+    `on_epoch_end` (D03-03) recibe las métricas de cada época real en cuanto se
+    calculan: el trainer-worker lo usa para progreso/logs/MLflow y para cortar el
+    entrenamiento si se pide cancelar o detener (una excepción ahí aborta `train`).
+    No cambia el entrenamiento ni el criterio de parada/checkpoint."""
     seed_everything(config.seed)
     model = build_model(config)
     optimizer = _build_optimizer(model, config)
@@ -157,6 +163,7 @@ def train(
             learning_rate=config.learning_rate,
         )
         history.append(metrics)
+        on_epoch_end(metrics)
 
         # Checkpoint: puede desempatar por macro-F1/val_loss (is_better).
         if best is None or is_better(metrics, best):

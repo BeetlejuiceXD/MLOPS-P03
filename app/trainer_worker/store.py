@@ -70,6 +70,28 @@ training_job_logs = Table(
     Column("message", Text, nullable=False),
 )
 
+# D03-03 (0005_p3_training_sources.sql): snapshot de fuentes que lee el backend.
+p3_training_sources = Table(
+    "p3_training_sources",
+    metadata,
+    Column("name", String(16), primary_key=True),
+    Column("status", String(16), nullable=False),
+    Column("payload", Text),
+    Column("detail", Text),
+    Column("updated_at", DateTime, nullable=False),
+)
+
+
+@dataclass(frozen=True)
+class SourceSnapshot:
+    """Estado publicado de una fuente: `ok` con su JSON de contrato, o `unavailable`
+    con el motivo (nunca un payload inventado)."""
+
+    status: str
+    payload: str | None
+    detail: str | None
+
+
 TERMINAL = ("succeeded", "failed", "cancelled")
 RUN_TERMINAL = ("FINISHED", "FAILED", "KILLED")
 MAX_ERROR_CHARS = 2000
@@ -163,6 +185,27 @@ class JobStore:
 
     def set_run_id(self, job_id: int, worker_id: str, run_id: str) -> bool:
         return self._update_running(job_id, worker_id, mlflow_run_id=run_id)
+
+    def publish_source(self, name: str, snapshot: SourceSnapshot) -> None:
+        values = {
+            "status": snapshot.status,
+            "payload": snapshot.payload,
+            "detail": snapshot.detail,
+            "updated_at": utcnow(),
+        }
+        with self.engine.begin() as conn:
+            updated = conn.execute(
+                p3_training_sources.update()
+                .where(p3_training_sources.c.name == name)
+                .values(**values)
+            ).rowcount
+            if updated == 0:
+                conn.execute(p3_training_sources.insert().values(name=name, **values))
+
+    def read_sources(self) -> dict[str, SourceSnapshot]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(p3_training_sources)).all()
+        return {row.name: SourceSnapshot(row.status, row.payload, row.detail) for row in rows}
 
     def mlflow_run_id(self, job_id: int) -> str | None:
         with self.engine.connect() as conn:

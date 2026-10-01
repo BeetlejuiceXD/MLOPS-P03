@@ -1254,9 +1254,9 @@ worker (un job inválido que llegue a la tabla termina `failed` sin crear run).
   registra por época métricas sintéticas `controlled_*` y crea un run con tag
   `p3.run_kind=controlled_task` (Experiments debe filtrarlo: no es corrida de la campaña).
   `controlled.fail_at_epoch` fuerza un fallo en esa época.
-- `training` — entrenamiento real. **Cerrado por defecto:** la API responde `409` hasta
-  que existan el release aprobado y el manifest congelado oficiales (D03-01/D03-03). La
-  compuerta (`createEligibilityGate`) ya está probada con los fixtures de contratos.
+- `training` — entrenamiento real con el trainer de D02-03 (ver **D03-03** abajo). La
+  API responde `409` con el motivo mientras no haya release aprobado y manifest
+  congelado oficiales verificados.
 
 **Interrupciones (sin duplicar entrenamientos):**
 
@@ -1291,7 +1291,7 @@ entrenamiento real (409), éxito, fallo controlado, cancelación, SIGTERM, SIGKI
 recuperación y `down`/`up` con jobs y logs idénticos; imprime Job IDs, estados y run IDs.
 Los fixtures de `contracts/p3/fixtures` son evidencia de componente, no de integración.
 
-**Mutaciones:** `.github/scripts/run_jobs_mutations.py` aplica 7 mutantes (claim atómico,
+**Mutaciones:** `.github/scripts/run_jobs_mutations.py` aplica 7 mutantes de D02-05 (claim atómico,
 latido vencido, cierre pendiente del run huérfano, compuerta release/manifest y las dos
 protecciones del cierre), corre solo los tests del área, informa qué tests detectaron
 cada uno y restaura el archivo. CI lo corre en los jobs Python y Backend:
@@ -1299,3 +1299,74 @@ cada uno y restaura el archivo. CI lo corre en los jobs Python y Backend:
 ```bash
 cd app && uv run python ../.github/scripts/run_jobs_mutations.py   # ambas suites
 ```
+
+## D03-03 — Training real con trainer y datos reales
+
+`task=training` entrena de verdad desde el portal: `trainer-worker` toma el job (mismo
+claim, estados, cancelación, SIGTERM y recuperación de D02-05) y corre `trainer.engine.train`
+sobre el **release aprobado** + el **manifest P3 congelado** de D03-01, solo con train/val.
+
+**Fuentes (una sola verdad, verificada en Python):**
+
+1. El manifest congelado es `data/p3/manifest.json` + `data/p3/manifest.json.dvc`
+   (ruta configurable con `P3_MANIFEST_PATH`). Contrato: `FrozenManifest` en
+   `app/presentation/contracts.py` (`frozen: true`, `seed: 42`, identidad DVC,
+   `test_split_hash` y `assignments` train/val/test por `crop_id`).
+2. `trainer_worker/sources.py::verify_training_sources` rechaza **antes de entrenar**, con
+   un motivo estable, si: falta el artefacto (`manifest_missing`), no está congelado
+   (`manifest_not_frozen`), no está versionado o no coincide con el md5 de su `.dvc`
+   (`manifest_not_versioned`/`manifest_dvc_mismatch`), su `manifest_hash` o
+   `test_split_hash` no corresponden al contenido (`manifest_hash_mismatch`/
+   `test_hash_mismatch`), el job pide otro release/hash (`request_mismatch`), el release
+   no está aprobado por el resolver D01-02 (`release_<motivo>`), la identidad DVC no es la
+   del release (`identity_mismatch`) o la partición no es válida contra los crops y grupos
+   near-duplicate **recalculados desde los datos** (`invalid_partition`).
+3. Cada `TRAINER_SOURCES_REFRESH_SECONDS` (300) el worker publica el resultado en
+   `p3_training_sources` (migración `0005`). El backend lo sirve en `GET /api/releases` y
+   `GET /api/manifest` (validado otra vez contra los contratos; `503` con el motivo si no
+   está disponible, nunca datos vacíos) y la compuerta de `POST /api/training/jobs` lo
+   usa para responder `409`. El worker **vuelve a verificar contra los archivos** al tomar
+   cada job: el snapshot solo sirve para la UI y la compuerta.
+
+**Qué llega al trainer:** `build_training_dataset` recorta los crops (bbox D01-07) de
+train y val; `TrainingDataset.test` va vacío y los píxeles de test nunca se recortan ni se
+cargan para entrenar (Ale custodia el frozen test, #33). La verificación sí lee las
+imágenes del release para recalcular crops y near-duplicates (auditoría de integridad,
+igual que D03-01), sin pasarlas al modelo.
+
+**Trazabilidad en MLflow (run `p3.run_kind=training`):**
+
+- Tags `git_commit`, `dvc_release`, `dvc_images_md5`, `dvc_annotations_md5`,
+  `dvc_release_hash`, `manifest_version`, `manifest_hash`, `classes`, `seed`, `job_id`,
+  `stopped_early`, `device`, `checkpoint_sha256`.
+- Params: el `TrainingConfig` completo + `classes`.
+- Métricas por época (`train_loss`, `train_accuracy`, `val_loss`, `val_accuracy`,
+  `val_macro_f1`, `learning_rate`) y resumen (`best_epoch`, `best_val_*`,
+  `duration_seconds`, `peak_memory_mb`). Nunca métricas de test.
+- Artefactos `checkpoint/`: `model.pt` (mejor época), `training_config.json`,
+  `class_map.json`, `environment.json`, `sources.json`. Tras subirlo, el worker lo
+  **descarga del servidor y compara el sha256**; si no coincide, el job termina `failed`.
+- El progreso del job avanza con cada época real (`on_epoch_end` de `train()`), y
+  cancelación/SIGTERM se atienden al final de cada época.
+
+**Compose:** `trainer-worker` monta `./data/raw`, `./reports` y `./data/p3` en solo
+lectura (`TRAINER_REPO_ROOT=/app`), recibe `GIT_COMMIT` (exporta
+`GIT_COMMIT=$(git rev-parse HEAD)` antes de `docker compose up`) y guarda los pesos
+preentrenados de torchvision en el volumen `torch_cache`. Para entrenar con v0.1.1:
+
+```bash
+dvc pull -r prod                         # datos del release (SSO de AWS)
+# data/p3/manifest.json(.dvc) congelado por D03-01 en el repo / `dvc pull`
+GIT_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+```
+
+Sin datos o sin manifest (p. ej. en CI), el portal muestra el motivo y solo ofrece la
+tarea controlada.
+
+**Evidencia:** `tests/test_training_sources.py` (verificación y adaptador),
+`tests/test_trainer_worker_training.py` (entrenamiento real con worker, MLflow,
+cancelación, SIGTERM, error del trainer y checkpoint no verificable),
+`backend/tests/p3-sources.test.ts` y `frontend/tests/p3-training.test.tsx`. El job de CI
+**Jobs persistentes** comprueba además que el worker publica las fuentes reales y que,
+sin datos, la API responde `503`/`409` con el motivo. Mutantes D03-03 (8 a 14) en
+`run_jobs_mutations.py`.

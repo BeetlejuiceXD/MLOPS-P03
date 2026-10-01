@@ -42,7 +42,9 @@ function realTrainingStatus(
 /**
  * Training (D01-05 → D02-05): formulario de TrainingConfig, jobs persistentes y
  * procedencia. La tarea controlada no necesita release ni manifest oficiales; el
- * entrenamiento real se bloquea con su motivo hasta que ambos sean elegibles (D03-03).
+ * entrenamiento real (D03-03) usa las fuentes que trainer-worker verificó y publicó
+ * (`GET /api/releases`, `GET /api/manifest`) y se bloquea con su motivo si no son
+ * elegibles. El worker las vuelve a verificar contra los archivos antes de entrenar.
  */
 export function TrainingPage({ pollMs = 3000 }: Readonly<{ pollMs?: number }>) {
   const releases = useReleases();

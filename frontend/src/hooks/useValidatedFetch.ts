@@ -16,12 +16,28 @@ type FetchState<T> =
   | { status: "error"; message: string }
   | { status: "success"; data: T };
 
+async function errorReason(res: Response): Promise<string | null> {
+  try {
+    const body: unknown = await res.json();
+    return body && typeof body === "object" && "error" in body && typeof body.error === "string"
+      ? body.error
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Wraps native fetch + Zod validation so no component ever trusts an
  * unvalidated backend payload. On a schema mismatch we surface a generic
  * error instead of silently rendering `undefined`/`NaN` in the UI.
  */
-export function useValidatedFetch<T>(url: string, schema: ZodSchema<T>) {
+export function useValidatedFetch<T>(
+  url: string,
+  schema: ZodSchema<T>,
+  options: Readonly<{ showServerReason?: boolean }> = {}
+) {
+  const { showServerReason = false } = options;
   const [state, setState] = useState<FetchState<T>>({ status: "loading" });
 
   const load = useCallback(() => {
@@ -35,7 +51,12 @@ export function useValidatedFetch<T>(url: string, schema: ZodSchema<T>) {
     fetch(requestUrl)
       .then(async (res) => {
         if (!res.ok) {
-          throw new Error(`El servidor respondió con estado ${res.status}.`);
+          // Opcional: si la API explica el motivo ({ error }), se añade al mensaje. Lo usan
+          // las fuentes de Training (D03-03), cuyo 503 trae lo que publicó trainer-worker.
+          const reason = showServerReason ? await errorReason(res) : null;
+          throw new Error(
+            `El servidor respondió con estado ${res.status}${reason ? `: ${reason}` : "."}`
+          );
         }
         const json: unknown = await res.json();
         const parsed = schema.safeParse(json);
@@ -56,7 +77,7 @@ export function useValidatedFetch<T>(url: string, schema: ZodSchema<T>) {
     return () => {
       cancelled = true;
     };
-  }, [url, schema]);
+  }, [url, schema, showServerReason]);
 
   useEffect(() => load(), [load]);
 

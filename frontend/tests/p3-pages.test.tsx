@@ -186,10 +186,14 @@ describe("errores y respuestas incompatibles", () => {
   });
 
   it("D02-05: si falla el manifest, Training bloquea solo el entrenamiento real", async () => {
-    mockApi({ ...TRAINING_READY, "/api/manifest": { status: 503, body: { error: "x" } } });
+    mockApi({
+      ...TRAINING_READY,
+      "/api/manifest": { status: 503, body: { error: "manifest_missing: sin manifest" } },
+    });
     renderAt("/ml/training");
+    // D03-03: el motivo que publicó trainer-worker se muestra junto al estado.
     expect(await screen.findByTestId("p3-state-blocked")).toHaveTextContent(
-      "El servidor respondió con estado 503."
+      "El servidor respondió con estado 503: manifest_missing: sin manifest"
     );
     // La tarea controlada no depende del manifest oficial (#45).
     expect(screen.getByRole("button", { name: "Encolar job" })).toBeInTheDocument();

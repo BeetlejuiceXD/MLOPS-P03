@@ -4,6 +4,8 @@ import { env } from '../config/env.js';
 import {
   checkHealth,
   createAnnotationForImage,
+  createEligibilityGate,
+  createP3SourcesService,
   createSettingsService,
   createTrainingJobsService,
   deleteAnnotation,
@@ -16,14 +18,15 @@ import {
   idParamSchema,
   imageSearchSchema,
   initializeApplication,
+  mariaDbP3SourcesRepository,
   mariaDbTrainingJobRepository,
-  officialSourcesUnavailableGate,
   searchImages,
   setImageStatus,
   updateAnnotation,
   uploadImage,
 } from '../logic/index.js';
 import { sendError } from './http-errors.js';
+import { createP3SourcesRouter } from './p3-sources.routes.js';
 import { createTrainingRouter } from './training.routes.js';
 
 /**
@@ -50,12 +53,17 @@ const port = env.PORT;
 app.use(express.json());
 const settingsService = createSettingsService(env.PIPELINE_CONFIG_ROOT);
 
-// D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`.
-// Hasta D03-01/D03-03 el training real queda cerrado (solo tareas controladas).
+// D03-03: fuentes oficiales (releases + manifest congelado) que verifica y publica
+// `trainer-worker`; alimentan GET /api/releases, GET /api/manifest y la compuerta real.
+const p3Sources = createP3SourcesService(mariaDbP3SourcesRepository);
+app.use(createP3SourcesRouter(p3Sources));
+
+// D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`, que
+// vuelve a verificar las fuentes contra los archivos antes de entrenar (D03-03).
 app.use(
   '/training',
   createTrainingRouter(
-    createTrainingJobsService(mariaDbTrainingJobRepository, officialSourcesUnavailableGate),
+    createTrainingJobsService(mariaDbTrainingJobRepository, createEligibilityGate(p3Sources)),
   ),
 );
 

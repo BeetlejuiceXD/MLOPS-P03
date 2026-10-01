@@ -178,6 +178,21 @@ services:
       # siguiente vuelta, en vez de bloquear el worker minutos en reintentos HTTP.
       MLFLOW_HTTP_REQUEST_MAX_RETRIES: "2"
       MLFLOW_HTTP_REQUEST_TIMEOUT: "10"
+      # D03-03: fuentes reales de Training. /app es la raíz del repo dentro del contenedor
+      # (data/raw, reports y data/p3 montados abajo); el manifest congelado de D03-01 vive
+      # en data/p3/manifest.json (+ .dvc). Cada TRAINER_SOURCES_REFRESH_SECONDS el worker
+      # vuelve a verificar y publica el snapshot que sirve la API (GET /api/releases|manifest).
+      TRAINER_REPO_ROOT: /app
+      TRAINER_SOURCES_REFRESH_SECONDS: ${TRAINER_SOURCES_REFRESH_SECONDS:-300}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      # appuser no tiene home: pesos preentrenados de torchvision en un volumen propio.
+      TORCH_HOME: /app/.torch
+    volumes:
+      # Solo lectura: el worker nunca modifica el release, los reportes ni el manifest.
+      - ./data/raw:/app/data/raw:ro
+      - ./reports:/app/reports:ro
+      - ./data/p3:/app/data/p3:ro
+      - torch_cache:/app/.torch
     stop_grace_period: 20s
     restart: on-failure:5
 
@@ -201,4 +216,5 @@ services:
 
 volumes:
   mariadb_data:
+  torch_cache:
   minio_data:
