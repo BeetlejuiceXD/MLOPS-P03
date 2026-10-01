@@ -448,6 +448,10 @@ jobs:
         run: >-
           docker run --rm p3-app-check python -c
           "from training.class_map import CLASS_MAP; assert CLASS_MAP == {'cat': 0, 'dog': 1}; print(CLASS_MAP)"
+      - name: El productor de la evaluación se importa dentro de la imagen (D04-05)
+        run: >-
+          docker run --rm p3-app-check python -c
+          "from evaluation.producer import produce_evaluation; from evaluation.store import EvaluationStore; print('evaluation OK')"
 
   backend-image:
     name: Imagen backend (arranca desde cero)

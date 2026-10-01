@@ -134,10 +134,13 @@ def produce(namespace: str, model_run_id: str = CANDIDATE, drop: list[int] | Non
     result = subprocess.run(
         [*COMPOSE_RUN, "python", "-c", PRODUCER, args],
         cwd=REPO,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        print(result.stdout, result.stderr, sep="\n", flush=True)
+        fail(f"el productor terminó con código {result.returncode} ({args})")
     print(f"productor {args} → {result.stdout.strip()}", flush=True)
     return json.loads(result.stdout.strip().splitlines()[-1])
 
