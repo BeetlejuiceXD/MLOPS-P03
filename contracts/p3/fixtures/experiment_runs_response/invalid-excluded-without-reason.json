@@ -1,0 +1,18 @@
+{
+  "contract": "experiment_runs_response",
+  "valid": false,
+  "why": "Un run excluido debe decir por qué",
+  "payload": {
+    "experiment_name": "p3-cnn-classifier",
+    "runs": [],
+    "excluded": [
+      {
+        "run_id": "11111111111111111111111111111111",
+        "run_kind": "controlled_task",
+        "status": "FINISHED",
+        "start_time": "2026-09-25T10:00:00Z",
+        "reasons": []
+      }
+    ]
+  }
+}
