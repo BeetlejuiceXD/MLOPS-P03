@@ -1294,7 +1294,7 @@ Los fixtures de `contracts/p3/fixtures` son evidencia de componente, no de integ
 **Mutaciones:** `.github/scripts/run_jobs_mutations.py` aplica 7 mutantes de D02-05 (claim atómico,
 latido vencido, cierre pendiente del run huérfano, compuerta release/manifest y las dos
 protecciones del cierre), corre solo los tests del área, informa qué tests detectaron
-cada uno y restaura el archivo. CI lo corre en los jobs Python y Backend:
+cada uno y restaura el archivo. CI lo corre en los jobs "Mutaciones Python" (`--suite app`) y Backend:
 
 ```bash
 cd app && uv run python ../.github/scripts/run_jobs_mutations.py   # ambas suites
