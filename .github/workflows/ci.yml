@@ -393,7 +393,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, python-mutations, backend, frontend, compose, mlflow-persistence, training-jobs, short-run-instrumentation, quality-gate, quality-gate-prod, app-image]
+    needs: [python, python-mutations, backend, frontend, compose, mlflow-persistence, training-jobs, short-run-instrumentation, quality-gate, quality-gate-prod, app-image, backend-image]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -423,3 +423,23 @@ jobs:
         run: >-
           docker run --rm p3-app-check python -c
           "from training.class_map import CLASS_MAP; assert CLASS_MAP == {'cat': 0, 'dog': 1}; print(CLASS_MAP)"
+
+  backend-image:
+    name: Imagen backend (arranca desde cero)
+    # D03-06: el arranque limpio produjo una imagen sin el binario de esbuild que usa tsx
+    # (drizzle-kit migrate, db:seed) y el backend moría al arrancar. Ningún job construía
+    # esta imagen. Se construye sin caché y se comprueba que tsx transpila dentro de ella.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Construir la imagen del backend sin caché
+        run: docker build --no-cache --pull -t p3-backend-check backend
+      - name: Cada esbuild de la imagen tiene su binario de plataforma
+        run: docker run --rm --entrypoint node p3-backend-check docker/check-esbuild.mjs
+      - name: tsx (migraciones y seed) transpila TypeScript dentro de la imagen
+        run: >-
+          docker run --rm --entrypoint npx p3-backend-check --no-install
+          tsx -e "const n: number = 1; console.log('tsx OK', n)"
