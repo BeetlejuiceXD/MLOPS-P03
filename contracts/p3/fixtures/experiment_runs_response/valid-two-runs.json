@@ -77,7 +77,10 @@
             "val_macro_f1": 0.8391,
             "learning_rate": 0.001
           }
-        ]
+        ],
+        "checkpoint_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "campaign_eligible": true,
+        "ineligible_reasons": []
       },
       {
         "run_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -128,8 +131,14 @@
             "val_macro_f1": 0.7,
             "learning_rate": 0.001
           }
+        ],
+        "checkpoint_sha256": null,
+        "campaign_eligible": false,
+        "ineligible_reasons": [
+          "estado RUNNING: run incompleto"
         ]
       }
-    ]
+    ],
+    "excluded": []
   }
 }
