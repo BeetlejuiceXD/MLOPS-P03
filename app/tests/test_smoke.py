@@ -316,7 +316,9 @@ def test_best_epoch_must_be_an_existing_integer_epoch(trained, official, tmp_pat
 
     report = verify_smoke(clone, tracking_uri=uri, workdir=tmp_path / "w", sources=official)
 
-    assert any("best_epoch" in p for p in report.problems)
+    # El motivo debe ser el propio best_epoch, no un efecto secundario (p. ej. que la
+    # curva no tenga esa época): así el chequeo de best_epoch se prueba por sí solo.
+    assert any(f"best_epoch={best_epoch} no es una época registrada" in p for p in report.problems)
 
 
 @pytest.mark.parametrize(
