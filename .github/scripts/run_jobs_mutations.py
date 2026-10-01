@@ -1,5 +1,6 @@
-"""Mutation testing de D02-05 (#45), D03-03 (#60) y D03-04 (#61): jobs persistentes, trainer-worker,
-compuerta de training y entrenamiento real sobre fuentes verificadas.
+"""Mutation testing de D02-05 (#45), D03-03 (#60) y D03-04 (#61, B1/B2 de #69):
+jobs persistentes, trainer-worker, compuerta de training y entrenamiento real sobre fuentes
+verificadas.
 
 Para cada mutante: aplica un cambio en una línea concreta (debe aparecer exactamente una
 vez), corre SOLO los tests del área, registra QUÉ tests fallaron y restaura el archivo en
@@ -228,6 +229,89 @@ MUTANTS = [
         SMOKE,
         '    if stored_config != job["config"]:',
         "    if False:",
+        SMOKE_TESTS,
+    ),
+    # --- D03-04 B1: historial por época y resumen best_* (auditoría de #69) ---
+    Mutant(
+        "app",
+        "D03-04 B1",
+        "aceptar épocas duplicadas en el historial",
+        SMOKE,
+        "        if duplicated:",
+        "        if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B1",
+        "aceptar un historial que no cubre exactamente 1..epoch",
+        SMOKE,
+        "        elif sorted(steps) != list(range(1, epoch + 1)):",
+        "        elif False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B1",
+        "aceptar best_epoch no entero o fuera de las épocas registradas",
+        SMOKE,
+        "    if not float(raw).is_integer() or not 1 <= int(raw) <= epoch:",
+        "    if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B1",
+        "contrastar solo best_val_accuracy (no macro-F1 ni loss)",
+        SMOKE,
+        "    for summary, curve in BEST_SUMMARY:",
+        "    for summary, curve in BEST_SUMMARY[:1]:",
+        SMOKE_TESTS,
+    ),
+    # --- D03-04 B2: procedencia contra las fuentes oficiales ---
+    Mutant(
+        "app",
+        "D03-04 B2",
+        "aceptar el tag classes que declare el run",
+        SMOKE,
+        '        "classes": frozen_classes,',
+        '        "classes": tags.get("classes"),',
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B2",
+        "aceptar el dvc_images_md5 que declare el run",
+        SMOKE,
+        '            "dvc_images_md5": release["images_md5"],',
+        '            "dvc_images_md5": tags.get("dvc_images_md5"),',
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B2",
+        "no recalcular dvc_release_hash desde los md5 oficiales",
+        SMOKE,
+        '        if tags.get("dvc_release_hash") != recomputed:',
+        "        if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B2",
+        "aceptar un job cuyo release no está aprobado",
+        SMOKE,
+        "    if release is None:",
+        "    if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 B2",
+        "no contrastar sources.json del checkpoint con el run",
+        SMOKE,
+        "        if recorded.get(name) != value:",
+        "        if False:",
         SMOKE_TESTS,
     ),
 ]
