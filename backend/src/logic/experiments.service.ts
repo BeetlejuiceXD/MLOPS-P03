@@ -101,21 +101,20 @@ function typedParam(value: string): unknown {
 const asRecord = (pairs: { key: string; value: string }[] = []) =>
   Object.fromEntries(pairs.map(({ key, value }) => [key, value]));
 
-const STATUS = new Set(['RUNNING', 'FINISHED', 'FAILED', 'KILLED']);
+// Estados de un run de MLflow (RunStatus). Se conservan tal cual; nunca se sustituye uno por otro.
+const STATUS = new Set(['RUNNING', 'SCHEDULED', 'FINISHED', 'FAILED', 'KILLED']);
+// #33 / D03-04: ningún run de entrenamiento trae métricas del frozen test.
+const TEST_METRIC = /^test/i;
 
 function excludedFrom(run: MlflowRun, kind: string | null, reasons: string[]): Classified {
-  const status = STATUS.has(run.info.status) ? run.info.status : 'FAILED';
-  const extra = STATUS.has(run.info.status)
-    ? []
-    : [`estado desconocido de MLflow: ${run.info.status}`];
   return {
     kind: 'excluded',
     excluded: {
       run_id: run.info.run_id,
       run_kind: kind,
-      status: status as ExcludedRun['status'],
+      status: run.info.status as ExcludedRun['status'],
       start_time: toIso(run.info.start_time) as string,
-      reasons: [...reasons, ...extra],
+      reasons,
     },
   };
 }
@@ -173,6 +172,11 @@ export function createExperimentsService(mlflow: MlflowReader): ExperimentsServi
   }
 
   async function classify(run: MlflowRun): Promise<Classified> {
+    if (!STATUS.has(run.info.status)) {
+      throw new MlflowUnavailableError(
+        `MLflow devolvió el estado ${run.info.status} para el run ${run.info.run_id}, que no es un RunStatus de MLflow; no se sustituye por otro`,
+      );
+    }
     const tags = asRecord(run.data.tags);
     const kind = tags[RUN_KIND_TAG] || null;
     if (kind === null) {
@@ -183,6 +187,14 @@ export function createExperimentsService(mlflow: MlflowReader): ExperimentsServi
     }
 
     const reasons: string[] = [];
+    const testMetrics = (run.data.metrics ?? [])
+      .map((m) => m.key)
+      .filter((key) => TEST_METRIC.test(key));
+    if (testMetrics.length > 0) {
+      reasons.push(
+        `métricas de test en el run (${testMetrics.sort().join(', ')}): el frozen test no se evalúa antes de MODEL SELECTION CLOSED (#33)`,
+      );
+    }
     for (const name of PROVENANCE_TAGS) {
       if (!tags[name])
         reasons.push(`tags.${name}: falta en MLflow (no se rellena con el valor oficial)`);
@@ -234,7 +246,7 @@ export function createExperimentsService(mlflow: MlflowReader): ExperimentsServi
       experiment_name: P3_EXPERIMENT,
       status,
       start_time: toIso(run.info.start_time),
-      end_time: status === 'RUNNING' ? null : toIso(run.info.end_time),
+      end_time: status === 'RUNNING' || status === 'SCHEDULED' ? null : toIso(run.info.end_time),
       params,
       tags: {
         ...Object.fromEntries(PROVENANCE_TAGS.map((name) => [name, tags[name]])),

@@ -313,7 +313,7 @@ export const experimentRunSchema = z
   .strictObject({
     run_id: mlflowRunIdSchema,
     experiment_name: z.literal(P3_EXPERIMENT),
-    status: z.enum(['RUNNING', 'FINISHED', 'FAILED', 'KILLED']),
+    status: z.enum(['RUNNING', 'SCHEDULED', 'FINISHED', 'FAILED', 'KILLED']),
     start_time: timestampSchema,
     end_time: timestampSchema.nullable(),
     params: trainingConfigSchema,
@@ -366,7 +366,7 @@ export const experimentRunSchema = z
     if (run.status === 'FINISHED' && run.summary === null) {
       issue('summary', 'FINISHED exige el resumen de mejores métricas');
     }
-    if (run.status === 'RUNNING' && run.end_time !== null)
+    if ((run.status === 'RUNNING' || run.status === 'SCHEDULED') && run.end_time !== null)
       issue('end_time', 'RUNNING sin end_time');
     if (run.summary) {
       const summary = run.summary;
@@ -407,7 +407,7 @@ export type ExperimentRun = z.infer<typeof experimentRunSchema>;
 export const excludedRunSchema = z.strictObject({
   run_id: mlflowRunIdSchema,
   run_kind: z.string().min(1).nullable(),
-  status: z.enum(['RUNNING', 'FINISHED', 'FAILED', 'KILLED']),
+  status: z.enum(['RUNNING', 'SCHEDULED', 'FINISHED', 'FAILED', 'KILLED']),
   start_time: timestampSchema,
   reasons: z.array(z.string().min(1)).min(1),
 });

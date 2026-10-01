@@ -1555,7 +1555,8 @@ curl -s -o model.pt http://localhost:8080/api/experiments/runs/<run_id>/artifact
 | Situación | Respuesta |
 |---|---|
 | Run de training completo | En `runs`; `campaign_eligible: true` solo si es `FINISHED`, con resumen y `checkpoint_sha256` |
-| Training `RUNNING`, `FAILED` o `KILLED` | En `runs` con sus épocas reales, `campaign_eligible: false` y el motivo |
+| Training `RUNNING`, `SCHEDULED`, `FAILED` o `KILLED` | En `runs` con su estado real de MLflow y sus épocas reales, `campaign_eligible: false` y el motivo |
+| Training con cualquier métrica `test*` | En `excluded`: el frozen test no se evalúa antes de MODEL SELECTION CLOSED (#33) |
 | `controlled_task` (D02-05), `short_run_instrumentation` (D02-06), `persistence_check` (D02-01) o sin `p3.run_kind` | En `excluded` con el motivo; detalle y artefactos → 409 |
 | Training sin un tag de provenance o con un hueco en la curva | En `excluded`; el valor no se rellena con el oficial ni se interpola |
 | Artefacto que no existe | 404 `artifact_missing: …` |

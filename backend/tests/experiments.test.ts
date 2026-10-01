@@ -445,7 +445,8 @@ describe('GET /experiments/runs — listado desde MLflow', () => {
   });
 
   it('SCHEDULED se conserva tal cual (no se convierte en FAILED) y no es elegible', async () => {
-    const run = trainingRun({ status: 'SCHEDULED', end_time: null, metrics: [] });
+    // Aunque MLflow trajera end_time, un run SCHEDULED no ha terminado: se sirve null.
+    const run = trainingRun({ status: 'SCHEDULED', end_time: T0 + 5_000, metrics: [] });
     delete run.tags.checkpoint_sha256;
     const aux = { ...auxiliaryRun('controlled_task'), status: 'SCHEDULED', end_time: null };
     const api = await setup(run, aux);
