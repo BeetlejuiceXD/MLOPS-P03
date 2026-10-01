@@ -1,48 +1,60 @@
 """D04-03 — `campaign.run.summarize`: agrega las 12 filas sin red (datos ya
 producidos por `run`/`verify_smoke`). Cubre los "Tests requeridos" del
-ticket y los 4 bloqueantes de la reauditoría de #72: selección de reintentos
-por el criterio de #33 (no "el más reciente"), endurecimiento del auditor
-(fila→request→job.config, reporte/FINISHED, IDs, unicidad de run_id), y
-evidencia de recursos/commit. La identidad de datos, curvas y checkpoint por
-run ya los garantiza `verify_smoke` (D03-04, `tests/test_smoke.py`) — aquí
-no se repiten.
+ticket y la reauditoría de #72: selección de reintentos por `start_time`
+(#33 — nunca por métrica, eso sería p-hacking entre corridas reales),
+endurecimiento del auditor (fila→request→job.config, job.mlflow_run_id↔
+report.run_id, task/run_kind=training, reporte completo, unicidad de
+run_id), y el código de salida en la frontera de `main()`. La identidad de
+datos, curvas y checkpoint por run ya los garantiza `verify_smoke` (D03-04,
+`tests/test_smoke.py`) — aquí no se repiten.
 """
 
 from __future__ import annotations
 
-from campaign.matrix import MATRIX
-from campaign.run import summarize
+import json
+
+from campaign.matrix import MATRIX, to_training_config_kwargs
+from campaign.run import MISMATCH, VERIFIED, main, summarize
+from training.config import TrainingConfig
+
+
+def _frozen_config(row_index: int) -> dict:
+    row = next(r for r in MATRIX if r.index == row_index)
+    return TrainingConfig(**to_training_config_kwargs(row)).model_dump()
 
 
 def _ok(
     row: int,
     run_id: str = "run-x",
     *,
-    val_accuracy: float = 0.90,
-    val_macro_f1: float = 0.90,
-    val_loss: float = 0.10,
+    start_time: int = 1_000_000,
     job_id: int | None = None,
     config: dict | None = None,
 ) -> dict:
-    config = config or {"seed": row}
+    config = config if config is not None else _frozen_config(row)
     return {
         "row": row,
         "change": "x",
-        "request": {"config": config},
+        "request": {"task": "training", "config": config},
         "job": {
             "id": job_id if job_id is not None else row,
             "status": "succeeded",
             "config": config,
+            "mlflow_run_id": run_id,
         },
         "report": {
             "run_id": run_id,
             "run_status": "FINISHED",
-            "best_val_accuracy": val_accuracy,
-            "best_val_macro_f1": val_macro_f1,
+            "best_epoch": 10,
+            "best_val_accuracy": 0.90,
+            "best_val_macro_f1": 0.90,
+            "checkpoint_sha256": "a" * 64,
+            "manifest_hash": "b" * 64,
+            "tags": {"p3.run_kind": "training"},
             "problems": [],
         },
         "details": {
-            "best_val_loss": val_loss,
+            "start_time": start_time,
             "duration_seconds": 12.5,
             "peak_memory_mb": 512.0,
             "device": "cpu",
@@ -119,8 +131,8 @@ def test_a_failed_job_status_is_excluded_from_the_minimum():
         {
             "row": 12,
             "change": "x",
-            "request": {"config": {}},
-            "job": {"id": 12, "status": "failed", "config": {}},
+            "request": {"task": "training", "config": {}},
+            "job": {"id": 12, "status": "failed", "config": {}, "mlflow_run_id": None},
             "report": {"run_id": None, "run_status": None, "problems": []},
             "details": {},
         }
@@ -148,38 +160,26 @@ def test_resources_and_commit_are_surfaced_per_row():
     }
 
 
-# --- Bloqueante 1 (#33): seleccion de reintentos por metricas, no por "el mas reciente" ---
+# --- Reintentos (#33): se elige por start_time, NUNCA por metrica -----------------
 
 
-def test_retry_selection_picks_higher_accuracy_even_if_it_ran_first():
-    first_attempt = _ok(1, run_id="run-good", val_accuracy=0.95)
-    second_attempt = _ok(1, run_id="run-worse", val_accuracy=0.80)  # corrio despues, pero es peor
-    results = [first_attempt, second_attempt] + [
-        _ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]
-    ]
+def test_retry_selection_picks_earlier_start_time_not_better_metric():
+    # El intento 2 corrio DESPUES pero "parece mejor" si uno mirara metricas
+    # (no las tiene en este fixture a proposito: #33 prohibe usarlas aqui).
+    earlier = _ok(1, run_id="run-earlier", start_time=1_000_000)
+    later = _ok(1, run_id="run-later", start_time=2_000_000)
+    results = [later, earlier] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["run_id"] == "run-good"
+    assert row_1["run_id"] == "run-earlier"
     assert row_1["retries"] == 1
 
 
-def test_retry_selection_breaks_accuracy_tie_with_macro_f1():
-    best = _ok(1, run_id="run-best", val_accuracy=0.90, val_macro_f1=0.95)
-    worse = _ok(1, run_id="run-worse", val_accuracy=0.90, val_macro_f1=0.60)
-    results = [worse, best] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
-
-    summary = summarize(results)
-
-    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["run_id"] == "run-best"
-
-
-def test_retry_selection_breaks_full_tie_with_lower_run_id():
-    # Empate total en accuracy/macro-F1/val_loss a 4 decimales -> gana el run_id menor.
-    a = _ok(1, run_id="run-aaa", val_accuracy=0.90, val_macro_f1=0.90, val_loss=0.10)
-    b = _ok(1, run_id="run-bbb", val_accuracy=0.90, val_macro_f1=0.90, val_loss=0.10)
+def test_retry_selection_breaks_start_time_tie_with_lower_run_id():
+    a = _ok(1, run_id="run-aaa", start_time=1_000_000)
+    b = _ok(1, run_id="run-bbb", start_time=1_000_000)
     results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
     summary = summarize(results)
@@ -190,7 +190,6 @@ def test_retry_selection_breaks_full_tie_with_lower_run_id():
 
 def test_retry_selection_skips_invalid_attempts_and_picks_the_only_valid_one():
     broken = _failed(1, ["checkpoint no recuperable"])
-    broken["report"]["run_id"] = "run-broken"
     good = _ok(1, run_id="run-good")
     results = [broken, good] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
@@ -215,12 +214,24 @@ def test_all_attempts_invalid_reports_the_most_recent_without_hiding_it():
     assert "problema B" in row_1["problems"]
 
 
-# --- Bloqueante 2: auditor endurecido -------------------------------------------
+# --- Auditor endurecido (bloqueante 2 de la reauditoria) -------------------------
+
+
+def test_config_that_does_not_match_the_frozen_matrix_row_invalidates_the_row():
+    wrong = _ok(1, run_id="run-1", config={**_frozen_config(1), "seed": 999})
+
+    results = [wrong] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("fila OFAT congelada" in p for p in row_1["problems"])
 
 
 def test_job_config_mismatch_versus_request_invalidates_the_row():
-    mismatched = _ok(1, run_id="run-1", config={"seed": 999})
-    mismatched["request"]["config"] = {"seed": 1}  # lo que se pidio != lo que el job guardo
+    mismatched = _ok(1, run_id="run-1")
+    mismatched["job"]["config"] = {**_frozen_config(1), "seed": 999}
 
     results = [mismatched] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
@@ -229,6 +240,45 @@ def test_job_config_mismatch_versus_request_invalidates_the_row():
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
     assert row_1["valid"] is False
     assert any("job.config" in p for p in row_1["problems"])
+
+
+def test_job_mlflow_run_id_mismatch_versus_report_run_id_invalidates_the_row():
+    mismatched = _ok(1, run_id="run-1")
+    mismatched["job"]["mlflow_run_id"] = "otro-run-distinto"
+
+    results = [mismatched] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("mlflow_run_id" in p for p in row_1["problems"])
+
+
+def test_request_task_other_than_training_invalidates_the_row():
+    wrong_task = _ok(1, run_id="run-1")
+    wrong_task["request"]["task"] = "controlled"
+
+    results = [wrong_task] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("request.task" in p for p in row_1["problems"])
+
+
+def test_run_kind_tag_other_than_training_invalidates_the_row():
+    wrong_kind = _ok(1, run_id="run-1")
+    wrong_kind["report"]["tags"] = {"p3.run_kind": "controlled_task"}
+
+    results = [wrong_kind] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("p3.run_kind" in p for p in row_1["problems"])
 
 
 def test_succeeded_job_without_finished_run_status_invalidates_the_row():
@@ -244,17 +294,18 @@ def test_succeeded_job_without_finished_run_status_invalidates_the_row():
     assert any("RUNNING" in p for p in row_1["problems"])
 
 
-def test_succeeded_job_without_run_id_invalidates_the_row():
-    no_run_id = _ok(1, run_id="run-1")
-    no_run_id["report"]["run_id"] = None
+def test_incomplete_report_invalidates_the_row():
+    incomplete = _ok(1, run_id="run-1")
+    incomplete["report"]["best_val_accuracy"] = None
+    incomplete["report"]["checkpoint_sha256"] = None
 
-    results = [no_run_id] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+    results = [incomplete] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
     assert row_1["valid"] is False
-    assert any("run_id" in p for p in row_1["problems"])
+    assert any("reporte incompleto" in p for p in row_1["problems"])
 
 
 def test_missing_job_id_invalidates_the_row():
@@ -286,3 +337,26 @@ def test_duplicate_run_id_across_rows_invalidates_the_later_row():
     assert row_2["valid"] is False
     assert any("duplicado" in p for p in row_2["problems"])
     assert summary["valid_count"] == 10  # 12 intentos - fila 2 invalidada por duplicado
+
+
+# --- Codigo de salida en la frontera de main() (bloqueante 5) --------------------
+
+
+def test_main_audit_returns_mismatch_exit_code_when_below_minimum(tmp_path):
+    evidence_path = tmp_path / "evidence.json"
+    results = [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[:9]]
+    evidence_path.write_text(json.dumps({"results": results}), encoding="utf-8")
+
+    exit_code = main(["audit", "--evidence", str(evidence_path)])
+
+    assert exit_code == MISMATCH
+
+
+def test_main_audit_returns_verified_exit_code_when_minimum_met(tmp_path):
+    evidence_path = tmp_path / "evidence.json"
+    results = [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[:10]]
+    evidence_path.write_text(json.dumps({"results": results}), encoding="utf-8")
+
+    exit_code = main(["audit", "--evidence", str(evidence_path)])
+
+    assert exit_code == VERIFIED

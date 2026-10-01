@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import tempfile
 import time
@@ -32,7 +33,6 @@ from pathlib import Path
 
 from campaign.matrix import MATRIX, CampaignRow, to_training_config_kwargs
 from tracking import smoke
-from trainer.metrics import EpochMetrics, is_better
 from training.config import TrainingConfig
 
 VERIFIED, MISMATCH, UNAVAILABLE = 0, 1, 2
@@ -51,10 +51,10 @@ def build_request(manifest: dict, row: CampaignRow) -> dict:
 
 def _run_details(tracking_uri: str, run_id: str) -> dict:
     """Evidencia que `verify_smoke` (D03-04) no captura porque no la
-    necesitaba: duración, memoria pico, dispositivo, commit y val_loss del
-    mejor checkpoint. Se usa aquí para el desempate de reintentos (#33) y
-    como evidencia de recursos/commit del PR (ambas, bloqueantes de la
-    auditoría de #72)."""
+    necesitaba: duración, memoria pico, dispositivo, commit y `start_time`
+    (milisegundos, el que MLflow asigna al crear el run). `start_time` es lo
+    que decide entre reintentos (#33: el run FINISHED más temprano, nunca el
+    de mejor métrica — eso sería p-hacking entre corridas reales)."""
     from mlflow.tracking import MlflowClient
 
     client = MlflowClient(tracking_uri=tracking_uri)
@@ -64,8 +64,18 @@ def _run_details(tracking_uri: str, run_id: str) -> dict:
         "peak_memory_mb": run.data.metrics.get("peak_memory_mb"),
         "device": run.data.tags.get("device"),
         "git_commit": run.data.tags.get("git_commit"),
-        "best_val_loss": run.data.metrics.get("best_val_loss"),
+        "start_time": run.info.start_time,
     }
+
+
+def _git_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
 
 
 def _run_one(
@@ -124,26 +134,55 @@ def _run_one(
     }
 
 
-def _attempt_problems(attempt: dict) -> list[str]:
+def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
     """Chequeos endurecidos sobre UN intento, además de lo que ya reporta
-    `verify_smoke`: fila→request→job.config, reporte/FINISHED, e IDs
-    presentes. La unicidad de `run_id` es entre filas, no por intento — se
-    audita aparte en `summarize`."""
+    `verify_smoke`:
+    - fila (matriz OFAT congelada) -> request.config
+    - request.config -> job.config
+    - job.mlflow_run_id -> report.run_id
+    - task=training y tag MLflow p3.run_kind=training
+    - el reporte de verify_smoke está completo (no a medias)
+    La unicidad de `run_id` es entre filas, no por intento — se audita
+    aparte en `summarize`."""
     report = attempt.get("report") or {}
     problems = list(attempt.get("problems") or []) + list(report.get("problems") or [])
 
-    request_config = (attempt.get("request") or {}).get("config")
-    job_config = (attempt.get("job") or {}).get("config")
-    if request_config is not None and job_config is not None and request_config != job_config:
+    request = attempt.get("request") or {}
+    job = attempt.get("job") or {}
+
+    expected_config = TrainingConfig(**to_training_config_kwargs(row)).model_dump()
+    if request.get("config") != expected_config:
+        problems.append("request.config no coincide con la fila OFAT congelada (#33)")
+    if request.get("config") != job.get("config"):
         problems.append("job.config no coincide con el config enviado en el request")
 
-    succeeded = attempt["job"]["status"] == "succeeded"
+    succeeded = job.get("status") == "succeeded"
+    if succeeded and job.get("mlflow_run_id") != report.get("run_id"):
+        mismatch = f"{job.get('mlflow_run_id')!r} != {report.get('run_id')!r}"
+        problems.append(f"job.mlflow_run_id != report.run_id: {mismatch}")
+    if request.get("task") != "training":
+        problems.append(f"request.task={request.get('task')!r}, se esperaba 'training'")
+    if succeeded and report.get("tags", {}).get("p3.run_kind") != "training":
+        problems.append("tag p3.run_kind del run no es 'training'")
+
     if succeeded and report.get("run_status") != "FINISHED":
         problems.append(f"run_status={report.get('run_status')!r}, se esperaba FINISHED")
-    if succeeded and not report.get("run_id"):
-        problems.append("corrida exitosa sin run_id")
-    if not attempt["job"].get("id"):
+    if not job.get("id"):
         problems.append("sin job_id")
+
+    if succeeded:
+        required_report_fields = (
+            "run_id",
+            "run_status",
+            "best_epoch",
+            "best_val_accuracy",
+            "best_val_macro_f1",
+            "checkpoint_sha256",
+            "manifest_hash",
+        )
+        missing = [field for field in required_report_fields if report.get(field) is None]
+        if missing:
+            problems.append(f"reporte incompleto, faltan: {', '.join(missing)}")
 
     return problems
 
@@ -151,47 +190,31 @@ def _attempt_problems(attempt: dict) -> list[str]:
 def _retry_key(attempt: dict) -> dict:
     report = attempt.get("report") or {}
     details = attempt.get("details") or {}
-    return {
-        "run_id": report.get("run_id") or "",
-        "best_val_accuracy": report.get("best_val_accuracy"),
-        "best_val_macro_f1": report.get("best_val_macro_f1"),
-        "best_val_loss": details.get("best_val_loss"),
-    }
+    return {"run_id": report.get("run_id") or "", "start_time": details.get("start_time")}
 
 
-def _better_retry(candidate: dict, current: dict) -> bool:
+def _earlier_retry(candidate: dict, current: dict) -> bool:
     """¿`candidate` desplaza a `current` como el intento que cuenta para la
-    fila? Mismo criterio de selección que #33: accuracy -> macro-F1 ->
-    val_loss (reutilizando `trainer.metrics.is_better`), y como última
-    instancia run_id menor — el desempate que D02-03 dejó fuera de su
-    alcance porque ahí aún no existían corridas reales con run_id."""
-    neutral = {"epoch": 0, "train_loss": 0.0, "train_accuracy": 0.0, "learning_rate": 0.0}
-    candidate_metrics = EpochMetrics(
-        **neutral,
-        val_accuracy=candidate["best_val_accuracy"],
-        val_macro_f1=candidate["best_val_macro_f1"],
-        val_loss=candidate["best_val_loss"],
-    )
-    current_metrics = EpochMetrics(
-        **neutral,
-        val_accuracy=current["best_val_accuracy"],
-        val_macro_f1=current["best_val_macro_f1"],
-        val_loss=current["best_val_loss"],
-    )
-    if is_better(candidate_metrics, current_metrics):
-        return True
-    if is_better(current_metrics, candidate_metrics):
-        return False
-    return candidate["run_id"] < current["run_id"]  # empate total: run_id menor, determinista
+    fila? Entre varios intentos válidos y FINISHED de la misma fila, #33 dice
+    que se queda el de menor `start_time` (el que corrió primero) — nunca el
+    de mejor accuracy/F1/loss: eso sería elegir entre corridas reales por
+    resultado, lo que #33 prohíbe explícitamente. Empate exacto de
+    `start_time` (no debería pasar; MLflow lo asigna al crear el run):
+    `run_id` menor, determinista."""
+    candidate_time, current_time = candidate.get("start_time"), current.get("start_time")
+    if candidate_time is not None and current_time is not None and candidate_time != current_time:
+        return candidate_time < current_time
+    return candidate["run_id"] < current["run_id"]
 
 
 def summarize(results: list[dict]) -> dict:
     """Agregación pura (sin I/O): ≥10 filas válidas, sin duplicados ni filas
     faltantes, cada problema documentado. `verify_smoke` ya garantiza por run
     que no hay métricas de test y que la identidad/config/curvas/checkpoint
-    coinciden; aquí además se audita fila→request→job.config, reporte/
-    FINISHED, IDs, unicidad de `run_id` entre filas, y se elige entre
-    reintentos con el criterio de selección de #33 (no "el más reciente")."""
+    coinciden; `_attempt_problems` endurece fila→request→job.config,
+    job.mlflow_run_id↔report.run_id, task/run_kind=training y reporte
+    completo. Entre reintentos válidos, se elige por menor `start_time`
+    (#33) — nunca por métrica."""
     by_row: dict[int, list[dict]] = {}
     for result in results:
         by_row.setdefault(result["row"], []).append(result)
@@ -209,7 +232,9 @@ def summarize(results: list[dict]) -> dict:
             continue
 
         retries = len(attempts) - 1
-        enriched = [{**attempt, "problems": _attempt_problems(attempt)} for attempt in attempts]
+        enriched = [
+            {**attempt, "problems": _attempt_problems(attempt, row)} for attempt in attempts
+        ]
         candidates = [
             a for a in enriched if a["job"]["status"] == "succeeded" and not a["problems"]
         ]
@@ -219,7 +244,7 @@ def summarize(results: list[dict]) -> dict:
             chosen_key = _retry_key(chosen)
             for candidate in candidates[1:]:
                 candidate_key = _retry_key(candidate)
-                if _better_retry(candidate_key, chosen_key):
+                if _earlier_retry(candidate_key, chosen_key):
                     chosen, chosen_key = candidate, candidate_key
             valid = True
         else:
@@ -290,6 +315,7 @@ def _print_summary(summary: dict) -> int:
             else ""
         )
         print(f"  {label}: OK — job #{row['job_id']} run {row['run_id']}{retry_note}{res_note}")
+    return VERIFIED if summary["meets_minimum"] else MISMATCH
 
 
 def run_campaign(args: argparse.Namespace) -> int:
@@ -323,6 +349,45 @@ def audit_campaign(args: argparse.Namespace) -> int:
     return _print_summary(summary)
 
 
+def enrich_campaign(args: argparse.Namespace) -> int:
+    """Rellena duration_seconds/peak_memory_mb/device/git_commit/start_time
+    desde MLflow sobre una evidencia YA escrita — consulta de solo lectura
+    sobre los 12 runs que ya existen. Nunca crea jobs ni reentrena nada."""
+    evidence = json.loads(args.evidence.read_text(encoding="utf-8"))
+    for result in evidence["results"]:
+        run_id = (result.get("report") or {}).get("run_id")
+        if not run_id:
+            continue
+        try:
+            result["details"] = _run_details(args.tracking_uri, run_id)
+        except Exception as error:
+            result["details"] = {"error": f"no se pudo leer detalles: {error}"}
+
+    summary = summarize(evidence["results"])
+    evidence["summary"] = summary
+    args.evidence.write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    head = _git_commit()
+    print(f"HEAD actual del repo: {head}")
+    run_commits = {
+        (r.get("details") or {}).get("git_commit")
+        for r in evidence["results"]
+        if (r.get("details") or {}).get("git_commit")
+    }
+    if run_commits - {head}:
+        print(
+            f"Nota: los 12 runs se entrenaron en commit(s) {sorted(run_commits)}, "
+            f"distinto del HEAD actual de este PR ({head}). El código de entrenamiento "
+            "(campaign/matrix.py, trainer/, training/) no cambió entre esos commits y "
+            "este HEAD — solo cambió el auditor/orquestador (campaign/run.py) — por eso "
+            "esta evidencia se completa sin reentrenar."
+        )
+
+    return _print_summary(summary)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="D04-03 - campaña de 12 runs OFAT (#33)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -337,8 +402,19 @@ def main(argv: list[str] | None = None) -> int:
     audit = sub.add_parser("audit", help="re-audita una evidencia ya escrita, sin red")
     audit.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
 
+    enrich = sub.add_parser(
+        "enrich",
+        help="rellena recursos/commit desde MLflow sobre runs YA existentes, sin reentrenar",
+    )
+    enrich.add_argument("--tracking-uri", default="http://localhost:5000")
+    enrich.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+
     args = parser.parse_args(argv)
-    return run_campaign(args) if args.command == "run" else audit_campaign(args)
+    if args.command == "run":
+        return run_campaign(args)
+    if args.command == "enrich":
+        return enrich_campaign(args)
+    return audit_campaign(args)
 
 
 if __name__ == "__main__":

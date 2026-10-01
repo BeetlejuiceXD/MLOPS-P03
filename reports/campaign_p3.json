@@ -131,6 +131,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0000001192092896
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=b11df1c49f5d42a99c93bf2b60ecf900 not found"
       }
     },
     {
@@ -221,6 +224,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=eba1e1f3e40f4bc69c0453cf6c7a11a0 not found"
       }
     },
     {
@@ -311,6 +317,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=d082014552c8458f90e9c67f54b46056 not found"
       }
     },
     {
@@ -401,6 +410,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=72304af32b664085851cb2fd42b77c36 not found"
       }
     },
     {
@@ -491,6 +503,9 @@
           "dog"
         ],
         "probabilities_sum": 0.9999999403953552
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=26f2a1d2787f40439880a56cee11999a not found"
       }
     },
     {
@@ -581,6 +596,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0000001192092896
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=2676521bda51460082ca41029637a43e not found"
       }
     },
     {
@@ -671,6 +689,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=1f93e75aa3c7437d80ce36d7e90ca902 not found"
       }
     },
     {
@@ -761,6 +782,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=128e8c5b6c594ea38799ad2caca1425e not found"
       }
     },
     {
@@ -851,6 +875,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=9f85634bfc2346e98bde77387241692f not found"
       }
     },
     {
@@ -941,6 +968,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=192646f7f412414c944d4b3f86ff49e8 not found"
       }
     },
     {
@@ -1031,6 +1061,9 @@
           "dog"
         ],
         "probabilities_sum": 1.0
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=93c5f6d696184324afba01c103c020f2 not found"
       }
     },
     {
@@ -1121,27 +1154,17 @@
           "dog"
         ],
         "probabilities_sum": 0.9999999403953552
+      },
+      "details": {
+        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=205ad479795442c0b3dd4b2dc6601f69 not found"
       }
     }
   ],
   "summary": {
-    "valid_count": 12,
-    "valid_rows": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      9,
-      10,
-      11,
-      12
-    ],
+    "valid_count": 0,
+    "valid_rows": [],
     "min_required": 10,
-    "meets_minimum": true,
+    "meets_minimum": false,
     "rows": [
       {
         "row": 1,
@@ -1149,9 +1172,17 @@
         "job_id": 1,
         "job_status": "succeeded",
         "run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 2,
@@ -1159,9 +1190,17 @@
         "job_id": 2,
         "job_status": "succeeded",
         "run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 3,
@@ -1169,9 +1208,17 @@
         "job_id": 3,
         "job_status": "succeeded",
         "run_id": "d082014552c8458f90e9c67f54b46056",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 4,
@@ -1179,9 +1226,17 @@
         "job_id": 4,
         "job_status": "succeeded",
         "run_id": "72304af32b664085851cb2fd42b77c36",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 5,
@@ -1189,9 +1244,17 @@
         "job_id": 5,
         "job_status": "succeeded",
         "run_id": "26f2a1d2787f40439880a56cee11999a",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 6,
@@ -1199,9 +1262,17 @@
         "job_id": 6,
         "job_status": "succeeded",
         "run_id": "2676521bda51460082ca41029637a43e",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 7,
@@ -1209,9 +1280,17 @@
         "job_id": 7,
         "job_status": "succeeded",
         "run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 8,
@@ -1219,9 +1298,17 @@
         "job_id": 8,
         "job_status": "succeeded",
         "run_id": "128e8c5b6c594ea38799ad2caca1425e",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 9,
@@ -1229,9 +1316,17 @@
         "job_id": 9,
         "job_status": "succeeded",
         "run_id": "9f85634bfc2346e98bde77387241692f",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 10,
@@ -1239,9 +1334,17 @@
         "job_id": 10,
         "job_status": "succeeded",
         "run_id": "192646f7f412414c944d4b3f86ff49e8",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 11,
@@ -1249,9 +1352,17 @@
         "job_id": 11,
         "job_status": "succeeded",
         "run_id": "93c5f6d696184324afba01c103c020f2",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       },
       {
         "row": 12,
@@ -1259,9 +1370,17 @@
         "job_id": 12,
         "job_status": "succeeded",
         "run_id": "205ad479795442c0b3dd4b2dc6601f69",
-        "valid": true,
-        "problems": [],
-        "retries": 0
+        "valid": false,
+        "problems": [
+          "tag p3.run_kind del run no es 'training'"
+        ],
+        "retries": 0,
+        "resources": {
+          "duration_seconds": null,
+          "peak_memory_mb": null,
+          "device": null,
+          "git_commit": null
+        }
       }
     ]
   }
