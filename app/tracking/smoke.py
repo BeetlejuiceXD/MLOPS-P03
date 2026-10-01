@@ -89,6 +89,19 @@ def _download(client, run_id: str, artifact_path: str, dest: Path) -> Path:
     return Path(get_artifact_repository(artifact_uri).download_artifacts(artifact_path, str(dest)))
 
 
+def _same_param(logged: str | None, value: object) -> bool:
+    """MLflow guarda params como texto ("0.0"); la API los devuelve como JSON, donde
+    0.0 llega como 0. Números se comparan por valor; lo demás, por su texto."""
+    if logged is None:
+        return False
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        try:
+            return float(logged) == float(value)
+        except ValueError:
+            return False
+    return logged == str(value)
+
+
 def _check_run(job: dict, run, client, report: SmokeReport) -> None:
     problems = report.problems
     config = job["config"]
@@ -118,7 +131,7 @@ def _check_run(job: dict, run, client, report: SmokeReport) -> None:
 
     params = run.data.params
     for name, value in config.items():
-        if params.get(name) != str(value):
+        if not _same_param(params.get(name), value):
             problems.append(f"param {name}={params.get(name)!r} distinto de la config del job")
 
     metrics = run.data.metrics
