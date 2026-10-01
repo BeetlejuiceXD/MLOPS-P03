@@ -173,3 +173,14 @@ def test_run_outside_the_p3_experiment_is_rejected(trained, tmp_path):
     report = verify_smoke({**job, "mlflow_run_id": other}, tracking_uri=uri, workdir=tmp_path)
 
     assert any("p3-cnn-classifier" in p for p in report.problems)
+
+
+def test_numbers_as_the_api_serializes_them_still_match_the_run(trained, tmp_path):
+    """La API (JSON vía JavaScript) devuelve `dropout: 0` y MLflow guarda "0.0": es el
+    mismo valor. Visto en el smoke real con v0.1.1; no debe reportarse como distinto."""
+    job, uri = trained
+    as_api = {**job, "config": {**job["config"], "dropout": 0, "learning_rate": 0.001}}
+
+    report = verify_smoke(as_api, tracking_uri=uri, workdir=tmp_path)
+
+    assert report.problems == []
