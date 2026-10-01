@@ -107,10 +107,11 @@ function makeRun(options: RunOptions): Record<string, unknown> {
       job_id: 1,
       ...options.tags,
     },
-    summary:
-      status === 'FINISHED'
-        ? { best_epoch: 2, best_val_accuracy: acc, best_val_macro_f1: f1, best_val_loss: loss }
-        : null,
+    // Un run FAILED/KILLED puede traer resumen parcial (el contrato lo permite): que
+    // tenga métricas no lo vuelve elegible.
+    summary: finished
+      ? { best_epoch: 2, best_val_accuracy: acc, best_val_macro_f1: f1, best_val_loss: loss }
+      : null,
     history: [
       epoch(1, acc - 0.1, f1 - 0.1, loss + 0.2),
       epoch(2, acc, f1, loss),
@@ -432,11 +433,17 @@ describe('servicio de selección', () => {
   let runs: Record<string, unknown>[];
   let manifest: Record<string, unknown>;
   let now: Date;
+  let listCalls: number;
 
   const service = () =>
     createModelSelectionService(
       repo,
-      { list: async () => ({ experiment_name: 'p3-cnn-classifier', runs }) },
+      {
+        list: async () => {
+          listCalls += 1;
+          return { experiment_name: 'p3-cnn-classifier', runs };
+        },
+      },
       { manifest: async () => manifest },
       () => now,
     );
@@ -452,6 +459,7 @@ describe('servicio de selección', () => {
     };
     expect(manifestSummarySchema.safeParse(manifest).success).toBe(true);
     now = new Date('2026-10-01T12:00:00Z');
+    listCalls = 0;
   });
 
   it('empieza abierta, sin candidato, y Evaluation responde bloqueado por contrato', async () => {
@@ -478,8 +486,14 @@ describe('servicio de selección', () => {
   });
 
   it('un candidato preparatorio NO desbloquea el test', async () => {
+    // Por el motivo correcto: no basta que otra comprobación (p. ej. closed_at vacío)
+    // también lo rechace.
+    const notClosed = /MODEL SELECTION CLOSED no existe/;
+    await expect(service().requireClosed()).rejects.toThrow(ConflictError);
+    await expect(service().requireClosed()).rejects.toThrow(notClosed);
     await service().propose();
     await expect(service().requireClosed()).rejects.toThrow(ConflictError);
+    await expect(service().requireClosed()).rejects.toThrow(notClosed);
     expect(evaluationResponseSchema.parse(await service().blockedEvaluation()).state).toBe(
       'blocked',
     );
@@ -513,10 +527,23 @@ describe('servicio de selección', () => {
     await service().propose();
     await service().close(runId('c'));
     const before = await repo.read();
+    const callsAtClose = listCalls;
     runs = [makeRun({ id: 'e', row: 1, acc: 0.999 })];
     await expect(service().propose()).rejects.toThrow(ConflictError);
     await expect(service().close(runId('c'))).rejects.toThrow(ConflictError);
     expect(await repo.read()).toEqual(before);
+    // Se rechaza ANTES de recalcular: cerrada, los runs ni se consultan.
+    expect(listCalls).toBe(callsAtClose);
+  });
+
+  it('sin runs elegibles no propone ni escribe', async () => {
+    runs = [
+      makeRun({ id: '1', status: 'FAILED' }),
+      makeRun({ id: '2', config: { max_epochs: 10 } }),
+    ];
+    await expect(service().propose()).rejects.toThrow(ConflictError);
+    expect(repo.writes).toBe(0);
+    expect((await repo.read()).status).toBe('open');
   });
 
   it('no cierra sin candidato propuesto', async () => {
