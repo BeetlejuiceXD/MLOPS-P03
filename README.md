@@ -1531,4 +1531,4 @@ bloquea `Activate.ps1`, corre antes `Set-ExecutionPolicy -Scope Process Bypass`.
 Si un paso no da lo esperado, el motivo suele estar en la propia respuesta: por
 ejemplo `GET /api/manifest` → `503 manifest_missing` significa que faltó el
 `dvc pull` del manifest, y `docker compose` → `Define MARIADB_ROOT_PASSWORD` que faltó
-el `.env`. La evidencia del ensayo está en el PR de D03-06 (#63).
+el `.env`. La evidencia del ensayo está en el PR que cierra #63.
