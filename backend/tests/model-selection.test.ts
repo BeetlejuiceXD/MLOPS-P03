@@ -119,6 +119,10 @@ function makeRun(options: RunOptions): Record<string, unknown> {
       epoch(2, acc, f1, loss),
       epoch(3, acc - 0.02, f1 - 0.02, loss + 0.05),
     ],
+    // D04-01: campos que agrega el adaptador MLflow al contrato de cada run.
+    checkpoint_sha256: status === 'FINISHED' ? 'e'.repeat(64) : null,
+    campaign_eligible: status === 'FINISHED',
+    ineligible_reasons: status === 'FINISHED' ? [] : [`estado ${status}: el run no terminó`],
   };
 }
 

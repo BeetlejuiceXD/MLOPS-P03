@@ -1,7 +1,7 @@
 {
   "contract": "experiment_runs_response",
   "valid": false,
-  "why": "0.8590 vs 0.8588 en history[best_epoch]: diferencia 2e-4 > tolerancia 1e-4 del contrato",
+  "why": "campaign_eligible=true exige cero motivos",
   "payload": {
     "experiment_name": "p3-cnn-classifier",
     "runs": [
@@ -46,7 +46,7 @@
         "summary": {
           "best_epoch": 2,
           "best_val_accuracy": 0.86,
-          "best_val_macro_f1": 0.859,
+          "best_val_macro_f1": 0.8588,
           "best_val_loss": 0.38
         },
         "history": [
@@ -80,7 +80,9 @@
         ],
         "checkpoint_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "campaign_eligible": true,
-        "ineligible_reasons": []
+        "ineligible_reasons": [
+          "algo"
+        ]
       }
     ],
     "excluded": []

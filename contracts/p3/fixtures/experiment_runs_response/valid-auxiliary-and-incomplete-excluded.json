@@ -1,7 +1,7 @@
 {
   "contract": "experiment_runs_response",
-  "valid": false,
-  "why": "0.8590 vs 0.8588 en history[best_epoch]: diferencia 2e-4 > tolerancia 1e-4 del contrato",
+  "valid": true,
+  "why": "Auxiliares (controlled_task, short_run_instrumentation, persistence_check), un training sin provenance y uno sin p3.run_kind van a excluded con su motivo; nunca a runs",
   "payload": {
     "experiment_name": "p3-cnn-classifier",
     "runs": [
@@ -46,7 +46,7 @@
         "summary": {
           "best_epoch": 2,
           "best_val_accuracy": 0.86,
-          "best_val_macro_f1": 0.859,
+          "best_val_macro_f1": 0.8588,
           "best_val_loss": 0.38
         },
         "history": [
@@ -83,6 +83,52 @@
         "ineligible_reasons": []
       }
     ],
-    "excluded": []
+    "excluded": [
+      {
+        "run_id": "11111111111111111111111111111111",
+        "run_kind": "controlled_task",
+        "status": "FINISHED",
+        "start_time": "2026-09-25T10:00:00Z",
+        "reasons": [
+          "run auxiliar (controlled_task): no es de campaña"
+        ]
+      },
+      {
+        "run_id": "22222222222222222222222222222222",
+        "run_kind": "short_run_instrumentation",
+        "status": "FINISHED",
+        "start_time": "2026-09-25T11:00:00Z",
+        "reasons": [
+          "run auxiliar (short_run_instrumentation): no es de campaña"
+        ]
+      },
+      {
+        "run_id": "33333333333333333333333333333333",
+        "run_kind": "persistence_check",
+        "status": "FINISHED",
+        "start_time": "2026-09-25T12:00:00Z",
+        "reasons": [
+          "run auxiliar (persistence_check): no es de campaña"
+        ]
+      },
+      {
+        "run_id": "44444444444444444444444444444444",
+        "run_kind": "training",
+        "status": "FINISHED",
+        "start_time": "2026-09-25T13:00:00Z",
+        "reasons": [
+          "tags.dvc_release_hash: falta en MLflow (no se rellena con el valor oficial)"
+        ]
+      },
+      {
+        "run_id": "55555555555555555555555555555555",
+        "run_kind": null,
+        "status": "FINISHED",
+        "start_time": "2026-09-25T14:00:00Z",
+        "reasons": [
+          "sin tag p3.run_kind: no se puede saber qué es"
+        ]
+      }
+    ]
   }
 }

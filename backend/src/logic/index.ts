@@ -46,6 +46,9 @@ export { ConflictError, NotFoundError, ValidationError } from './errors.js';
 export { mariaDbEvaluationRepository } from './evaluation.repository.js';
 export type { EvaluationService } from './evaluation.service.js';
 export { createEvaluationService } from './evaluation.service.js';
+// D04-01: adaptador MLflow → portal.
+export type { ExperimentsService } from './experiments.service.js';
+export { createExperimentsService } from './experiments.service.js';
 export type { HealthStatus } from './health.service.js';
 export { checkHealth } from './health.service.js';
 export type { ImageFile } from './image-file.service.js';
@@ -59,6 +62,7 @@ export type {
 export { searchImages } from './image-search.service.js';
 export { setImageStatus } from './image-status.service.js';
 export { deleteImage, uploadImage } from './image-upload.service.js';
+export { createMlflowReader } from './mlflow-reader.js';
 // Selección por validation y bloqueo del test (D04-04)
 export { mariaDbModelSelectionRepository } from './model-selection.repository.js';
 export type { ModelSelectionService } from './model-selection.service.js';

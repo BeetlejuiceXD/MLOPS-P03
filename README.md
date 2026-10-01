@@ -1536,3 +1536,31 @@ no pudo descargar un binario opcional ni en el reintento (casi siempre la red): 
 correr `docker compose build --no-cache backend`. Antes de D03-06 ese caso producía una
 imagen que se construía "bien" y moría al arrancar (`/api/*` → 502); ahora el build falla.
 La evidencia del ensayo está en el PR que cierra #63.
+
+## D04-01 — Runs de MLflow en la API del portal
+
+El backend lee el experimento `p3-cnn-classifier` del MLflow persistente por su API REST
+(`MLFLOW_TRACKING_URI`, en Compose `http://mlflow:5000`) y lo sirve al portal con el
+contrato de `contracts/p3/README.md`. No guarda ni inventa runs: lo que muestra está en MLflow.
+
+```bash
+# Listado: runs de training en `runs`; auxiliares e incompletos en `excluded` con su motivo
+curl -s http://localhost:8080/api/experiments/runs
+# Detalle de un run (mismos valores del listado + artefactos)
+curl -s http://localhost:8080/api/experiments/runs/<run_id>
+# Recuperar un artefacto (el sha256 de model.pt coincide con el tag checkpoint_sha256)
+curl -s -o model.pt http://localhost:8080/api/experiments/runs/<run_id>/artifacts/checkpoint/model.pt
+```
+
+| Situación | Respuesta |
+|---|---|
+| Run de training completo | En `runs`; `campaign_eligible: true` solo si es `FINISHED`, con resumen y `checkpoint_sha256` |
+| Training `RUNNING`, `SCHEDULED`, `FAILED` o `KILLED` | En `runs` con su estado real de MLflow y sus épocas reales, `campaign_eligible: false` y el motivo |
+| Training con cualquier métrica `test*` | En `excluded`: el frozen test no se evalúa antes de MODEL SELECTION CLOSED (#33) |
+| `controlled_task` (D02-05), `short_run_instrumentation` (D02-06), `persistence_check` (D02-01) o sin `p3.run_kind` | En `excluded` con el motivo; detalle y artefactos → 409 |
+| Training sin un tag de provenance o con un hueco en la curva | En `excluded`; el valor no se rellena con el oficial ni se interpola |
+| Artefacto que no existe | 404 `artifact_missing: …` |
+| MLflow caído | 503 `mlflow_unavailable: …` (nunca un listado vacío) |
+
+`campaign_eligible` es elegibilidad estructural. Que el run pertenezca a la matriz OFAT de
+la campaña y la selección por validation son de D04-03/D04-04.

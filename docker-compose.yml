@@ -117,6 +117,8 @@ services:
       MINIO_BUCKET: image-annotations
       MAX_UPLOAD_SIZE_BYTES: 5242880
       PIPELINE_CONFIG_ROOT: /pipeline
+      # D04-01: el portal lee runs, curvas y artefactos de MLflow por su API REST.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     volumes:
       - ./app/policies:/pipeline/policies
       - ./app/splits:/pipeline/splits

@@ -6,6 +6,8 @@ import {
   createAnnotationForImage,
   createEligibilityGate,
   createEvaluationService,
+  createExperimentsService,
+  createMlflowReader,
   createModelSelectionService,
   createP3SourcesService,
   createSettingsService,
@@ -31,6 +33,7 @@ import {
   uploadImage,
 } from '../logic/index.js';
 import { createEvaluationRouter } from './evaluation.routes.js';
+import { createExperimentsRouter } from './experiments.routes.js';
 import { sendError } from './http-errors.js';
 import { createModelSelectionRouter } from './model-selection.routes.js';
 import { createP3SourcesRouter } from './p3-sources.routes.js';
@@ -64,6 +67,13 @@ const settingsService = createSettingsService(env.PIPELINE_CONFIG_ROOT);
 // `trainer-worker`; alimentan GET /api/releases, GET /api/manifest y la compuerta real.
 const p3Sources = createP3SourcesService(mariaDbP3SourcesRepository);
 app.use(createP3SourcesRouter(p3Sources));
+
+// D04-01: runs reales del experimento p3-cnn-classifier (listado, detalle y artefactos),
+// leídos de MLflow por su API REST; MLflow caído → 503 con el motivo.
+app.use(
+  '/experiments',
+  createExperimentsRouter(createExperimentsService(createMlflowReader(env.MLFLOW_TRACKING_URI))),
+);
 
 // D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`, que
 // vuelve a verificar las fuentes contra los archivos antes de entrenar (D03-03).

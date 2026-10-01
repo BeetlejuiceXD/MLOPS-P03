@@ -4,6 +4,7 @@
   "why": "Solo el experimento p3-cnn-classifier",
   "payload": {
     "experiment_name": "default",
-    "runs": []
+    "runs": [],
+    "excluded": []
   }
 }
