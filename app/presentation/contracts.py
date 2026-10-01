@@ -409,3 +409,11 @@ EvaluationResponse = Annotated[EvaluationBlocked | EvaluationReady, Field(discri
 EVALUATION_RESPONSE: TypeAdapter[EvaluationBlocked | EvaluationReady] = TypeAdapter(
     EvaluationResponse
 )
+
+
+# D04-05 — `GET /api/evaluation/predictions` (stub Red).
+class EvaluationPredictions(ContractModel):
+    @model_validator(mode="before")
+    @classmethod
+    def not_implemented(cls, data):
+        raise NotImplementedError

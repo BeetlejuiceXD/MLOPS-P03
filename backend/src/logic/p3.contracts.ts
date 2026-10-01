@@ -489,6 +489,11 @@ export const evaluationResponseSchema = z.discriminatedUnion('state', [
 ]);
 export type EvaluationResponse = z.infer<typeof evaluationResponseSchema>;
 
+// D04-05: exportación por muestra (stub Red).
+export const evaluationNamespaces = ['official', 'synthetic'] as const;
+export const evaluationPredictionsSchema = z.never();
+export type EvaluationPredictions = z.infer<typeof evaluationPredictionsSchema>;
+
 // ---------------------------------------------------------------------------
 // Versiones del modelo publicadas en AWS S3 (#33: bucket propio de modelos).
 // ---------------------------------------------------------------------------
@@ -571,6 +576,7 @@ export const P3_CONTRACTS = {
   job_logs: jobLogsSchema,
   experiment_runs_response: experimentRunsResponseSchema,
   evaluation_response: evaluationResponseSchema,
+  evaluation_predictions: evaluationPredictionsSchema,
   models_response: modelsResponseSchema,
   inference_result: inferenceResultSchema,
   annotation_queue_item: annotationQueueItemSchema,
