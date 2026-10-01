@@ -26,7 +26,10 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/training/jobs/:id/logs` | `job_logs` | Hannah (D02-05) |
 | `POST /api/training/jobs/:id/cancel` | `training_job` (`queued` → `cancelled`; `running` → `cancel_requested`) | Hannah (D02-05) |
 | `GET /api/experiments/runs` | `experiment_runs_response` (proxy de MLflow, sin datos fijos) | Hannah (D04) |
-| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED) | Ale |
+| `GET /api/selection` | Estado persistido de la selección (`open` \| `candidate` \| `closed`): candidato, ranking solo validation y runs excluidos con su motivo | Ale (D04-04) |
+| `POST /api/selection/candidate` | Recalcula y guarda el candidato **preparatorio** (409 si ya está cerrada; 503 sin runs/manifest) | Ale (D04-04) |
+| `POST /api/selection/close` | body `{ "candidate_run_id" }` → MODEL SELECTION CLOSED, definitivo (409 si no es el candidato, hay < 10 filas comparables o la campaña cambió) | Ale (D04-04); cierre oficial en D05-02 |
+| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED; cerrada y sin evaluación oficial → 404) | Ale |
 | `GET /api/models` | `models_response` | Hannah (D06) |
 | `POST /api/models/:semver/publish` | `model_version` | Hannah (D06) |
 | `POST /api/inference` | multipart (`image`, `model_version`) → `inference_result` | Hannah + motor de Esteban (D06) |

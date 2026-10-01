@@ -55,6 +55,13 @@ export type {
 export { searchImages } from './image-search.service.js';
 export { setImageStatus } from './image-status.service.js';
 export { deleteImage, uploadImage } from './image-upload.service.js';
+// Selección por validation y bloqueo del test (D04-04)
+export { mariaDbModelSelectionRepository } from './model-selection.repository.js';
+export type { ModelSelectionService } from './model-selection.service.js';
+export {
+  createModelSelectionService,
+  runsAdapterPendingSource,
+} from './model-selection.service.js';
 export { mariaDbP3SourcesRepository } from './p3-sources.repository.js';
 // Fuentes oficiales de Training publicadas por trainer-worker (D03-03)
 export type { P3SourcesService } from './p3-sources.service.js';
