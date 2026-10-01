@@ -23,16 +23,16 @@ particiones. Quien llama decide sobre qué datos se evalúa.
 from evaluation.metrics import compute_metrics
 
 report = compute_metrics(y_true=["cat", "dog", ...], y_pred=["cat", "cat", ...])
-report.rows                        # ((tp_cat, cat→dog), (dog→cat, tp_dog))
-report.accuracy, report.macro_f1   # sin redondear
-report.per_class                   # (ClassMetrics(cat), ClassMetrics(dog))
-report.meets_acceptance()          # accuracy >= 0.85 con conteos enteros
+report.rows  # ((tp_cat, cat→dog), (dog→cat, tp_dog))
+report.accuracy, report.macro_f1  # sin redondear
+report.per_class  # (ClassMetrics(cat), ClassMetrics(dog))
+report.meets_acceptance()  # accuracy >= 0.85 con conteos enteros
 
 response = report.to_ready_response(
-    candidate_run_id=...,   # run_id de MLflow del candidato cerrado (D05-02)
-    closed_at=...,          # ISO 8601 con zona: momento de MODEL SELECTION CLOSED
-    manifest_hash=...,      # manifest congelado (D03-01)
-    evaluated_at=...,       # debe ser posterior a closed_at
+    candidate_run_id=...,  # run_id de MLflow del candidato cerrado (D05-02)
+    closed_at=...,  # ISO 8601 con zona: momento de MODEL SELECTION CLOSED
+    manifest_hash=...,  # manifest congelado (D03-01)
+    evaluated_at=...,  # debe ser posterior a closed_at
 )
 response.model_dump_json()  # payload `ready` de GET /api/evaluation
 ```
