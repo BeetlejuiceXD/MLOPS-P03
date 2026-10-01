@@ -313,7 +313,7 @@ export const experimentRunSchema = z
   .strictObject({
     run_id: mlflowRunIdSchema,
     experiment_name: z.literal(P3_EXPERIMENT),
-    status: z.enum(['RUNNING', 'FINISHED', 'FAILED', 'KILLED']),
+    status: z.enum(['RUNNING', 'SCHEDULED', 'FINISHED', 'FAILED', 'KILLED']),
     start_time: timestampSchema,
     end_time: timestampSchema.nullable(),
     params: trainingConfigSchema,
@@ -339,10 +339,25 @@ export const experimentRunSchema = z
       })
       .nullable(),
     history: z.array(epochMetricsSchema),
+    // D04-01: sha256 del checkpoint que registró el worker (tag `checkpoint_sha256`); null si
+    // el run no lo tiene. Elegible para campaña = run de training terminado, con resumen y
+    // checkpoint: FINISHED solo no basta. Si no es elegible, dice por qué.
+    checkpoint_sha256: sha256Schema.nullable(),
+    campaign_eligible: z.boolean(),
+    ineligible_reasons: z.array(z.string().min(1)),
   })
   .superRefine((run, ctx) => {
     const issue = (path: string, message: string) =>
       ctx.addIssue({ code: 'custom', path: [path], message });
+    if (run.campaign_eligible !== (run.ineligible_reasons.length === 0)) {
+      issue('campaign_eligible', 'Elegible ⇔ sin motivos; no elegible ⇔ al menos un motivo');
+    }
+    if (run.campaign_eligible && (run.status !== 'FINISHED' || run.summary === null)) {
+      issue('campaign_eligible', 'Solo un run FINISHED con resumen puede ser elegible');
+    }
+    if (run.campaign_eligible && run.checkpoint_sha256 === null) {
+      issue('campaign_eligible', 'Sin checkpoint_sha256 no es elegible');
+    }
     if (run.tags.seed !== run.params.seed)
       issue('tags', 'tags.seed debe coincidir con params.seed');
     run.history.forEach((row, index) => {
@@ -351,7 +366,7 @@ export const experimentRunSchema = z
     if (run.status === 'FINISHED' && run.summary === null) {
       issue('summary', 'FINISHED exige el resumen de mejores métricas');
     }
-    if (run.status === 'RUNNING' && run.end_time !== null)
+    if ((run.status === 'RUNNING' || run.status === 'SCHEDULED') && run.end_time !== null)
       issue('end_time', 'RUNNING sin end_time');
     if (run.summary) {
       const summary = run.summary;
@@ -386,10 +401,57 @@ export const experimentRunSchema = z
   });
 export type ExperimentRun = z.infer<typeof experimentRunSchema>;
 
-export const experimentRunsResponseSchema = z.strictObject({
-  experiment_name: z.literal(P3_EXPERIMENT),
-  runs: z.array(experimentRunSchema),
+// D04-01: runs del experimento que no se pueden presentar como corridas de la campaña
+// (auxiliares: controlled_task, short_run_instrumentation, persistence_check; o de training
+// sin provenance, params o curvas completas). Se listan con su motivo, no se esconden.
+export const excludedRunSchema = z.strictObject({
+  run_id: mlflowRunIdSchema,
+  run_kind: z.string().min(1).nullable(),
+  status: z.enum(['RUNNING', 'SCHEDULED', 'FINISHED', 'FAILED', 'KILLED']),
+  start_time: timestampSchema,
+  reasons: z.array(z.string().min(1)).min(1),
 });
+export type ExcludedRun = z.infer<typeof excludedRunSchema>;
+
+export const experimentRunsResponseSchema = z
+  .strictObject({
+    experiment_name: z.literal(P3_EXPERIMENT),
+    runs: z.array(experimentRunSchema),
+    excluded: z.array(excludedRunSchema),
+  })
+  .superRefine((response, ctx) => {
+    const ids = [...response.runs, ...response.excluded].map((run) => run.run_id);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', path: ['excluded'], message: 'run_id repetido' });
+    }
+  });
+
+// D04-01: detalle de un run. Rutas de artefacto relativas a la raíz de artefactos del run.
+const artifactPathSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (path) =>
+      !path.startsWith('/') && !path.split('/').some((part) => part === '..' || part === ''),
+    'Ruta relativa al run, sin .. ni segmentos vacíos',
+  );
+export const artifactEntrySchema = z
+  .strictObject({
+    path: artifactPathSchema,
+    is_dir: z.boolean(),
+    size_bytes: nonNegativeInt.nullable(),
+  })
+  .refine((entry) => !entry.is_dir || entry.size_bytes === null, {
+    message: 'Un directorio no tiene tamaño',
+    path: ['size_bytes'],
+  });
+export type ArtifactEntry = z.infer<typeof artifactEntrySchema>;
+
+export const experimentRunDetailSchema = z.strictObject({
+  run: experimentRunSchema,
+  artifacts: z.array(artifactEntrySchema),
+});
+export type ExperimentRunDetail = z.infer<typeof experimentRunDetailSchema>;
 
 // ---------------------------------------------------------------------------
 // Evaluation: bloqueada hasta MODEL SELECTION CLOSED (#33, custodia: Ale).
@@ -490,6 +552,62 @@ export const evaluationResponseSchema = z.discriminatedUnion('state', [
 export type EvaluationResponse = z.infer<typeof evaluationResponseSchema>;
 
 // ---------------------------------------------------------------------------
+// D04-05: exportación por muestra de una evaluación (`GET /api/evaluation/predictions`).
+// Filas en orden de crop_id; probabilidades de cada clase declarada; `synthetic` marca
+// recorridos de prueba, que nunca se sirven como evaluación oficial. El backend verifica
+// además `test_split_hash` contra los crop_id y la matriz contra `evaluation_response`.
+// ---------------------------------------------------------------------------
+export const evaluationNamespaces = ['official', 'synthetic'] as const;
+
+const evaluationSampleSchema = z.strictObject({
+  crop_id: positiveInt,
+  true_class: classSchema,
+  predicted_class: classSchema,
+  // z.record con clave enum es exhaustivo: exige cat y dog, y rechaza cualquier otra.
+  probabilities: z.record(classSchema, unitInterval),
+});
+
+export const evaluationPredictionsSchema = z
+  .strictObject({
+    namespace: z.enum(evaluationNamespaces),
+    candidate_run_id: mlflowRunIdSchema,
+    manifest_hash: sha256Schema,
+    test_split_hash: sha256Schema,
+    evaluated_at: timestampSchema,
+    n_test: positiveInt,
+    classes: classListSchema,
+    predictions: z.array(evaluationSampleSchema),
+  })
+  .superRefine((exported, ctx) => {
+    const issue = (path: (string | number)[], message: string) =>
+      ctx.addIssue({ code: 'custom', path, message });
+    if (exported.predictions.length !== exported.n_test) {
+      issue(['predictions'], 'Debe haber exactamente n_test predicciones');
+    }
+    exported.predictions.forEach((sample, i) => {
+      const previous = exported.predictions[i - 1];
+      if (previous && sample.crop_id <= previous.crop_id) {
+        issue(
+          ['predictions', i, 'crop_id'],
+          'crop_id en orden estrictamente creciente (sin repetidos)',
+        );
+      }
+      const values = Object.values(sample.probabilities);
+      const sum = values.reduce((total, p) => total + p, 0);
+      if (!close(sum, 1, PROBABILITY_SUM_TOLERANCE)) {
+        issue(['predictions', i, 'probabilities'], 'Deben sumar ~1');
+      }
+      if (sample.probabilities[sample.predicted_class] !== Math.max(...values)) {
+        issue(
+          ['predictions', i, 'predicted_class'],
+          'predicted_class debe ser el argmax de probabilities',
+        );
+      }
+    });
+  });
+export type EvaluationPredictions = z.infer<typeof evaluationPredictionsSchema>;
+
+// ---------------------------------------------------------------------------
 // Versiones del modelo publicadas en AWS S3 (#33: bucket propio de modelos).
 // ---------------------------------------------------------------------------
 export const modelVersionSchema = z
@@ -570,7 +688,9 @@ export const P3_CONTRACTS = {
   training_job: trainingJobSchema,
   job_logs: jobLogsSchema,
   experiment_runs_response: experimentRunsResponseSchema,
+  experiment_run_detail: experimentRunDetailSchema,
   evaluation_response: evaluationResponseSchema,
+  evaluation_predictions: evaluationPredictionsSchema,
   models_response: modelsResponseSchema,
   inference_result: inferenceResultSchema,
   annotation_queue_item: annotationQueueItemSchema,
@@ -587,7 +707,10 @@ export const P3_ENDPOINTS = {
   getTrainingJobLogs: 'GET /api/training/jobs/:id/logs',
   cancelTrainingJob: 'POST /api/training/jobs/:id/cancel',
   listRuns: 'GET /api/experiments/runs',
+  getRun: 'GET /api/experiments/runs/:runId',
+  getRunArtifact: 'GET /api/experiments/runs/:runId/artifacts/*path',
   getEvaluation: 'GET /api/evaluation',
+  exportEvaluationPredictions: 'GET /api/evaluation/predictions',
   listModels: 'GET /api/models',
   publishModel: 'POST /api/models/:semver/publish',
   runInference: 'POST /api/inference',

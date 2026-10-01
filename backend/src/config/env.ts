@@ -32,6 +32,9 @@ const envSchema = z.object({
 
   MINIO_BUCKET: z.string().min(3),
 
+  // D04-01: servidor MLflow que lee el portal (Compose: http://mlflow:5000).
+  MLFLOW_TRACKING_URI: z.string().url().default('http://localhost:5000'),
+
   MAX_UPLOAD_SIZE_BYTES: z.coerce
     .number()
     .int()

@@ -72,8 +72,14 @@
             "val_macro_f1": 0.8391,
             "learning_rate": 0.001
           }
+        ],
+        "checkpoint_sha256": null,
+        "campaign_eligible": false,
+        "ineligible_reasons": [
+          "FINISHED sin resumen de mejores métricas"
         ]
       }
-    ]
+    ],
+    "excluded": []
   }
 }

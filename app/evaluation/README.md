@@ -76,3 +76,76 @@ uv run python ../.github/scripts/run_evaluation_metrics_mutations.py   # ~2-3 mi
 
 El runner trabaja sobre una copia aislada en un directorio temporal y nunca
 modifica el árbol de trabajo.
+
+# D04-05 — Productor de la evaluación, API y exportación por muestra
+
+`evaluation.producer` conecta el motor anterior con las guardas de D04-04 y la
+persistencia; el backend sirve el resultado con `GET /api/evaluation` y
+`GET /api/evaluation/predictions`.
+
+> El frozen test **no** se ejecutó en este ticket. Todo se probó con predicciones
+> sintéticas conocidas (6 crops inventados, matriz `[[2, 1], [1, 2]]`) en el namespace
+> `synthetic`. La evaluación oficial es de D06-01, después de MODEL SELECTION CLOSED (D05-02).
+
+## Flujo
+
+```text
+predicciones por crop ──▶ produce_evaluation ──▶ p3_evaluation (MariaDB) ──▶ API
+                            │ 1. guarda: p3_model_selection = closed      │ requireClosed
+                            │ 2. compatibilidad (run, manifest, IDs)       │ + coherencia
+                            │ 3. motor D03-05 + exportación                │ (503 si no)
+```
+
+```python
+from evaluation.producer import SamplePrediction, TestPartition, produce_evaluation
+from evaluation.store import EvaluationStore
+
+record = produce_evaluation(
+    EvaluationStore(engine),  # MariaDB (DATABASE_URL del worker)
+    samples,  # SamplePrediction(crop_id, true_class, predicted_class, probabilities)
+    namespace="official",  # o "synthetic" para recorridos de prueba
+    model_run_id=run_id,  # run de MLflow que produjo las predicciones
+    partition=TestPartition.from_manifest(frozen_manifest),  # IDs + hashes del test (D03-01)
+)
+```
+
+## Guardas y rechazos (`EvaluationRefusedError.reason`)
+
+| Motivo | Cuándo |
+|---|---|
+| `model_selection_open` | `p3_model_selection` no está `closed`. Se comprueba **antes** de leer predicciones. |
+| `incomplete_selection` | Cerrada, pero sin candidato, manifest o `closed_at`. |
+| `not_selected_candidate` | Las predicciones son de un run distinto del candidato cerrado. |
+| `manifest_mismatch` | La partición es de otro manifest que el de la selección. |
+| `test_split_hash_mismatch` | Los `crop_id` de la partición no dan su `test_split_hash`. |
+| `duplicate_crop_id` / `crop_ids_not_test_split` | Crops repetidos, faltantes o ajenos a la partición test. |
+| `evaluated_before_close` | `evaluated_at` no es posterior al cierre (al milisegundo). |
+| `invalid_prediction` | Probabilidades que no suman ~1, clase fuera de cat/dog o `predicted_class` ≠ argmax. |
+| `official_already_recorded` | Ya existe la evaluación oficial: se escribe una sola vez. `synthetic` sí se reemplaza. |
+
+## Exportación (`evaluation_predictions`)
+
+Una fila por crop, ordenada por `crop_id`, con la clase real, la predicha, la
+probabilidad de cada clase, el candidato, el manifest, el `test_split_hash` y
+`evaluated_at`. `GET /api/evaluation/predictions?format=csv` entrega lo mismo como
+descarga (`p3-evaluation-predictions-official.csv`), con los hashes en cada fila.
+
+Antes de servir, el backend contrasta lo guardado con el cierre persistido y entre
+sí: candidato, `closed_at`, manifest, `evaluated_at`, `n_test`, clases,
+`test_split_hash` recalculado y matriz reconstruida desde las predicciones. Si algo no
+coincide responde 503 con el motivo. `server.ts` solo monta el namespace `official`.
+
+## Tests y mutation testing
+
+```bash
+cd app && uv run pytest tests/test_evaluation_producer.py tests/test_evaluation_predictions_contract.py
+cd backend && npx vitest run tests/evaluation.test.ts
+python .github/scripts/run_evaluation_api_mutations.py   # copia aislada, Python + TS
+```
+
+`backend/tests/fixtures/evaluation-synthetic.json` es la salida exacta del productor
+con las entradas sintéticas; el test Python lo exige igual y los tests del backend lo
+consumen. Con MariaDB real (job de CI "Jobs persistentes"),
+`.github/scripts/evaluation_e2e.py` corre el productor dentro de la imagen de
+trainer-worker y `backend/tests/evaluation.mariadb.test.ts` lee esa fila con el
+repositorio real.

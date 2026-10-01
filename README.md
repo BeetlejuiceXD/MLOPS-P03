@@ -1536,3 +1536,54 @@ no pudo descargar un binario opcional ni en el reintento (casi siempre la red): 
 correr `docker compose build --no-cache backend`. Antes de D03-06 ese caso producía una
 imagen que se construía "bien" y moría al arrancar (`/api/*` → 502); ahora el build falla.
 La evidencia del ensayo está en el PR que cierra #63.
+
+## D04-01 — Runs de MLflow en la API del portal
+
+El backend lee el experimento `p3-cnn-classifier` del MLflow persistente por su API REST
+(`MLFLOW_TRACKING_URI`, en Compose `http://mlflow:5000`) y lo sirve al portal con el
+contrato de `contracts/p3/README.md`. No guarda ni inventa runs: lo que muestra está en MLflow.
+
+```bash
+# Listado: runs de training en `runs`; auxiliares e incompletos en `excluded` con su motivo
+curl -s http://localhost:8080/api/experiments/runs
+# Detalle de un run (mismos valores del listado + artefactos)
+curl -s http://localhost:8080/api/experiments/runs/<run_id>
+# Recuperar un artefacto (el sha256 de model.pt coincide con el tag checkpoint_sha256)
+curl -s -o model.pt http://localhost:8080/api/experiments/runs/<run_id>/artifacts/checkpoint/model.pt
+```
+
+| Situación | Respuesta |
+|---|---|
+| Run de training completo | En `runs`; `campaign_eligible: true` solo si es `FINISHED`, con resumen y `checkpoint_sha256` |
+| Training `RUNNING`, `SCHEDULED`, `FAILED` o `KILLED` | En `runs` con su estado real de MLflow y sus épocas reales, `campaign_eligible: false` y el motivo |
+| Training con cualquier métrica `test*` | En `excluded`: el frozen test no se evalúa antes de MODEL SELECTION CLOSED (#33) |
+| `controlled_task` (D02-05), `short_run_instrumentation` (D02-06), `persistence_check` (D02-01) o sin `p3.run_kind` | En `excluded` con el motivo; detalle y artefactos → 409 |
+| Training sin un tag de provenance o con un hueco en la curva | En `excluded`; el valor no se rellena con el oficial ni se interpola |
+| Artefacto que no existe | 404 `artifact_missing: …` |
+| MLflow caído | 503 `mlflow_unavailable: …` (nunca un listado vacío) |
+
+`campaign_eligible` es elegibilidad estructural. Que el run pertenezca a la matriz OFAT de
+la campaña y la selección por validation son de D04-03/D04-04.
+
+## D04-02 — Experiments en el portal
+
+`http://localhost:8080/ml/experiments` muestra los runs reales del experimento
+`p3-cnn-classifier` tal como los sirve el adaptador de D04-01 (`/api/experiments/runs`).
+
+- **Conteo:** runs de training, elegibles para campaña y, aparte, auxiliares y excluidos.
+  Los auxiliares (`controlled_task`, `short_run_instrumentation`, `persistence_check`) y los
+  runs excluidos aparecen en su propia sección con el motivo: no suman al conteo ni se pueden
+  elegir para comparar.
+- **Filtros:** estado, elegibilidad, seed, capas entrenables, optimizador y learning rate. Las
+  opciones salen de los runs presentes.
+- **Comparar:** marca dos o más runs. Se muestran los 15 campos de `TrainingConfig` lado a lado
+  (resaltando los que difieren), las mejores métricas de validation y las curvas de
+  `val_accuracy` y `val_loss` superpuestas.
+- **Ver:** abre el detalle desde `/api/experiments/runs/<run_id>`. Muestra provenance, resumen,
+  curvas por época con su tabla de valores y artefactos descargables
+  (`checkpoint/model.pt`, etc.).
+- **Actualizar:** vuelve a pedir los runs a la API, por ejemplo mientras un job está `RUNNING`.
+- Si MLflow no responde, la página muestra el motivo (`503 mlflow_unavailable`), nunca una
+  lista vacía.
+
+La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
