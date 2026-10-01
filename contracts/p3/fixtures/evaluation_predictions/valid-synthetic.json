@@ -1,0 +1,73 @@
+{
+  "contract": "evaluation_predictions",
+  "valid": true,
+  "why": "Exportación sintética de 6 crops: matriz [[2,1],[1,2]]; namespace synthetic, nunca oficial",
+  "payload": {
+    "namespace": "synthetic",
+    "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "test_split_hash": "898c9b54504a279db6e8ce4a86037a0a05b4be37942924398d539af86188dcc8",
+    "evaluated_at": "2026-10-01T14:00:00.000Z",
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "n_test": 6,
+    "predictions": [
+      {
+        "crop_id": 3,
+        "true_class": "cat",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.9,
+          "dog": 0.1
+        }
+      },
+      {
+        "crop_id": 7,
+        "true_class": "cat",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.8,
+          "dog": 0.2
+        }
+      },
+      {
+        "crop_id": 12,
+        "true_class": "cat",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.3,
+          "dog": 0.7
+        }
+      },
+      {
+        "crop_id": 20,
+        "true_class": "dog",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.25,
+          "dog": 0.75
+        }
+      },
+      {
+        "crop_id": 21,
+        "true_class": "dog",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.6,
+          "dog": 0.4
+        }
+      },
+      {
+        "crop_id": 30,
+        "true_class": "dog",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.1,
+          "dog": 0.9
+        }
+      }
+    ]
+  }
+}

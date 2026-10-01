@@ -27,6 +27,8 @@ COPY trainer_worker/ ./trainer_worker/
 COPY trainer/ ./trainer/
 COPY manifest/ ./manifest/
 COPY campaign/ ./campaign/
+# D03-05/D04-05: motor de métricas y productor de la evaluación (lo usa D06-01).
+COPY evaluation/ ./evaluation/
 
 # El volumen nombrado reports_data (docker-compose.yml) se inicializa la
 # primera vez con el contenido/dueño de este directorio si ya existe en la

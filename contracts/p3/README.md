@@ -25,8 +25,14 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/training/jobs/:id` | `training_job` | Hannah (D02-05) |
 | `GET /api/training/jobs/:id/logs` | `job_logs` | Hannah (D02-05) |
 | `POST /api/training/jobs/:id/cancel` | `training_job` (`queued` → `cancelled`; `running` → `cancel_requested`) | Hannah (D02-05) |
-| `GET /api/experiments/runs` | `experiment_runs_response` (proxy de MLflow, sin datos fijos) | Hannah (D04) |
-| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED) | Ale |
+| `GET /api/experiments/runs` | `experiment_runs_response` (adaptador de MLflow, sin datos fijos; 503 con el motivo si MLflow no responde) | Hannah (D04-01) |
+| `GET /api/experiments/runs/:runId` | `experiment_run_detail` (run + artefactos; 409 si el run es auxiliar o incompleto, 404 si no es de P3) | Hannah (D04-01) |
+| `GET /api/experiments/runs/:runId/artifacts/<ruta>` | bytes del artefacto vía MLflow (404 `artifact_missing`) | Hannah (D04-01) |
+| `GET /api/selection` | Estado persistido de la selección (`open` \| `candidate` \| `closed`): candidato, ranking solo validation y runs excluidos con su motivo | Ale (D04-04) |
+| `POST /api/selection/candidate` | Recalcula y guarda el candidato **preparatorio** (409 si ya está cerrada; 503 sin runs/manifest) | Ale (D04-04) |
+| `POST /api/selection/close` | body `{ "candidate_run_id" }` → MODEL SELECTION CLOSED, definitivo (409 si no es el candidato, hay < 10 filas comparables o la campaña cambió) | Ale (D04-04); cierre oficial en D05-02 |
+| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED; cerrada y sin evaluación oficial → 404; guardada pero incoherente → 503) | Ale (D04-05) |
+| `GET /api/evaluation/predictions[?format=json\|csv]` | `evaluation_predictions` por muestra (409 antes del cierre, sin leer nada; 404 sin evaluación oficial; `csv` = mismo contenido como descarga) | Ale (D04-05) |
 | `GET /api/models` | `models_response` | Hannah (D06) |
 | `POST /api/models/:semver/publish` | `model_version` | Hannah (D06) |
 | `POST /api/inference` | multipart (`image`, `model_version`) → `inference_result` | Hannah + motor de Esteban (D06) |
@@ -44,6 +50,9 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | `training_job` | Máquina de estados `queued → running → succeeded \| failed \| cancelled`; sin `mlflow_run_id` en `queued` (no se fabrican IDs); `succeeded` exige run; `failed` exige error; `total_epochs = max_epochs`. |
 | `create_training_job_request` | `task` obligatoria: `controlled` (tarea sintética de D02-05, sin datos ni entrenamiento) o `training` (D03-03: la API exige release elegible y manifest oficial congelado, si no responde 409); `controlled.fail_at_epoch` solo con `controlled` y ≤ `max_epochs`. |
 | `experiment_runs_response` | Solo `p3-cnn-classifier`; tags de trazabilidad obligatorios (`git_commit`, `dvc_release`, `dvc_images_md5`, `dvc_annotations_md5`, `dvc_release_hash`, `manifest_version`, `manifest_hash`, `classes`, `seed`, `job_id`); `tags.seed = params.seed`; `best_epoch` es la de mayor `val_accuracy` (restaurar el mejor, no el último) y `best_val_accuracy`, `best_val_macro_f1` y `best_val_loss` son los de `history[best_epoch]` (tolerancia 1e-4); sin métricas de test. |
+| `experiment_runs_response` (D04-01) | `runs` = solo `p3.run_kind=training` con provenance, params y curvas completas tal como están en MLflow. `campaign_eligible` ⇔ sin `ineligible_reasons`; elegible exige `FINISHED`, resumen y `checkpoint_sha256` (FINISHED solo no basta). El `status` es el de MLflow tal cual (`RUNNING`, `SCHEDULED`, `FINISHED`, `FAILED`, `KILLED`); no se sustituye. Un training con métricas `test*` va a `excluded`. `excluded` = auxiliares (`controlled_task`, `short_run_instrumentation`, `persistence_check`), runs sin `p3.run_kind` y training con provenance/curvas incompletas, cada uno con su motivo. Un `run_id` no aparece dos veces. Pertenecer a la matriz OFAT de la campaña es de D04-03/D04-04. |
+| `experiment_run_detail` | El mismo run del listado más `artifacts`: rutas relativas al run (sin `/` inicial ni `..`), directorios sin tamaño. |
+| `evaluation_predictions` | `namespace` `official` o `synthetic` (la API solo sirve `official`); una fila por crop en orden estrictamente creciente de `crop_id`, `n_test` filas; probabilidad para cada clase declarada y ninguna otra, suma ≈ 1 (±1e-3), `predicted_class` = argmax. El backend exige además `test_split_hash` = sha256 del JSON de los `crop_id` ordenados, la matriz reconstruida igual a la de `evaluation_response` y mismo candidato/`closed_at`/manifest que el cierre persistido. |
 | `evaluation_response` | `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
 | `models_response` | `semver` propio del modelo (no del dataset); `s3_key` bajo `models/p3-cnn-classifier/<semver>/`; `sha256` hex de 64; `published` exige `version_id` y `published_at`. |
 | `inference_result` | Probabilidad para cada clase declarada y ninguna otra; suma ≈ 1 (±1e-3); `predicted_class` = argmax. |

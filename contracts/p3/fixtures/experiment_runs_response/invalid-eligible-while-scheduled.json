@@ -1,0 +1,55 @@
+{
+  "contract": "experiment_runs_response",
+  "valid": false,
+  "why": "Un run SCHEDULED no puede ser elegible",
+  "payload": {
+    "experiment_name": "p3-cnn-classifier",
+    "runs": [
+      {
+        "run_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "experiment_name": "p3-cnn-classifier",
+        "status": "SCHEDULED",
+        "start_time": "2026-09-27T17:00:05Z",
+        "end_time": null,
+        "params": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 21,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0
+        },
+        "tags": {
+          "git_commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "22222222222222222222222222222222.dir",
+          "dvc_annotations_md5": "11111111111111111111111111111111.dir",
+          "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "classes": [
+            "cat",
+            "dog"
+          ],
+          "seed": 21,
+          "job_id": 2
+        },
+        "summary": null,
+        "history": [],
+        "checkpoint_sha256": null,
+        "campaign_eligible": true,
+        "ineligible_reasons": []
+      }
+    ],
+    "excluded": []
+  }
+}

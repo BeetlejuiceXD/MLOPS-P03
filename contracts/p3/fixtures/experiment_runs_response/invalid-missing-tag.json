@@ -76,8 +76,12 @@
             "val_macro_f1": 0.8391,
             "learning_rate": 0.001
           }
-        ]
+        ],
+        "checkpoint_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "campaign_eligible": true,
+        "ineligible_reasons": []
       }
-    ]
+    ],
+    "excluded": []
   }
 }

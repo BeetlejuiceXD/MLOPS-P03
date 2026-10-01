@@ -11,6 +11,9 @@ const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefine
 const API_BASE_URL =
   configuredBaseUrl !== undefined && configuredBaseUrl.trim() !== "" ? configuredBaseUrl : "/api";
 
+/** URL del backend para enlaces directos (p. ej. descargas), con la misma base que fetch. */
+export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
 type FetchState<T> =
   | { status: "loading" }
   | { status: "error"; message: string }

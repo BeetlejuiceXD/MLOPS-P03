@@ -5,6 +5,7 @@
 import { useValidatedFetch } from "@/hooks/useValidatedFetch";
 import {
   evaluationResponseSchema,
+  experimentRunDetailSchema,
   experimentRunsResponseSchema,
   manifestSummarySchema,
   modelsResponseSchema,
@@ -18,7 +19,10 @@ export const useReleases = () =>
   useValidatedFetch("/releases", releasesResponseSchema, WITH_REASON);
 export const useManifest = () => useValidatedFetch("/manifest", manifestSummarySchema, WITH_REASON);
 export const useTrainingJobs = () => useValidatedFetch("/training/jobs", trainingJobListSchema);
+// D04-02: el 503 de MLflow caído (D04-01) trae el motivo; se muestra.
 export const useExperimentRuns = () =>
-  useValidatedFetch("/experiments/runs", experimentRunsResponseSchema);
+  useValidatedFetch("/experiments/runs", experimentRunsResponseSchema, WITH_REASON);
+export const useExperimentRun = (runId: string) =>
+  useValidatedFetch(`/experiments/runs/${runId}`, experimentRunDetailSchema, WITH_REASON);
 export const useEvaluation = () => useValidatedFetch("/evaluation", evaluationResponseSchema);
 export const useModels = () => useValidatedFetch("/models", modelsResponseSchema);
