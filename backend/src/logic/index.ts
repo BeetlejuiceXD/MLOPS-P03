@@ -42,6 +42,9 @@ export { buildDashboardSummary, buildThumbnailUrl } from './dashboard.builder.js
 export { getDashboardSummary } from './dashboard.service.js';
 // Errores tipados: la capa UI los mapea a códigos HTTP (SPEC-VALID-001).
 export { ConflictError, NotFoundError, ValidationError } from './errors.js';
+// D04-01: adaptador MLflow → portal.
+export type { ExperimentsService } from './experiments.service.js';
+export { createExperimentsService } from './experiments.service.js';
 export type { HealthStatus } from './health.service.js';
 export { checkHealth } from './health.service.js';
 export type { ImageFile } from './image-file.service.js';
@@ -55,6 +58,7 @@ export type {
 export { searchImages } from './image-search.service.js';
 export { setImageStatus } from './image-status.service.js';
 export { deleteImage, uploadImage } from './image-upload.service.js';
+export { createMlflowReader } from './mlflow-reader.js';
 export { mariaDbP3SourcesRepository } from './p3-sources.repository.js';
 // Fuentes oficiales de Training publicadas por trainer-worker (D03-03)
 export type { P3SourcesService } from './p3-sources.service.js';
