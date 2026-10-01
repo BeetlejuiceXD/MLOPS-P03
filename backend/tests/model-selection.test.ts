@@ -24,6 +24,7 @@ import {
 import {
   createModelSelectionService,
   type ModelSelectionRepository,
+  runsAdapterPendingSource,
   type SelectionRecord,
 } from '../src/logic/model-selection.service.js';
 import {
@@ -670,5 +671,35 @@ describe('API de selección y bloqueo de Evaluation', () => {
     // Cerrada, Evaluation ya no está bloqueada, pero la evaluación oficial aún no existe (D06-01).
     const evaluation = await call('GET', '/evaluation');
     expect(evaluation.status).toBe(404);
+  });
+
+  it('sin el adaptador de runs (D04-01) proponer responde 503 con el motivo, sin escribir', async () => {
+    const pendingRepo = new InMemorySelectionRepository();
+    const app = express();
+    app.use(express.json());
+    app.use(
+      createModelSelectionRouter(
+        createModelSelectionService(pendingRepo, runsAdapterPendingSource, {
+          manifest: async () => ({
+            ...frozenManifest(),
+            manifest_hash: MANIFEST_HASH,
+            dataset_version: 'v0.1.1',
+            dvc_release_hash: RELEASE_HASH,
+          }),
+        }),
+      ),
+    );
+    const server = app.listen(0);
+    try {
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const res = await fetch(`${url}/selection/candidate`, { method: 'POST' });
+      expect(res.status).toBe(503);
+      expect((await res.json()).error).toMatch(/D04-01/);
+      expect(pendingRepo.writes).toBe(0);
+      const evaluation = await fetch(`${url}/evaluation`);
+      expect(evaluationResponseSchema.parse(await evaluation.json()).state).toBe('blocked');
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });
