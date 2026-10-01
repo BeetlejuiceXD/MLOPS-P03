@@ -71,8 +71,8 @@ este proyecto usa IAM Identity Center / SSO con tu propia identidad.
 ### 2. Clonar el repositorio
 
 ```bash
-git clone https://github.com/karenelizabg/proyecto-fase2-MLOPS.git
-cd proyecto-fase2-MLOPS
+git clone https://github.com/BeetlejuiceXD/MLOPS-P03.git
+cd MLOPS-P03
 git status
 ```
 
@@ -118,7 +118,7 @@ py -3.12 -m venv .venv-dvc
 El repositorio ya está inicializado y ya contiene sus remotes. **No ejecutes
 `dvc init`.**
 
-### 5. Comprobar AWS CLI v2 (macOS)
+### 5. Comprobar AWS CLI v2
 
 Comprueba primero si ya está instalada:
 
@@ -135,6 +135,18 @@ curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "/tmp/AWSCLIV2.pkg"
 sudo installer -pkg "/tmp/AWSCLIV2.pkg" -target /
 aws --version
 ```
+
+En Windows (PowerShell), con el instalador MSI oficial; abre una terminal nueva al
+terminar:
+
+```powershell
+msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+aws --version
+```
+
+Un perfil de otro curso (p. ej. AWS Academy) no sirve: el perfil de este proyecto es
+`mlops-p2` (paso 6). Al configurarlo, elige el rol con acceso al bucket de DVC
+(`MLOPS-S3-DVC`).
 
 ### 6. Configurar IAM Identity Center / SSO
 
@@ -214,13 +226,14 @@ permisos requeridos para esas operaciones. Después puedes consultar el estado
 de los metadatos DVC sin subir datos:
 
 ```bash
-dvc status -r prod data/raw/images.dvc data/raw/annotations.dvc
+dvc status -r prod data/raw/images.dvc data/raw/annotations.dvc data/p3/manifest.json.dvc
 ```
 
-Descarga el dataset únicamente cuando realmente lo necesites:
+Descarga el dataset únicamente cuando realmente lo necesites. Para P3 (Training) hacen
+falta el release v0.1.1 **y** el manifest congelado de D03-01:
 
 ```bash
-dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc
+dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc data/p3/manifest.json.dvc
 ```
 
 `dvc pull` materializa archivos en tu máquina, pero no sube nada a S3. No uses
@@ -277,22 +290,42 @@ aplicación local también se necesitan Docker y Docker Compose.
 ## Despliegue con un solo comando
 
 Antes del primer arranque, crea el `.env` local para Compose y completa los
-dos valores de MinIO con credenciales locales:
+**tres** valores obligatorios con credenciales locales inventadas por ti:
+`MARIADB_ROOT_PASSWORD` (hexadecimal), `MINIO_ROOT_USER` y `MINIO_ROOT_PASSWORD`.
+Sin ellos `docker compose` se niega a arrancar (`Define … en .env`).
 
 ```bash
 cp .env.example .env
 chmod 600 .env
+# edita .env; por ejemplo, contraseñas con: openssl rand -hex 32
+```
+
+En PowerShell, el mismo paso genera los valores sin escribirlos en pantalla:
+
+```powershell
+Copy-Item .env.example .env
+$hex = { -join ((1..32) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }) }
+(Get-Content .env) `
+  -replace '^MARIADB_ROOT_PASSWORD=$', "MARIADB_ROOT_PASSWORD=$(& $hex)" `
+  -replace '^MINIO_ROOT_USER=$', 'MINIO_ROOT_USER=minio-local' `
+  -replace '^MINIO_ROOT_PASSWORD=$', "MINIO_ROOT_PASSWORD=$(& $hex)" |
+  Set-Content .env -Encoding ascii
 ```
 
 `ANTHROPIC_API_KEY` puede permanecer vacío si no vas a usar el chat Copilot.
 No pongas credenciales AWS en este archivo.
 
 ```bash
+export GIT_COMMIT=$(git rev-parse HEAD)   # PowerShell: $env:GIT_COMMIT = git rev-parse HEAD
 docker compose up --build
 ```
 
-Este comando levanta los servicios de MariaDB, MinIO, backend, frontend,
-pipeline `app` y Copilot. El backend espera a que MariaDB y MinIO estén listos, aplica las
+`GIT_COMMIT` queda como tag de procedencia en cada run de Training (si no se define,
+el tag dice `unknown`). Este comando levanta los servicios de MariaDB, MinIO,
+MLflow, backend, frontend, pipeline `app`, `trainer-worker` y Copilot. Para que
+Training pueda entrenar con datos reales, antes hay que bajar el release y el manifest
+congelado con DVC (paso 8 del onboarding); sin ellos todo arranca, pero el portal
+explica que las fuentes no están disponibles y solo ofrece la tarea controlada. El backend espera a que MariaDB y MinIO estén listos, aplica las
 migraciones y siembra únicamente las categorías `dog` y `cat` antes de
 arrancar; no crea imágenes demo ni hace falta ejecutar otro paso manual.
 
@@ -300,7 +333,8 @@ arrancar; no crea imágenes demo ni hace falta ejecutar otro paso manual.
 |-----------------|-----------------------------------|
 | Frontend        | http://localhost:8080            |
 | Backend (API)   | http://localhost:3100            |
-| Consola MinIO   | http://localhost:9001 (minioadmin/minioadmin) |
+| Consola MinIO   | http://localhost:9001 (usuario y contraseña de tu `.env`) |
+| MLflow          | http://localhost:5000 (`MLFLOW_HOST_PORT` en `.env` para cambiarlo) |
 
 Para apagar normalmente los servicios, sin borrar los datos persistidos:
 
@@ -1355,8 +1389,8 @@ lectura (`TRAINER_REPO_ROOT=/app`), recibe `GIT_COMMIT` (exporta
 preentrenados de torchvision en el volumen `torch_cache`. Para entrenar con v0.1.1:
 
 ```bash
-dvc pull -r prod                         # datos del release (SSO de AWS)
-# data/p3/manifest.json(.dvc) congelado por D03-01 en el repo / `dvc pull`
+# release v0.1.1 + manifest congelado de D03-01 (SSO de AWS, perfil mlops-p2)
+dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc data/p3/manifest.json.dvc
 GIT_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
 ```
 
@@ -1426,3 +1460,75 @@ faltante) y de procedencia (B2: un solo tag falso — `classes`, `dvc_release_ha
 `manifest_version`, `dvc_release`, `seed`, `job_id` —, hash no recalculable, release no
 aprobado o distinto al oficial, `sources.json` incoherente). El clon fiel del run real
 pasa, así cada negativo cambia una sola pieza. Mutantes D03-04 en `run_jobs_mutations.py`.
+
+## D03-06 — Arranque limpio verificado
+
+Recorrido completo desde un clon nuevo hasta el smoke de D03-04 (job real → run de
+MLflow → checkpoint verificado), sin depender de nada que no esté en este README. Es la
+secuencia que se ejecutó para D03-06; sirve como checklist de instalación. **No evalúa
+el frozen test ni es una corrida de la campaña.**
+
+**Prerrequisitos fuera del repo** (una vez por máquina, ver
+[Onboarding](#onboarding-de-desarrollo)): Git, Python 3.12, Docker Desktop corriendo,
+AWS CLI v2 con el perfil SSO `mlops-p2` (rol con acceso al bucket DVC) y unos 10 GB
+libres para las imágenes. Puertos libres: 3306, 9000/9001, 5000, 3100 y 8080; si ya
+tienes otro clon levantado, apágalo antes (`docker compose down` en esa carpeta).
+
+```bash
+# 1) Clon limpio e identificación del commit
+git clone https://github.com/BeetlejuiceXD/MLOPS-P03.git MLOPS-P03-clean
+cd MLOPS-P03-clean
+git rev-parse HEAD
+
+# 2) .env local (ver "Despliegue con un solo comando"; tres valores obligatorios)
+cp .env.example .env && chmod 600 .env   # y completa MARIADB_ROOT_PASSWORD, MINIO_ROOT_*
+
+# 3) Datos oficiales con DVC (entorno separado .venv-dvc, perfil SSO mlops-p2)
+python3.12 -m venv .venv-dvc && source .venv-dvc/bin/activate
+python -m pip install 'dvc[s3]==3.67.1'
+aws sso login --profile mlops-p2
+dvc remote modify --local prod profile mlops-p2
+dvc pull -r prod data/raw/images.dvc data/raw/annotations.dvc data/p3/manifest.json.dvc
+dvc status data/raw/images.dvc data/raw/annotations.dvc data/p3/manifest.json.dvc
+
+# 4) Servicios, construidos desde cero
+export GIT_COMMIT=$(git rev-parse HEAD)
+docker compose build --no-cache --pull
+docker compose up -d
+docker compose ps
+
+# 5) Salud y fuentes publicadas (esperar ~30 s a que trainer-worker publique)
+curl -s http://localhost:3100/health
+curl -s http://localhost:5000/health
+curl -s http://localhost:8080/api/releases
+curl -s http://localhost:8080/api/manifest
+
+# 6) Flujo corto integrado de D03-04: crea el job por la API del portal, lo sigue hasta
+#    su estado terminal y verifica job, run, procedencia y checkpoint
+mkdir -p _smoke
+docker compose run --rm --no-deps -v "$PWD/_smoke:/out" app \
+  python -m tracking.smoke run --seed 7 --max-epochs 10 --patience 3 \
+  --api http://frontend/api --tracking-uri http://mlflow:5000 \
+  --label "D03-06 arranque limpio (no es corrida de campaña)" \
+  --evidence /out/smoke-d03-06.json
+```
+
+En PowerShell cambian solo estas líneas: `Copy-Item .env.example .env` (y el bloque que
+genera los valores de "Despliegue con un solo comando"), `py -3.12 -m venv .venv-dvc` y
+`.venv-dvc\Scripts\Activate.ps1`, `$env:GIT_COMMIT = git rev-parse HEAD`,
+`curl.exe` en vez de `curl`, `mkdir _smoke` y `"${PWD}/_smoke:/out"`. Si PowerShell
+bloquea `Activate.ps1`, corre antes `Set-ExecutionPolicy -Scope Process Bypass`.
+
+**Qué esperar en cada punto:**
+
+| Paso | Resultado esperado |
+|---|---|
+| 3 | `dvc status` → `Data and pipelines are up to date.`; `data/raw/images` con 600 archivos |
+| 4 | `docker compose ps`: `mariadb`, `minio` y `mlflow` *healthy*; los demás *running* |
+| 5 | `/health` → `"status":"ok"`; `/api/releases` con `v0.1.1` en `approved`; `/api/manifest` con `p3-v0.1.1-s42` y `"frozen":true` |
+| 6 | `SMOKE OK: job #1 → run … → checkpoint … cargado (['cat', 'dog'])` y salida `0` |
+
+Si un paso no da lo esperado, el motivo suele estar en la propia respuesta: por
+ejemplo `GET /api/manifest` → `503 manifest_missing` significa que faltó el
+`dvc pull` del manifest, y `docker compose` → `Define MARIADB_ROOT_PASSWORD` que faltó
+el `.env`. La evidencia del ensayo está en el PR de D03-06 (#63).
