@@ -1531,4 +1531,8 @@ bloquea `Activate.ps1`, corre antes `Set-ExecutionPolicy -Scope Process Bypass`.
 Si un paso no da lo esperado, el motivo suele estar en la propia respuesta: por
 ejemplo `GET /api/manifest` → `503 manifest_missing` significa que faltó el
 `dvc pull` del manifest, y `docker compose` → `Define MARIADB_ROOT_PASSWORD` que faltó
-el `.env`. La evidencia del ensayo está en el PR que cierra #63.
+el `.env`. Si el build del backend termina con `[check-esbuild] … falta @esbuild/…`, npm
+no pudo descargar un binario opcional ni en el reintento (casi siempre la red): vuelve a
+correr `docker compose build --no-cache backend`. Antes de D03-06 ese caso producía una
+imagen que se construía "bien" y moría al arrancar (`/api/*` → 502); ahora el build falla.
+La evidencia del ensayo está en el PR que cierra #63.
