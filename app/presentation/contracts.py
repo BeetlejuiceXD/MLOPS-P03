@@ -12,6 +12,7 @@ from pydantic import (
     Field,
     JsonValue,
     StringConstraints,
+    TypeAdapter,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -261,3 +262,65 @@ def frozen_test_split_hash(test_crop_ids: list[int] | tuple[int, ...]) -> str:
     """Hash de la partición test: SHA-256 del JSON canónico de sus crop_id ordenados."""
     canonical = json.dumps(sorted(test_crop_ids), separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# D03-05 — `GET /api/evaluation` (stub Red).
+# ---------------------------------------------------------------------------
+
+MlflowRunId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+
+
+class EvaluationSelection(ContractModel):
+    candidate_run_id: MlflowRunId
+    metric: Literal["val_accuracy"]
+    closed_at: str
+
+
+class EvaluationConfusionMatrix(ContractModel):
+    labels: list[ManifestClassName]
+    rows: list[list[Count]]
+
+
+class EvaluationClassMetrics(ContractModel):
+    class_name: ManifestClassName
+    precision: Ratio
+    recall: Ratio
+    f1: Ratio
+    support: Count
+
+
+class EvaluationMetrics(ContractModel):
+    accuracy: Ratio
+    macro_f1: Ratio
+    per_class: list[EvaluationClassMetrics]
+
+
+class EvaluationBlocked(ContractModel):
+    state: Literal["blocked"]
+    reason: Literal["model_selection_open"]
+    detail: str
+
+    @model_validator(mode="after")
+    def _red(self) -> Self:
+        raise NotImplementedError
+
+
+class EvaluationReady(ContractModel):
+    state: Literal["ready"]
+    selection: EvaluationSelection
+    manifest_hash: Sha256Hex
+    evaluated_at: str
+    n_test: Annotated[int, Field(gt=0)]
+    classes: list[ManifestClassName]
+    confusion_matrix: EvaluationConfusionMatrix
+    metrics: EvaluationMetrics
+    majority_baseline_accuracy: Ratio
+
+    @model_validator(mode="after")
+    def _red(self) -> Self:
+        raise NotImplementedError
+
+
+EvaluationResponse = Annotated[EvaluationBlocked | EvaluationReady, Field(discriminator="state")]
+EVALUATION_RESPONSE = TypeAdapter(EvaluationResponse)
