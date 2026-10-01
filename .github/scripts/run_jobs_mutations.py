@@ -35,7 +35,6 @@ WORKER_TESTS = ["tests/test_trainer_worker.py"]
 BACKEND_TESTS = ["tests/training-jobs.test.ts"]
 SOURCES_TESTS = ["tests/test_training_sources.py", "tests/test_trainer_worker_training.py"]
 P3_SOURCES_TESTS = ["tests/p3-sources.test.ts"]
-SMOKE_TESTS = ["tests/test_smoke.py"]
 
 
 @dataclass(frozen=True)
@@ -193,7 +192,7 @@ MUTANTS = [
         SMOKE,
         '    if report.checkpoint_sha256 != run.data.tags.get("checkpoint_sha256"):',
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_checkpoint_replaced_on_the_server_fails_the_hash"],
     ),
     Mutant(
         "app",
@@ -202,7 +201,7 @@ MUTANTS = [
         SMOKE,
         "    if leaked:",
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_a_test_metric_in_the_run_fails_the_smoke"],
     ),
     Mutant(
         "app",
@@ -211,7 +210,7 @@ MUTANTS = [
         SMOKE,
         "    if experiment != P3_EXPERIMENT:",
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_run_outside_the_p3_experiment_is_rejected"],
     ),
     Mutant(
         "app",
@@ -220,7 +219,7 @@ MUTANTS = [
         SMOKE,
         "strict=True)",
         "strict=False)",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_checkpoint_that_does_not_fit_the_config_model_fails_loading"],
     ),
     Mutant(
         "app",
@@ -229,7 +228,7 @@ MUTANTS = [
         SMOKE,
         '    if stored_config != job["config"]:',
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_checkpoint_config_must_be_the_job_config"],
     ),
     # --- D03-04 B1: historial por época y resumen best_* (auditoría de #69) ---
     Mutant(
@@ -239,7 +238,7 @@ MUTANTS = [
         SMOKE,
         "        if duplicated:",
         "        if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_duplicated_epoch_step_is_rejected"],
     ),
     Mutant(
         "app",
@@ -248,7 +247,7 @@ MUTANTS = [
         SMOKE,
         "        elif sorted(steps) != list(range(1, epoch + 1)):",
         "        elif False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_incomplete_epoch_steps_are_rejected"],
     ),
     Mutant(
         "app",
@@ -257,7 +256,7 @@ MUTANTS = [
         SMOKE,
         "    if not float(raw).is_integer() or not 1 <= int(raw) <= epoch:",
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_best_epoch_must_be_an_existing_integer_epoch"],
     ),
     Mutant(
         "app",
@@ -266,7 +265,7 @@ MUTANTS = [
         SMOKE,
         "    for summary, curve in BEST_SUMMARY:",
         "    for summary, curve in BEST_SUMMARY[:1]:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_each_best_metric_must_be_the_curve_at_best_epoch"],
     ),
     # --- D03-04 B2: procedencia contra las fuentes oficiales ---
     Mutant(
@@ -276,7 +275,7 @@ MUTANTS = [
         SMOKE,
         '        "classes": frozen_classes,',
         '        "classes": tags.get("classes"),',
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_one_false_provenance_tag_is_rejected"],
     ),
     Mutant(
         "app",
@@ -285,7 +284,10 @@ MUTANTS = [
         SMOKE,
         '            "dvc_images_md5": release["images_md5"],',
         '            "dvc_images_md5": tags.get("dvc_images_md5"),',
-        SMOKE_TESTS,
+        [
+            "tests/test_smoke.py::test_one_false_provenance_tag_is_rejected",
+            "tests/test_smoke.py::test_run_identity_must_match_the_official_release_not_only_itself",
+        ],
     ),
     Mutant(
         "app",
@@ -294,7 +296,7 @@ MUTANTS = [
         SMOKE,
         '        if tags.get("dvc_release_hash") != recomputed:',
         "        if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_dvc_release_hash_must_be_recomputable_from_the_official_md5s"],
     ),
     Mutant(
         "app",
@@ -303,7 +305,7 @@ MUTANTS = [
         SMOKE,
         "    if release is None:",
         "    if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_job_must_use_an_officially_approved_release"],
     ),
     Mutant(
         "app",
@@ -312,7 +314,7 @@ MUTANTS = [
         SMOKE,
         "        if recorded.get(name) != value:",
         "        if False:",
-        SMOKE_TESTS,
+        ["tests/test_smoke.py::test_checkpoint_sources_json_must_match_the_run_provenance"],
     ),
 ]
 
