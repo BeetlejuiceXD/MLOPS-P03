@@ -1294,7 +1294,7 @@ Los fixtures de `contracts/p3/fixtures` son evidencia de componente, no de integ
 **Mutaciones:** `.github/scripts/run_jobs_mutations.py` aplica 7 mutantes de D02-05 (claim atómico,
 latido vencido, cierre pendiente del run huérfano, compuerta release/manifest y las dos
 protecciones del cierre), corre solo los tests del área, informa qué tests detectaron
-cada uno y restaura el archivo. CI lo corre en los jobs Python y Backend:
+cada uno y restaura el archivo. CI lo corre en los jobs "Mutaciones Python" (`--suite app`) y Backend:
 
 ```bash
 cd app && uv run python ../.github/scripts/run_jobs_mutations.py   # ambas suites
@@ -1370,3 +1370,59 @@ cancelación, SIGTERM, error del trainer y checkpoint no verificable),
 **Jobs persistentes** comprueba además que el worker publica las fuentes reales y que,
 sin datos, la API responde `503`/`409` con el motivo. Mutantes D03-03 (8 a 14) en
 `run_jobs_mutations.py`.
+
+## D03-04 — Smoke real Training → MLflow → checkpoint
+
+Recorrido integrado antes de la campaña: un job `task=training` lanzado **desde el
+portal** sobre train/val del manifest congelado, seguido hasta su estado terminal y
+contrastado con su run en `p3-cnn-classifier` (MariaDB + MinIO) y con su checkpoint
+descargado del servidor. **No es una corrida de la campaña (#33)**: se identifica como
+smoke en la evidencia, no se cuenta para selección y nunca consulta el frozen test.
+
+`app/tracking/smoke.py` (`python -m tracking.smoke`) verifica:
+
+- job `training` + `succeeded`, con run en el experimento `p3-cnn-classifier` y `FINISHED`;
+- procedencia contrastada con las **fuentes oficiales** que publica la API, no solo con lo
+  que declara el run: release aprobado en `GET /releases` (`dvc_release`,
+  `dvc_images_md5`, `dvc_annotations_md5`), manifest congelado de `GET /manifest`
+  (`manifest_version`, `manifest_hash`, `dvc_release_hash`, `classes`), `dvc_release_hash`
+  recalculado como sha256(`images_md5:annotations_md5`), `classes` = class map congelado,
+  y `job_id`/`seed`/params = el job y su `TrainingConfig`;
+- historial por época con pasos **únicos y exactamente 1..epoch** (= progreso del job) en
+  las seis curvas; `best_epoch` entero y registrado; `best_val_accuracy`,
+  `best_val_macro_f1` y `best_val_loss` iguales a su curva en `best_epoch` (tolerancia
+  1e-4 del contrato `experiment_runs_response`); **ninguna métrica de test**;
+- `checkpoint/model.pt` descargado con sha256 = tag, `training_config.json` = config del
+  job, `class_map.json` = class map congelado, `sources.json` = procedencia del run, y
+  carga estricta en el modelo de su config con una predicción usando el transform de
+  evaluación compartido.
+
+Con Compose levantado (D03-03: `dvc pull -r prod` de `data/raw` y `data/p3/manifest.json`):
+
+```bash
+export GIT_COMMIT=$(git rev-parse HEAD)          # PowerShell: $env:GIT_COMMIT = git rev-parse HEAD
+docker compose up -d --build
+# 1) Portal → http://localhost:8080 → Training: entrenamiento real, seed 7,
+#    épocas máximas 10, patience 3 → "Encolar job" (anota el Job #).
+# 2) Verificar ese job, su run y su checkpoint (dentro de la red de Compose):
+mkdir -p _smoke
+docker compose run --rm --no-deps -v "$PWD/_smoke:/out" app \
+  python -m tracking.smoke verify --job-id <N> \
+  --api http://frontend/api --tracking-uri http://mlflow:5000 \
+  --evidence /out/smoke-d03-04.json
+```
+
+`tracking.smoke run --seed 7` hace lo mismo creando el job por la API del portal.
+Sale con `0` solo si todo coincide (`1` = algo no coincide, `2` = servicios/fuentes no
+disponibles). `_smoke/` no se versiona.
+
+**Tests:** `app/tests/test_smoke.py` usa el worker real sobre el release sintético y
+altera una sola cosa por test (job no `succeeded`, config o manifest distintos, métrica
+de test, checkpoint reemplazado en el servidor, state_dict de otro modelo, class map o
+`training_config.json` distintos, run de otro experimento) y, tras la auditoría de #69,
+negativos independientes de historial/`best_*` (B1: pasos duplicados o incompletos,
+`best_epoch` inexistente o no entero, cada `best_*` distinto de su curva, resumen
+faltante) y de procedencia (B2: un solo tag falso — `classes`, `dvc_release_hash`, md5,
+`manifest_version`, `dvc_release`, `seed`, `job_id` —, hash no recalculable, release no
+aprobado o distinto al oficial, `sources.json` incoherente). El clon fiel del run real
+pasa, así cada negativo cambia una sola pieza. Mutantes D03-04 en `run_jobs_mutations.py`.

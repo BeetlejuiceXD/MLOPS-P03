@@ -49,7 +49,29 @@ jobs:
         run: uv run --locked --no-build pytest -q
       - name: Mutation test (quality gate)
         run: uv run --locked --no-build python ../.github/scripts/run_gate_mutation.py
-      - name: Mutation test (D02-05, trainer-worker)
+
+  python-mutations:
+    name: Mutaciones Python (trainer-worker, training real y smoke)
+    # Separado de "Python (Ruff y pytest)": cada mutante vuelve a correr tests que entrenan
+    # modelos reales (D03-03/D03-04) y no cabe en los 15 min de ese job. Corre en paralelo.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # Misma versión que app/Dockerfile.
+          version: "0.12.13"
+          enable-cache: true
+          cache-dependency-glob: app/uv.lock
+      - name: Instalar dependencias (falla si uv.lock está desactualizado)
+        run: uv sync --locked --no-build
+      - name: Mutation test (D02-05, D03-03 y D03-04, trainer-worker y smoke)
         run: uv run --locked --no-build python ../.github/scripts/run_jobs_mutations.py --suite app
 
   backend:
@@ -371,7 +393,7 @@ jobs:
     # `always()`: si un job falla, este también debe correr y fallar. Sin esto, un job
     # fallido dejaría a `CI OK` en "skipped", y GitHub lo trata como aprobado.
     if: always()
-    needs: [python, backend, frontend, compose, mlflow-persistence, training-jobs, short-run-instrumentation, quality-gate, quality-gate-prod, app-image]
+    needs: [python, python-mutations, backend, frontend, compose, mlflow-persistence, training-jobs, short-run-instrumentation, quality-gate, quality-gate-prod, app-image]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
