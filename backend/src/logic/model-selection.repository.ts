@@ -1,8 +1,10 @@
+// Módulo directo, no `../data/index.js`: el índice también carga MinIO (y exige su
+// configuración), que la selección no usa.
 import {
   closeModelSelection,
   readModelSelection,
   saveModelSelectionCandidate,
-} from '../data/index.js';
+} from '../data/repositories/model-selection.repository.js';
 import type { SelectionOutcome } from './model-selection.js';
 import type { ModelSelectionRepository } from './model-selection.service.js';
 
