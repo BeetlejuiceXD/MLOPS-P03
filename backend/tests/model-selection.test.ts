@@ -13,6 +13,7 @@ import path from 'node:path';
 import express from 'express';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ConflictError, ServiceUnavailableError, ValidationError } from '../src/logic/errors.js';
+import { createEvaluationService } from '../src/logic/evaluation.service.js';
 import {
   CAMPAIGN_MATRIX,
   campaignRowOf,
@@ -35,6 +36,7 @@ import {
   type TrainingConfig,
   trainingConfigSchema,
 } from '../src/logic/p3.contracts.js';
+import { createEvaluationRouter } from '../src/ui/evaluation.routes.js';
 import { createModelSelectionRouter } from '../src/ui/model-selection.routes.js';
 
 const FIXTURES = path.resolve('../contracts/p3/fixtures');
@@ -632,6 +634,14 @@ describe('servicio de selección', () => {
 
 // --- API ----------------------------------------------------------------------------------
 
+/** Selección + Evaluation montadas como en `server.ts` (D04-05), sin evaluación guardada. */
+function mountSelection(app: express.Express, svc: ReturnType<typeof createModelSelectionService>) {
+  app.use(createModelSelectionRouter(svc));
+  app.use(
+    createEvaluationRouter(createEvaluationService({ read: async () => null }, svc, 'official')),
+  );
+}
+
 describe('API de selección y bloqueo de Evaluation', () => {
   let repo: InMemorySelectionRepository;
   let baseUrl: string;
@@ -654,7 +664,7 @@ describe('API de selección y bloqueo de Evaluation', () => {
     );
     const app = express();
     app.use(express.json());
-    app.use(createModelSelectionRouter(svc));
+    mountSelection(app, svc);
     const server = app.listen(0);
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     close = () => new Promise((resolve) => server.close(() => resolve()));
@@ -704,17 +714,16 @@ describe('API de selección y bloqueo de Evaluation', () => {
     const pendingRepo = new InMemorySelectionRepository();
     const app = express();
     app.use(express.json());
-    app.use(
-      createModelSelectionRouter(
-        createModelSelectionService(pendingRepo, runsAdapterPendingSource, {
-          manifest: async () => ({
-            ...frozenManifest(),
-            manifest_hash: MANIFEST_HASH,
-            dataset_version: 'v0.1.1',
-            dvc_release_hash: RELEASE_HASH,
-          }),
+    mountSelection(
+      app,
+      createModelSelectionService(pendingRepo, runsAdapterPendingSource, {
+        manifest: async () => ({
+          ...frozenManifest(),
+          manifest_hash: MANIFEST_HASH,
+          dataset_version: 'v0.1.1',
+          dvc_release_hash: RELEASE_HASH,
         }),
-      ),
+      }),
     );
     const server = app.listen(0);
     try {

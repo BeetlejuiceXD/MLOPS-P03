@@ -489,9 +489,60 @@ export const evaluationResponseSchema = z.discriminatedUnion("state", [
 ]);
 export type EvaluationResponse = z.infer<typeof evaluationResponseSchema>;
 
-// D04-05: exportación por muestra (stub Red).
+// ---------------------------------------------------------------------------
+// D04-05: exportación por muestra de una evaluación (`GET /api/evaluation/predictions`).
+// Filas en orden de crop_id; probabilidades de cada clase declarada; `synthetic` marca
+// recorridos de prueba, que nunca se sirven como evaluación oficial. El backend verifica
+// además `test_split_hash` contra los crop_id y la matriz contra `evaluation_response`.
+// ---------------------------------------------------------------------------
 export const evaluationNamespaces = ["official", "synthetic"] as const;
-export const evaluationPredictionsSchema = z.never();
+
+const evaluationSampleSchema = z.strictObject({
+  crop_id: positiveInt,
+  true_class: classSchema,
+  predicted_class: classSchema,
+  // z.record con clave enum es exhaustivo: exige cat y dog, y rechaza cualquier otra.
+  probabilities: z.record(classSchema, unitInterval),
+});
+
+export const evaluationPredictionsSchema = z
+  .strictObject({
+    namespace: z.enum(evaluationNamespaces),
+    candidate_run_id: mlflowRunIdSchema,
+    manifest_hash: sha256Schema,
+    test_split_hash: sha256Schema,
+    evaluated_at: timestampSchema,
+    n_test: positiveInt,
+    classes: classListSchema,
+    predictions: z.array(evaluationSampleSchema),
+  })
+  .superRefine((exported, ctx) => {
+    const issue = (path: (string | number)[], message: string) =>
+      ctx.addIssue({ code: "custom", path, message });
+    if (exported.predictions.length !== exported.n_test) {
+      issue(["predictions"], "Debe haber exactamente n_test predicciones");
+    }
+    exported.predictions.forEach((sample, i) => {
+      const previous = exported.predictions[i - 1];
+      if (previous && sample.crop_id <= previous.crop_id) {
+        issue(
+          ["predictions", i, "crop_id"],
+          "crop_id en orden estrictamente creciente (sin repetidos)"
+        );
+      }
+      const values = Object.values(sample.probabilities);
+      const sum = values.reduce((total, p) => total + p, 0);
+      if (!close(sum, 1, PROBABILITY_SUM_TOLERANCE)) {
+        issue(["predictions", i, "probabilities"], "Deben sumar ~1");
+      }
+      if (sample.probabilities[sample.predicted_class] !== Math.max(...values)) {
+        issue(
+          ["predictions", i, "predicted_class"],
+          "predicted_class debe ser el argmax de probabilities"
+        );
+      }
+    });
+  });
 export type EvaluationPredictions = z.infer<typeof evaluationPredictionsSchema>;
 
 // ---------------------------------------------------------------------------
@@ -594,6 +645,7 @@ export const P3_ENDPOINTS = {
   cancelTrainingJob: "POST /api/training/jobs/:id/cancel",
   listRuns: "GET /api/experiments/runs",
   getEvaluation: "GET /api/evaluation",
+  exportEvaluationPredictions: "GET /api/evaluation/predictions",
   listModels: "GET /api/models",
   publishModel: "POST /api/models/:semver/publish",
   runInference: "POST /api/inference",

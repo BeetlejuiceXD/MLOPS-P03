@@ -78,7 +78,12 @@ class SelectionRepo implements ModelSelectionRepository {
     return false;
   }
   setCandidate() {
-    this.record = { status: 'candidate', outcome: outcome(), proposedAt: CLOSED_AT, closedAt: null };
+    this.record = {
+      status: 'candidate',
+      outcome: outcome(),
+      proposedAt: CLOSED_AT,
+      closedAt: null,
+    };
   }
   setClosed(candidate = CANDIDATE, manifestHash = MANIFEST_HASH, closedAt = CLOSED_AT) {
     this.record = {
@@ -108,6 +113,12 @@ const official = (): StoredEvaluation => {
   (row.predictions as EvaluationPredictions).namespace = 'official';
   return row;
 };
+
+function first<T>(items: T[]): T {
+  const item = items[0];
+  if (item === undefined) throw new Error('lista vacía');
+  return item;
+}
 
 let selectionRepo: SelectionRepo;
 let evaluationRepo: EvaluationRepo;
@@ -142,7 +153,7 @@ describe('exportación por muestra', () => {
     ]);
     // Filas = real, columnas = predicha, en el orden de las etiquetas pedidas.
     const skewed = structuredClone(predictions);
-    skewed.predictions[0] = { ...skewed.predictions[0]!, true_class: 'dog' };
+    skewed.predictions[0] = { ...first(skewed.predictions), true_class: 'dog' };
     expect(confusionRows(skewed, ['cat', 'dog'])).toEqual([
       [1, 1],
       [2, 2],
@@ -263,6 +274,29 @@ describe('datos guardados incompatibles → 503 con el motivo', () => {
       () => selectionRepo.setClosed(CANDIDATE, MANIFEST_HASH, new Date('2026-10-01T12:00:00Z')),
     ],
     [
+      'evaluación de otro candidato (exportación correcta)',
+      /candidato/,
+      (row) => {
+        (row.evaluation as { selection: { candidate_run_id: string } }).selection.candidate_run_id =
+          'b'.repeat(32);
+      },
+    ],
+    [
+      'evaluación de otro manifest (exportación correcta)',
+      /manifest/,
+      (row) => {
+        (row.evaluation as { manifest_hash: string }).manifest_hash = 'e'.repeat(64);
+      },
+    ],
+    [
+      'clases de la exportación en otro orden que la matriz',
+      /clases/,
+      (row) => {
+        const p = row.predictions as EvaluationPredictions;
+        p.classes = ['dog', 'cat'];
+      },
+    ],
+    [
       'exportación de otro candidato',
       /candidato/,
       (row) => {
@@ -296,7 +330,7 @@ describe('datos guardados incompatibles → 503 con el motivo', () => {
       (row) => {
         const p = row.predictions as EvaluationPredictions;
         p.predictions[0] = {
-          ...p.predictions[0]!,
+          ...first(p.predictions),
           predicted_class: 'dog',
           probabilities: { cat: 0.1, dog: 0.9 },
         };
@@ -389,7 +423,7 @@ describe('API de evaluación', () => {
     const csv = await get('/evaluation/predictions?format=csv');
     expect(csv.status).toBe(200);
     expect(csv.headers.get('content-type')).toMatch(/^text\/csv/);
-    expect(csv.headers.get('content-disposition')).toMatch(
+    expect(csv.headers.get('content-disposition') ?? '').toMatch(
       /attachment; filename="p3-evaluation-predictions-official\.csv"/,
     );
     expect(await csv.text()).toBe(predictionsToCsv(exported));

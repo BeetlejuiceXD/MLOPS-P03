@@ -10,7 +10,8 @@ acceso a resultados del frozen test mientras no exista MODEL SELECTION CLOSED.
   (migración 0006). Tiene un único registro, creado en `open`, que solo cambia con
   `UPDATE` condicionales.
 - `../ui/model-selection.routes.ts`: `GET /selection`, `POST /selection/candidate`,
-  `POST /selection/close` y `GET /evaluation`.
+  `POST /selection/close`. `GET /evaluation` y la exportación por muestra están en
+  `evaluation.routes.ts` (D04-05) y usan `requireClosed`/`blockedEvaluation` de aquí.
 
 > Este ticket prueba el mecanismo con runs sintéticos. Un candidato **propuesto** es
 > preparatorio y no desbloquea el test. El cierre de la campaña oficial lo declara

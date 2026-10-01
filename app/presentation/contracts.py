@@ -411,9 +411,56 @@ EVALUATION_RESPONSE: TypeAdapter[EvaluationBlocked | EvaluationReady] = TypeAdap
 )
 
 
-# D04-05 — `GET /api/evaluation/predictions` (stub Red).
+# ---------------------------------------------------------------------------
+# D04-05 — `GET /api/evaluation/predictions`: exportación por muestra.
+#
+# Espejo de `evaluationPredictionsSchema` (`backend/src/logic/p3.contracts.ts`).
+# `synthetic` marca los recorridos de prueba: nunca se sirven como evaluación oficial.
+# ---------------------------------------------------------------------------
+EVALUATION_NAMESPACES = ("official", "synthetic")
+PROBABILITY_SUM_TOLERANCE = 1e-3
+
+
+class EvaluationSample(ContractModel):
+    crop_id: Annotated[int, Field(gt=0)]
+    true_class: ManifestClassName
+    predicted_class: ManifestClassName
+    probabilities: dict[ManifestClassName, Ratio]
+
+
 class EvaluationPredictions(ContractModel):
-    @model_validator(mode="before")
-    @classmethod
-    def not_implemented(cls, data):
-        raise NotImplementedError
+    namespace: Literal["official", "synthetic"]
+    candidate_run_id: MlflowRunId
+    manifest_hash: Sha256Hex
+    test_split_hash: Sha256Hex
+    evaluated_at: IsoTimestamp
+    n_test: Annotated[int, Field(gt=0)]
+    classes: list[ManifestClassName]
+    predictions: list[EvaluationSample]
+
+    @model_validator(mode="after")
+    def classes_are_exactly_the_frozen_set(self) -> Self:
+        if not _exactly_frozen_classes(self.classes):
+            raise ValueError(f"classes debe declarar exactamente {MANIFEST_CLASSES}")
+        return self
+
+    @model_validator(mode="after")
+    def samples_are_coherent(self) -> Self:
+        if len(self.predictions) != self.n_test:
+            raise ValueError("Debe haber exactamente n_test predicciones")
+        for previous, sample in zip(self.predictions, self.predictions[1:], strict=False):
+            if sample.crop_id <= previous.crop_id:
+                raise ValueError("crop_id en orden estrictamente creciente (sin repetidos)")
+        for sample in self.predictions:
+            probabilities = sample.probabilities
+            if len(probabilities) != len(self.classes) or set(probabilities) != set(self.classes):
+                raise ValueError(
+                    f"crop {sample.crop_id}: una probabilidad por clase declarada y ninguna otra"
+                )
+            if not _close(sum(probabilities.values()), 1, PROBABILITY_SUM_TOLERANCE):
+                raise ValueError(f"crop {sample.crop_id}: las probabilidades deben sumar ~1")
+            if probabilities[sample.predicted_class] != max(probabilities.values()):
+                raise ValueError(
+                    f"crop {sample.crop_id}: predicted_class debe ser el argmax de probabilities"
+                )
+        return self

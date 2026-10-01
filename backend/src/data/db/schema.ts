@@ -311,3 +311,21 @@ export const p3ModelSelection = mysqlTable('p3_model_selection', {
 });
 
 export type P3ModelSelectionRow = typeof p3ModelSelection.$inferSelect;
+
+/**
+ * D04-05 — Evaluación del frozen test y su exportación por muestra, una fila por
+ * namespace. La escribe el productor Python (`app/evaluation`), nunca la API:
+ * `official` una sola vez (D06-01, después de MODEL SELECTION CLOSED) y `synthetic` para
+ * recorridos de prueba con predicciones conocidas, que la API no sirve como oficiales.
+ * `evaluation` cumple `evaluation_response` (ready) y `predictions`, `evaluation_predictions`.
+ */
+export const p3Evaluation = mysqlTable('p3_evaluation', {
+  namespace: mysqlEnum('namespace', ['official', 'synthetic']).primaryKey(),
+  candidateRunId: char('candidate_run_id', { length: 32 }).notNull(),
+  evaluatedAt: timestamp('evaluated_at', { fsp: 3 }).notNull(),
+  evaluation: json('evaluation').notNull(),
+  predictions: json('predictions').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type P3EvaluationRow = typeof p3Evaluation.$inferSelect;

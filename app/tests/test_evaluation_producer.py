@@ -92,18 +92,31 @@ def _build(samples=None, **overrides):
 
 
 def _refused(reason: str, call) -> EvaluationRefusedError:
-    """Exige el rechazo POR ESTE motivo: otro motivo no demuestra que la regla exista."""
-    with pytest.raises(EvaluationRefusedError) as caught:
+    """Exige el rechazo POR ESTE motivo: otro motivo no demuestra que la regla exista, y
+    otra excepción (un crash) tampoco es un rechazo: ambos son un veredicto del test."""
+    try:
         call()
-    assert caught.value.reason == reason, caught.value
-    return caught.value
+    except EvaluationRefusedError as error:
+        assert error.reason == reason, error
+        return error
+    except Exception as error:  # el crash es el veredicto, no se propaga
+        pytest.fail(f"se esperaba el rechazo {reason}; llegó {type(error).__name__}: {error}")
+    pytest.fail(f"no se rechazó (se esperaba {reason})")
+
+
+def _accepted(call):
+    """Camino feliz: un rechazo inesperado es un veredicto del test, no un crash."""
+    try:
+        return call()
+    except EvaluationRefusedError as error:
+        pytest.fail(f"rechazo inesperado {error.reason}: {error.detail}")
 
 
 # --- Cálculo y exportación con predicciones conocidas ---------------------------------
 
 
 def test_known_predictions_give_the_expected_matrix_metrics_and_export():
-    record = _build()
+    record = _accepted(_build)
     evaluation = record.evaluation.model_dump(mode="json")
     exported = record.predictions.model_dump(mode="json")
 
@@ -148,14 +161,23 @@ def test_known_predictions_give_the_expected_matrix_metrics_and_export():
 
 
 def test_export_rebuilds_exactly_the_reported_matrix():
-    record = _build()
+    record = _accepted(_build)
     rows = confusion_rows(record.predictions)
     assert rows == [[2, 1], [1, 2]]
     assert rows == record.evaluation.confusion_matrix.rows
 
 
+def test_export_matrix_rows_are_true_class_and_columns_predicted_class():
+    """Matriz asimétrica: filas = real, columnas = predicha (la simétrica no lo distingue)."""
+    skewed = [(3, "dog", "cat", 0.9, 0.1), *KNOWN[:1], *KNOWN[2:]]
+    record = _accepted(lambda: _build(_samples(skewed)))
+    rows = confusion_rows(record.predictions)
+    assert rows == [[1, 1], [2, 2]]
+    assert rows == record.evaluation.confusion_matrix.rows
+
+
 def test_backend_fixture_is_the_exact_output_of_the_producer():
-    record = _build()
+    record = _accepted(_build)
     fixture = json.loads(BACKEND_FIXTURE.read_text(encoding="utf-8"))
     assert fixture == {
         "evaluation": record.evaluation.model_dump(mode="json"),
@@ -236,14 +258,16 @@ def test_evaluation_not_after_the_close_is_refused():
     ids=["not-argmax", "sum", "unknown-class"],
 )
 def test_invalid_sample_is_refused(row):
-    _refused("invalid_prediction", lambda: _build(_samples([row, *KNOWN[1:]])))
+    # Reemplaza al crop 3 (KNOWN[1]); los demás quedan igual.
+    _refused("invalid_prediction", lambda: _build(_samples([KNOWN[0], row, *KNOWN[2:]])))
 
 
 def test_probability_of_an_undeclared_class_is_refused():
     sample = SamplePrediction(
         crop_id=3, true_class="cat", predicted_class="cat", probabilities={"cat": 1.0}
     )
-    _refused("invalid_prediction", lambda: _build([sample, *_samples(KNOWN[1:])]))
+    others = _samples([KNOWN[0], *KNOWN[2:]])
+    _refused("invalid_prediction", lambda: _build([sample, *others]))
 
 
 # --- Guardas de D04-04 sobre la base y persistencia ------------------------------------
@@ -322,16 +346,17 @@ def test_guard_runs_before_reading_any_prediction(engine):
         def __iter__(self):
             raise AssertionError("se leyeron predicciones antes de la guarda")
 
-    with pytest.raises(EvaluationRefusedError) as caught:
-        produce_evaluation(
+    _refused(
+        "model_selection_open",
+        lambda: produce_evaluation(
             EvaluationStore(engine),
             Untouchable(),
             namespace="synthetic",
             model_run_id=CANDIDATE,
             partition=PARTITION,
             clock=lambda: EVALUATED_AT,
-        )
-    assert caught.value.reason == "model_selection_open"
+        ),
+    )
 
 
 def test_closed_record_without_candidate_keeps_the_test_blocked(engine):
@@ -350,7 +375,7 @@ def test_closed_selection_is_read_from_the_persisted_record(engine):
 def test_synthetic_run_is_persisted_and_read_back_identically(engine):
     _close(engine)
     evaluation_store = EvaluationStore(engine)
-    record = _produce(evaluation_store)
+    record = _accepted(lambda: _produce(evaluation_store))
     assert _rows(engine) == {"synthetic": 1}
     stored = evaluation_store.read("synthetic")
     assert stored == {
@@ -368,9 +393,9 @@ def test_synthetic_run_is_persisted_and_read_back_identically(engine):
 def test_synthetic_run_can_be_repeated_and_replaces_the_previous_one(engine):
     _close(engine)
     evaluation_store = EvaluationStore(engine)
-    _produce(evaluation_store)
+    _accepted(lambda: _produce(evaluation_store))
     later = EVALUATED_AT + timedelta(hours=1)
-    _produce(evaluation_store, clock=lambda: later)
+    _accepted(lambda: _produce(evaluation_store, clock=lambda: later))
     assert _rows(engine) == {"synthetic": 1}
     stored = evaluation_store.read("synthetic")
     assert stored["evaluation"]["evaluated_at"] == "2026-10-01T15:00:00.000Z"
@@ -379,7 +404,7 @@ def test_synthetic_run_can_be_repeated_and_replaces_the_previous_one(engine):
 def test_official_evaluation_is_recorded_once_and_never_overwritten(engine):
     _close(engine)
     evaluation_store = EvaluationStore(engine)
-    first = _produce(evaluation_store, namespace="official")
+    first = _accepted(lambda: _produce(evaluation_store, namespace="official"))
     later = EVALUATED_AT + timedelta(hours=1)
     _refused(
         "official_already_recorded",
@@ -407,7 +432,7 @@ def test_producer_reads_no_files(monkeypatch, engine):
     monkeypatch.setattr("builtins.open", forbidden)
     monkeypatch.setattr(Path, "read_text", forbidden)
     monkeypatch.setattr(Path, "read_bytes", forbidden)
-    _produce(EvaluationStore(engine))
+    _accepted(lambda: _produce(EvaluationStore(engine)))
     assert not hasattr(producer, "load_manifest")
 
 

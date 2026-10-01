@@ -5,6 +5,7 @@ import {
   checkHealth,
   createAnnotationForImage,
   createEligibilityGate,
+  createEvaluationService,
   createModelSelectionService,
   createP3SourcesService,
   createSettingsService,
@@ -19,6 +20,7 @@ import {
   idParamSchema,
   imageSearchSchema,
   initializeApplication,
+  mariaDbEvaluationRepository,
   mariaDbModelSelectionRepository,
   mariaDbP3SourcesRepository,
   mariaDbTrainingJobRepository,
@@ -28,6 +30,7 @@ import {
   updateAnnotation,
   uploadImage,
 } from '../logic/index.js';
+import { createEvaluationRouter } from './evaluation.routes.js';
 import { sendError } from './http-errors.js';
 import { createModelSelectionRouter } from './model-selection.routes.js';
 import { createP3SourcesRouter } from './p3-sources.routes.js';
@@ -74,13 +77,18 @@ app.use(
 // D04-04: selección SOLO por validation (estado persistido) y bloqueo de Evaluation hasta
 // MODEL SELECTION CLOSED. Los runs llegarán por el adaptador MLflow de D04-01; mientras
 // tanto proponer/cerrar responden 503 con el motivo.
+const modelSelection = createModelSelectionService(
+  mariaDbModelSelectionRepository,
+  runsAdapterPendingSource,
+  p3Sources,
+);
+app.use(createModelSelectionRouter(modelSelection));
+
+// D04-05: evaluación y exportación por muestra, detrás de las guardas de D04-04. Solo el
+// namespace `official`: los recorridos sintéticos nunca se sirven como evaluación oficial.
 app.use(
-  createModelSelectionRouter(
-    createModelSelectionService(
-      mariaDbModelSelectionRepository,
-      runsAdapterPendingSource,
-      p3Sources,
-    ),
+  createEvaluationRouter(
+    createEvaluationService(mariaDbEvaluationRepository, modelSelection, 'official'),
   ),
 );
 
