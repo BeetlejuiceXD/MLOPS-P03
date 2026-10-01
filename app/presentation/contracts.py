@@ -438,6 +438,17 @@ class EvaluationPredictions(ContractModel):
     classes: list[ManifestClassName]
     predictions: list[EvaluationSample]
 
+    @field_validator("evaluated_at")
+    @classmethod
+    def evaluated_at_is_a_real_instant(cls, value: str) -> str:
+        """El patrón solo revisa el formato; `z.iso.datetime` también rechaza fechas que
+        no existen (p. ej. 30 de febrero), y el espejo debe rechazar lo mismo."""
+        try:
+            _parse_timestamp(value)
+        except ValueError as error:
+            raise ValueError(f"evaluated_at no es una fecha/hora real: {value}") from error
+        return value
+
     @model_validator(mode="after")
     def classes_are_exactly_the_frozen_set(self) -> Self:
         if not _exactly_frozen_classes(self.classes):

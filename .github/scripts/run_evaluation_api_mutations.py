@@ -262,6 +262,14 @@ MUTANTS = [
         "            if probabilities[sample.predicted_class] != max(probabilities.values()):",
         "            if False:",
     ),
+    Mutant(
+        "E45",
+        "py",
+        "evaluated_at con fecha imposible aceptado (contrato)",
+        CONTRACT,
+        "            _parse_timestamp(value)",
+        "            pass",
+    ),
     # --- API: guardas -------------------------------------------------------------------
     Mutant(
         "E23",
