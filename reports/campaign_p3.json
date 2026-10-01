@@ -1,0 +1,1268 @@
+{
+  "manifest": {
+    "manifest_version": "p3-v0.1.1-s42",
+    "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+    "dataset_version": "v0.1.1",
+    "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+    "seed": 42,
+    "target_ratios": {
+      "train": 0.7,
+      "val": 0.2,
+      "test": 0.1
+    },
+    "frozen": true,
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "splits": {
+      "train": {
+        "crops": 467,
+        "originals": 422,
+        "crops_per_class": {
+          "cat": 240,
+          "dog": 227
+        }
+      },
+      "val": {
+        "crops": 134,
+        "originals": 126,
+        "crops_per_class": {
+          "cat": 69,
+          "dog": 65
+        }
+      },
+      "test": {
+        "crops": 67,
+        "originals": 52,
+        "crops_per_class": {
+          "cat": 34,
+          "dog": 33
+        }
+      }
+    }
+  },
+  "results": [
+    {
+      "row": 1,
+      "change": "Baseline",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 1,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T17:43:13.000Z",
+        "started_at": "2026-10-01T17:43:14.000Z",
+        "finished_at": "2026-10-01T17:46:17.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9177959957615303,
+        "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "1",
+          "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0000001192092896
+      }
+    },
+    {
+      "row": 2,
+      "change": "trainable_layers",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "head_only",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 2,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "head_only",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 22,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T17:46:24.000Z",
+        "started_at": "2026-10-01T17:46:26.000Z",
+        "finished_at": "2026-10-01T17:50:59.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 22,
+        "best_epoch": 17,
+        "best_val_accuracy": 0.9552238805970149,
+        "best_val_macro_f1": 0.9551839464882943,
+        "checkpoint_sha256": "2aa2549e125c20330815a8ee8acd8cbc082c7efbc96b258aec85b0a9ec1ef9b2",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "2",
+          "checkpoint_sha256": "2aa2549e125c20330815a8ee8acd8cbc082c7efbc96b258aec85b0a9ec1ef9b2"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 3,
+      "change": "learning_rate",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.0003,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 3,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.0003,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 10,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "d082014552c8458f90e9c67f54b46056",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T17:51:02.000Z",
+        "started_at": "2026-10-01T17:51:03.000Z",
+        "finished_at": "2026-10-01T17:54:14.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "d082014552c8458f90e9c67f54b46056",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 10,
+        "best_epoch": 5,
+        "best_val_accuracy": 0.9552238805970149,
+        "best_val_macro_f1": 0.9551839464882943,
+        "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "3",
+          "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 4,
+      "change": "optimizer",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "sgd",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 4,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "sgd",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 16,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "72304af32b664085851cb2fd42b77c36",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T17:54:19.000Z",
+        "started_at": "2026-10-01T17:54:20.000Z",
+        "finished_at": "2026-10-01T17:59:12.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "72304af32b664085851cb2fd42b77c36",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 16,
+        "best_epoch": 16,
+        "best_val_accuracy": 0.9402985074626866,
+        "best_val_macro_f1": 0.9401785714285714,
+        "checkpoint_sha256": "e9b36b93bbca243c9ef4a58af329e91a92cb2ff55df46a8903646fab52f3b4ef",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "4",
+          "checkpoint_sha256": "e9b36b93bbca243c9ef4a58af329e91a92cb2ff55df46a8903646fab52f3b4ef"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 5,
+      "change": "batch_size",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 32,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 5,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 32,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 16,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "26f2a1d2787f40439880a56cee11999a",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T17:59:17.000Z",
+        "started_at": "2026-10-01T17:59:21.000Z",
+        "finished_at": "2026-10-01T18:04:12.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "26f2a1d2787f40439880a56cee11999a",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 16,
+        "best_epoch": 11,
+        "best_val_accuracy": 0.9552238805970149,
+        "best_val_macro_f1": 0.9550637156270958,
+        "checkpoint_sha256": "1e7ab9b07ac9e5d5c9cd4a0d342af16992729a50d8b0ec8dca27012a756cc1a5",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "5",
+          "checkpoint_sha256": "1e7ab9b07ac9e5d5c9cd4a0d342af16992729a50d8b0ec8dca27012a756cc1a5"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 0.9999999403953552
+      }
+    },
+    {
+      "row": 6,
+      "change": "max_epochs",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 60,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 6,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 60,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 60
+        },
+        "mlflow_run_id": "2676521bda51460082ca41029637a43e",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:04:16.000Z",
+        "started_at": "2026-10-01T18:04:19.000Z",
+        "finished_at": "2026-10-01T18:07:08.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "2676521bda51460082ca41029637a43e",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9177959957615303,
+        "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "6",
+          "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0000001192092896
+      }
+    },
+    {
+      "row": 7,
+      "change": "image_size",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 160,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 7,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 160,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:07:13.000Z",
+        "started_at": "2026-10-01T18:07:15.000Z",
+        "finished_at": "2026-10-01T18:10:01.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 6,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9176858211872452,
+        "checkpoint_sha256": "9ef31508c65d7bb085e8c7bb35e6c506b5c017aec66dfb1535362f6a76110571",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "7",
+          "checkpoint_sha256": "9ef31508c65d7bb085e8c7bb35e6c506b5c017aec66dfb1535362f6a76110571"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 8,
+      "change": "hidden_layers",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 1,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 8,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 1,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 12,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "128e8c5b6c594ea38799ad2caca1425e",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:10:05.000Z",
+        "started_at": "2026-10-01T18:10:07.000Z",
+        "finished_at": "2026-10-01T18:13:55.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "128e8c5b6c594ea38799ad2caca1425e",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 12,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.9253731343283582,
+        "best_val_macro_f1": 0.9252232142857143,
+        "checkpoint_sha256": "69e7426935d4cc1121695a9a583a4caede467d026756d8c8e56a1311861407c0",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "8",
+          "checkpoint_sha256": "69e7426935d4cc1121695a9a583a4caede467d026756d8c8e56a1311861407c0"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 9,
+      "change": "dropout",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.3,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 9,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.3
+        },
+        "progress": {
+          "epoch": 15,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "9f85634bfc2346e98bde77387241692f",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:13:58.000Z",
+        "started_at": "2026-10-01T18:13:59.000Z",
+        "finished_at": "2026-10-01T18:18:51.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "9f85634bfc2346e98bde77387241692f",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 15,
+        "best_epoch": 10,
+        "best_val_accuracy": 0.9328358208955224,
+        "best_val_macro_f1": 0.9325314685314685,
+        "checkpoint_sha256": "a6534599c9eecb76ec51fed0fe3797cd34d29351bc819597ffc7cfef5bc40ee3",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "9",
+          "checkpoint_sha256": "a6534599c9eecb76ec51fed0fe3797cd34d29351bc819597ffc7cfef5bc40ee3"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 10,
+      "change": "hidden_layers+dropout",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 1,
+          "hidden_dim": 128,
+          "dropout": 0.3,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7
+        }
+      },
+      "job": {
+        "id": 10,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 1,
+          "hidden_dim": 128,
+          "dropout": 0.3
+        },
+        "progress": {
+          "epoch": 10,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "192646f7f412414c944d4b3f86ff49e8",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:18:56.000Z",
+        "started_at": "2026-10-01T18:18:56.000Z",
+        "finished_at": "2026-10-01T18:22:09.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "192646f7f412414c944d4b3f86ff49e8",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 10,
+        "best_epoch": 5,
+        "best_val_accuracy": 0.9402985074626866,
+        "best_val_macro_f1": 0.9402852049910874,
+        "checkpoint_sha256": "fa92d3915df21139ae5efa510805f3bf418f5200a5dfffab32cc7c1fc1be8471",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "10",
+          "checkpoint_sha256": "fa92d3915df21139ae5efa510805f3bf418f5200a5dfffab32cc7c1fc1be8471"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 11,
+      "change": "Réplica de varianza (seed)",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 21
+        }
+      },
+      "job": {
+        "id": 11,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 21,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 7,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "93c5f6d696184324afba01c103c020f2",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:22:12.000Z",
+        "started_at": "2026-10-01T18:22:13.000Z",
+        "finished_at": "2026-10-01T18:24:26.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "93c5f6d696184324afba01c103c020f2",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 7,
+        "best_epoch": 4,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9179058758006127,
+        "checkpoint_sha256": "b95de4b773d2748c313e876d99bada03f5cb8fed7e1ac434c1d5705e81cdf55b",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "21",
+          "job_id": "11",
+          "checkpoint_sha256": "b95de4b773d2748c313e876d99bada03f5cb8fed7e1ac434c1d5705e81cdf55b"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0
+      }
+    },
+    {
+      "row": 12,
+      "change": "Réplica de varianza (seed)",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0.0,
+          "optimizer": "adam",
+          "batch_size": 16,
+          "max_epochs": 30,
+          "learning_rate": 0.001,
+          "image_size": 224,
+          "weight_decay": 0.0001,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 77
+        }
+      },
+      "job": {
+        "id": 12,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 77,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 7,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "205ad479795442c0b3dd4b2dc6601f69",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-01T18:24:28.000Z",
+        "started_at": "2026-10-01T18:24:30.000Z",
+        "finished_at": "2026-10-01T18:26:41.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "205ad479795442c0b3dd4b2dc6601f69",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 7,
+        "best_epoch": 2,
+        "best_val_accuracy": 0.9402985074626866,
+        "best_val_macro_f1": 0.9402852049910874,
+        "checkpoint_sha256": "55857f4fbe603634d864f3a55371054a49e2b177dc42d8ae4293e971f963f369",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "77",
+          "job_id": "12",
+          "checkpoint_sha256": "55857f4fbe603634d864f3a55371054a49e2b177dc42d8ae4293e971f963f369"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 0.9999999403953552
+      }
+    }
+  ],
+  "summary": {
+    "valid_count": 12,
+    "valid_rows": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "min_required": 10,
+    "meets_minimum": true,
+    "rows": [
+      {
+        "row": 1,
+        "change": "Baseline",
+        "job_id": 1,
+        "job_status": "succeeded",
+        "run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 2,
+        "change": "trainable_layers",
+        "job_id": 2,
+        "job_status": "succeeded",
+        "run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 3,
+        "change": "learning_rate",
+        "job_id": 3,
+        "job_status": "succeeded",
+        "run_id": "d082014552c8458f90e9c67f54b46056",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 4,
+        "change": "optimizer",
+        "job_id": 4,
+        "job_status": "succeeded",
+        "run_id": "72304af32b664085851cb2fd42b77c36",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 5,
+        "change": "batch_size",
+        "job_id": 5,
+        "job_status": "succeeded",
+        "run_id": "26f2a1d2787f40439880a56cee11999a",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 6,
+        "change": "max_epochs",
+        "job_id": 6,
+        "job_status": "succeeded",
+        "run_id": "2676521bda51460082ca41029637a43e",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 7,
+        "change": "image_size",
+        "job_id": 7,
+        "job_status": "succeeded",
+        "run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 8,
+        "change": "hidden_layers",
+        "job_id": 8,
+        "job_status": "succeeded",
+        "run_id": "128e8c5b6c594ea38799ad2caca1425e",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 9,
+        "change": "dropout",
+        "job_id": 9,
+        "job_status": "succeeded",
+        "run_id": "9f85634bfc2346e98bde77387241692f",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 10,
+        "change": "hidden_layers+dropout",
+        "job_id": 10,
+        "job_status": "succeeded",
+        "run_id": "192646f7f412414c944d4b3f86ff49e8",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 11,
+        "change": "Réplica de varianza (seed)",
+        "job_id": 11,
+        "job_status": "succeeded",
+        "run_id": "93c5f6d696184324afba01c103c020f2",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      },
+      {
+        "row": 12,
+        "change": "Réplica de varianza (seed)",
+        "job_id": 12,
+        "job_status": "succeeded",
+        "run_id": "205ad479795442c0b3dd4b2dc6601f69",
+        "valid": true,
+        "problems": [],
+        "retries": 0
+      }
+    ]
+  }
+}
