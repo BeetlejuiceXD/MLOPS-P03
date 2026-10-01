@@ -14,6 +14,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from sklearn.metrics import confusion_matrix as sk_confusion_matrix
 from sklearn.metrics import precision_recall_fscore_support
 
@@ -43,6 +44,14 @@ def _from_rows(rows):
             y_true += [real] * count
             y_pred += [predicted] * count
     return y_true, y_pred
+
+
+def _expect_input_error(fn, *args):
+    """Exige `MetricsInputError` por aserción: un `KeyError`/`ZeroDivisionError`
+    accidental también "rechaza" la entrada, pero no es un rechazo explícito."""
+    with pytest.raises(Exception) as caught:
+        fn(*args)
+    assert isinstance(caught.value, MetricsInputError), repr(caught.value)
 
 
 def _by_class(report):
@@ -218,8 +227,7 @@ def test_report_acceptance_uses_counts_not_the_rounded_accuracy(rows, expected):
 
 @pytest.mark.parametrize(("correct", "total"), [(1, 0), (-1, 10), (11, 10), (0, -5)])
 def test_acceptance_rejects_impossible_counts(correct, total):
-    with pytest.raises(MetricsInputError):
-        meets_acceptance(correct, total)
+    _expect_input_error(meets_acceptance, correct, total)
 
 
 # --- Entradas incompatibles -----------------------------------------------------------
@@ -239,10 +247,8 @@ def test_acceptance_rejects_impossible_counts(correct, total):
     ],
 )
 def test_incompatible_inputs_are_rejected(y_true, y_pred):
-    with pytest.raises(MetricsInputError):
-        compute_metrics(y_true, y_pred)
-    with pytest.raises(MetricsInputError):
-        confusion_matrix(y_true, y_pred)
+    _expect_input_error(compute_metrics, y_true, y_pred)
+    _expect_input_error(confusion_matrix, y_true, y_pred)
 
 
 # --- Salida contractual consumible por la pantalla Evaluation / D06-01 -------------------
@@ -262,7 +268,10 @@ def test_shared_ready_fixture_is_reproduced_from_its_predictions():
     fixture = json.loads(VALID_READY.read_text(encoding="utf-8"))["payload"]
     rows = tuple(tuple(r) for r in fixture["confusion_matrix"]["rows"])
 
-    response = compute_metrics(*_from_rows(rows)).to_ready_response(**SELECTION)
+    try:
+        response = compute_metrics(*_from_rows(rows)).to_ready_response(**SELECTION)
+    except ValidationError as error:
+        pytest.fail(f"El contrato rechazó la salida del motor: {error}")
     produced = response.model_dump()
 
     assert produced["confusion_matrix"] == fixture["confusion_matrix"]
@@ -286,7 +295,10 @@ def test_shared_ready_fixture_is_reproduced_from_its_predictions():
     "rows", [ASYMMETRIC_ROWS, ((3, 0), (2, 0)), ((3, 1), (0, 0)), ((0, 5), (7, 0))]
 )
 def test_ready_response_validates_against_the_shared_contract(rows):
-    response = compute_metrics(*_from_rows(rows)).to_ready_response(**SELECTION)
+    try:
+        response = compute_metrics(*_from_rows(rows)).to_ready_response(**SELECTION)
+    except ValidationError as error:
+        pytest.fail(f"El contrato rechazó la salida del motor: {error}")
 
     assert isinstance(response, EvaluationReady)
     assert response.state == "ready"

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from datetime import datetime
 from math import isclose
 from re import fullmatch
 from typing import Annotated, Literal, Self
@@ -265,19 +266,43 @@ def frozen_test_split_hash(test_crop_ids: list[int] | tuple[int, ...]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# D03-05 — `GET /api/evaluation` (stub Red).
+# D03-05 — `GET /api/evaluation` (custodia del frozen test: Ale).
+#
+# Espejo de `evaluationResponseSchema` en `backend/src/logic/p3.contracts.ts`
+# (D01-05): mismos campos, literales, tolerancias y las mismas ramas del
+# `superRefine`, ni más ni menos estrictas. `test_evaluation_contract.py` lo valida
+# contra los fixtures compartidos de `contracts/p3/fixtures/evaluation_response/`.
 # ---------------------------------------------------------------------------
 
 MlflowRunId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+# z.iso.datetime({ offset: true }): fecha y hora ISO 8601 con `Z` u offset explícito.
+IsoTimestamp = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$"
+    ),
+]
+EVALUATION_REPORTED_METRIC_TOLERANCE = 1e-4
+EVALUATION_EXACT_TOLERANCE = 1e-9
+
+
+def _parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def _close(a: float, b: float, tolerance: float) -> bool:
+    return abs(a - b) <= tolerance
 
 
 class EvaluationSelection(ContractModel):
     candidate_run_id: MlflowRunId
     metric: Literal["val_accuracy"]
-    closed_at: str
+    closed_at: IsoTimestamp
 
 
 class EvaluationConfusionMatrix(ContractModel):
+    """Filas = clase real, columnas = clase predicha (rúbrica 4.2)."""
+
     labels: list[ManifestClassName]
     rows: list[list[Count]]
 
@@ -297,20 +322,22 @@ class EvaluationMetrics(ContractModel):
 
 
 class EvaluationBlocked(ContractModel):
+    """Antes de MODEL SELECTION CLOSED no se revela nada del test."""
+
     state: Literal["blocked"]
     reason: Literal["model_selection_open"]
     detail: str
 
-    @model_validator(mode="after")
-    def _red(self) -> Self:
-        raise NotImplementedError
+
+def _exactly_frozen_classes(classes: list[str]) -> bool:
+    return len(classes) == len(MANIFEST_CLASSES) and set(classes) == set(MANIFEST_CLASSES)
 
 
 class EvaluationReady(ContractModel):
     state: Literal["ready"]
     selection: EvaluationSelection
     manifest_hash: Sha256Hex
-    evaluated_at: str
+    evaluated_at: IsoTimestamp
     n_test: Annotated[int, Field(gt=0)]
     classes: list[ManifestClassName]
     confusion_matrix: EvaluationConfusionMatrix
@@ -318,9 +345,67 @@ class EvaluationReady(ContractModel):
     majority_baseline_accuracy: Ratio
 
     @model_validator(mode="after")
-    def _red(self) -> Self:
-        raise NotImplementedError
+    def classes_are_exactly_the_frozen_set(self) -> Self:
+        for name, classes in (
+            ("classes", self.classes),
+            ("confusion_matrix.labels", self.confusion_matrix.labels),
+        ):
+            if not _exactly_frozen_classes(classes):
+                raise ValueError(f"{name} debe declarar exactamente {MANIFEST_CLASSES}")
+        return self
+
+    @model_validator(mode="after")
+    def evaluated_only_after_model_selection_closed(self) -> Self:
+        if _parse_timestamp(self.evaluated_at) <= _parse_timestamp(self.selection.closed_at):
+            raise ValueError("El test se evalúa solo después de MODEL SELECTION CLOSED")
+        return self
+
+    @model_validator(mode="after")
+    def metrics_are_coherent_with_the_matrix(self) -> Self:
+        labels = self.confusion_matrix.labels
+        rows = self.confusion_matrix.rows
+        if len(rows) != len(labels) or any(len(row) != len(labels) for row in rows):
+            raise ValueError("La matriz debe ser cuadrada con una fila/columna por clase")
+        if sum(map(sum, rows)) != self.n_test:
+            raise ValueError("La matriz debe sumar n_test")
+        trace = sum(rows[i][i] for i in range(len(labels)))
+        if not _close(self.metrics.accuracy, trace / self.n_test, EVALUATION_EXACT_TOLERANCE):
+            raise ValueError("accuracy debe ser traza / n_test, sin redondear")
+
+        supports = [sum(row) for row in rows]
+        reported_f1 = []
+        for i, label in enumerate(labels):
+            stats = next((s for s in self.metrics.per_class if s.class_name == label), None)
+            if stats is None:
+                raise ValueError(f"Faltan métricas de la clase {label}")
+            tp = rows[i][i]
+            predicted = sum(row[i] for row in rows)
+            precision = 0 if predicted == 0 else tp / predicted
+            recall = 0 if supports[i] == 0 else tp / supports[i]
+            f1 = 0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
+            reported_f1.append(stats.f1)
+            if stats.support != supports[i]:
+                raise ValueError(f"support de {label} ≠ suma de su fila")
+            if not all(
+                _close(got, want, EVALUATION_REPORTED_METRIC_TOLERANCE)
+                for got, want in (
+                    (stats.precision, precision),
+                    (stats.recall, recall),
+                    (stats.f1, f1),
+                )
+            ):
+                raise ValueError(f"precision/recall/F1 de {label} no coinciden con la matriz")
+
+        macro = sum(reported_f1) / max(len(reported_f1), 1)
+        if not _close(self.metrics.macro_f1, macro, EVALUATION_REPORTED_METRIC_TOLERANCE):
+            raise ValueError("macro_f1 debe ser el promedio de los F1 por clase")
+        majority = max(supports) / self.n_test
+        if not _close(self.majority_baseline_accuracy, majority, EVALUATION_EXACT_TOLERANCE):
+            raise ValueError("Baseline = soporte de la clase mayoritaria / n_test")
+        return self
 
 
 EvaluationResponse = Annotated[EvaluationBlocked | EvaluationReady, Field(discriminator="state")]
-EVALUATION_RESPONSE = TypeAdapter(EvaluationResponse)
+EVALUATION_RESPONSE: TypeAdapter[EvaluationBlocked | EvaluationReady] = TypeAdapter(
+    EvaluationResponse
+)
