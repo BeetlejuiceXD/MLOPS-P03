@@ -184,3 +184,20 @@ def test_numbers_as_the_api_serializes_them_still_match_the_run(trained, tmp_pat
     report = verify_smoke(as_api, tracking_uri=uri, workdir=tmp_path)
 
     assert report.problems == []
+
+
+def test_checkpoint_config_must_be_the_job_config(trained, tmp_path):
+    """El model.pt es el correcto, pero el training_config.json guardado junto al
+    checkpoint no es el del job: no se puede cargar/reutilizar con certeza."""
+    job, uri = trained
+    folder = tmp_path / "checkpoint"
+    folder.mkdir()
+    other = {**job["config"], "seed": job["config"]["seed"] + 1}
+    (folder / "training_config.json").write_text(json.dumps(other), encoding="utf-8")
+    _client(uri).log_artifact(
+        job["mlflow_run_id"], str(folder / "training_config.json"), "checkpoint"
+    )
+
+    report = verify_smoke(job, tracking_uri=uri, workdir=tmp_path / "w")
+
+    assert any("training_config.json" in p for p in report.problems)

@@ -1370,3 +1370,47 @@ cancelación, SIGTERM, error del trainer y checkpoint no verificable),
 **Jobs persistentes** comprueba además que el worker publica las fuentes reales y que,
 sin datos, la API responde `503`/`409` con el motivo. Mutantes D03-03 (8 a 14) en
 `run_jobs_mutations.py`.
+
+## D03-04 — Smoke real Training → MLflow → checkpoint
+
+Recorrido integrado antes de la campaña: un job `task=training` lanzado **desde el
+portal** sobre train/val del manifest congelado, seguido hasta su estado terminal y
+contrastado con su run en `p3-cnn-classifier` (MariaDB + MinIO) y con su checkpoint
+descargado del servidor. **No es una corrida de la campaña (#33)**: se identifica como
+smoke en la evidencia, no se cuenta para selección y nunca consulta el frozen test.
+
+`app/tracking/smoke.py` (`python -m tracking.smoke`) verifica:
+
+- job `training` + `succeeded`, con run en el experimento `p3-cnn-classifier` y `FINISHED`;
+- tags de procedencia (`job_id`, `dvc_release`, `manifest_hash`, `seed`, identidad DVC,
+  `git_commit`, `checkpoint_sha256`) iguales a los del job, y params = su `TrainingConfig`;
+- una métrica por época real (= progreso del job), resumen `best_*` coherente con la curva
+  y **ninguna métrica de test**;
+- `checkpoint/model.pt` descargado con sha256 = tag, `training_config.json` = config del
+  job, `class_map.json` = class map congelado, y carga estricta en el modelo de su config
+  con una predicción usando el transform de evaluación compartido.
+
+Con Compose levantado (D03-03: `dvc pull -r prod` de `data/raw` y `data/p3/manifest.json`):
+
+```bash
+export GIT_COMMIT=$(git rev-parse HEAD)          # PowerShell: $env:GIT_COMMIT = git rev-parse HEAD
+docker compose up -d --build
+# 1) Portal → http://localhost:8080 → Training: entrenamiento real, seed 7,
+#    épocas máximas 10, patience 3 → "Encolar job" (anota el Job #).
+# 2) Verificar ese job, su run y su checkpoint (dentro de la red de Compose):
+mkdir -p _smoke
+docker compose run --rm --no-deps -v "$PWD/_smoke:/out" app \
+  python -m tracking.smoke verify --job-id <N> \
+  --api http://frontend/api --tracking-uri http://mlflow:5000 \
+  --evidence /out/smoke-d03-04.json
+```
+
+`tracking.smoke run --seed 7` hace lo mismo creando el job por la API del portal.
+Sale con `0` solo si todo coincide (`1` = algo no coincide, `2` = servicios/fuentes no
+disponibles). `_smoke/` no se versiona.
+
+**Tests:** `app/tests/test_smoke.py` usa el worker real sobre el release sintético y
+altera una sola cosa por test (job no `succeeded`, config o manifest distintos, métrica
+de test, checkpoint reemplazado en el servidor, state_dict de otro modelo, class map o
+`training_config.json` distintos, run de otro experimento). Mutantes D03-04 (15 a 19) en
+`run_jobs_mutations.py`.

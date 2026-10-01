@@ -7,6 +7,8 @@ con su checkpoint descargado del servidor.
 
     python -m tracking.smoke run --api http://localhost:8080/api \\
         --tracking-uri http://localhost:5000 --seed 7 --evidence smoke-d03-04.json
+    # o, para un job lanzado a mano desde la página Training del portal:
+    python -m tracking.smoke verify --job-id 3 --evidence smoke-d03-04.json
 
 `verify_smoke` es la parte comprobable sin servicios (tests/test_smoke.py). Nunca lee
 el frozen test: solo pide train/val al worker y rechaza un run con métricas de test.
@@ -280,12 +282,10 @@ def run_smoke(args: argparse.Namespace) -> int:
     api = args.api.rstrip("/")
     started = time.monotonic()
     try:
-        releases = _http("GET", f"{api}/releases")
-        manifest = _http("GET", f"{api}/manifest")
+        approved, manifest = _sources(api)
     except (ApiError, urllib.error.URLError) as error:
         print(f"Fuentes no disponibles en {api}: {error}", file=sys.stderr)
         return UNAVAILABLE
-    approved = [r["dataset_version"] for r in releases["approved"]]
     if not manifest.get("frozen") or manifest["dataset_version"] not in approved:
         print(f"Sin manifest congelado sobre un release aprobado: {approved}", file=sys.stderr)
         return UNAVAILABLE
@@ -299,6 +299,18 @@ def run_smoke(args: argparse.Namespace) -> int:
     request = build_request(manifest, args)
     job = _http("POST", f"{api}/training/jobs", request)
     print(f"Job #{job['id']} creado ({job['status']})", flush=True)
+    return _finish(api, job, args, started, approved, manifest, request)
+
+
+def _sources(api: str):
+    releases = _http("GET", f"{api}/releases")
+    manifest = _http("GET", f"{api}/manifest")
+    approved = [r["dataset_version"] for r in releases["approved"]]
+    return approved, manifest
+
+
+def _finish(api, job, args, started, approved, manifest, request) -> int:
+    """Sigue el job hasta su estado terminal, verifica job/run/checkpoint y deja evidencia."""
     last = None
     deadline = time.monotonic() + args.timeout
     while job["status"] not in TERMINAL:
@@ -340,24 +352,41 @@ def run_smoke(args: argparse.Namespace) -> int:
     return VERIFIED
 
 
+def verify_job(args: argparse.Namespace) -> int:
+    """Para un job lanzado a mano desde la página Training del portal."""
+    api = args.api.rstrip("/")
+    started = time.monotonic()
+    try:
+        approved, manifest = _sources(api)
+        job = _http("GET", f"{api}/training/jobs/{args.job_id}")
+    except (ApiError, urllib.error.URLError) as error:
+        print(f"API no disponible en {api}: {error}", file=sys.stderr)
+        return UNAVAILABLE
+    print(f"Job #{job['id']} ({job['task']}/{job['status']}) lanzado desde el portal", flush=True)
+    return _finish(api, job, args, started, approved, manifest, None)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="D03-04 — smoke real Training → MLflow")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="crea el job desde la API y verifica job/run/checkpoint")
-    run.add_argument("--api", default="http://localhost:8080/api")
-    run.add_argument("--tracking-uri", default="http://localhost:5000")
+    verify = sub.add_parser("verify", help="verifica un job lanzado desde la página Training")
+    verify.add_argument("--job-id", type=int, required=True)
     run.add_argument("--seed", type=int, required=True)
     run.add_argument("--max-epochs", type=int, default=10)
     run.add_argument("--patience", type=int, default=3)
     run.add_argument("--image-size", type=int, default=224)
     run.add_argument("--batch-size", type=int, default=16)
     run.add_argument("--no-pretrained", dest="pretrained", action="store_false")
-    run.add_argument("--timeout", type=float, default=3600)
-    run.add_argument("--poll", type=float, default=3)
-    run.add_argument("--label", default="smoke-d03-04 (no es corrida de campaña)")
-    run.add_argument("--evidence", type=Path)
+    for command in (run, verify):
+        command.add_argument("--api", default="http://localhost:8080/api")
+        command.add_argument("--tracking-uri", default="http://localhost:5000")
+        command.add_argument("--timeout", type=float, default=3600)
+        command.add_argument("--poll", type=float, default=3)
+        command.add_argument("--label", default="smoke-d03-04 (no es corrida de campaña)")
+        command.add_argument("--evidence", type=Path)
     args = parser.parse_args(argv)
-    return run_smoke(args)
+    return run_smoke(args) if args.command == "run" else verify_job(args)
 
 
 if __name__ == "__main__":

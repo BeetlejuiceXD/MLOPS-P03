@@ -1,4 +1,4 @@
-"""Mutation testing de D02-05 (#45) y D03-03 (#60): jobs persistentes, trainer-worker,
+"""Mutation testing de D02-05 (#45), D03-03 (#60) y D03-04 (#61): jobs persistentes, trainer-worker,
 compuerta de training y entrenamiento real sobre fuentes verificadas.
 
 Para cada mutante: aplica un cambio en una línea concreta (debe aparecer exactamente una
@@ -34,6 +34,7 @@ WORKER_TESTS = ["tests/test_trainer_worker.py"]
 BACKEND_TESTS = ["tests/training-jobs.test.ts"]
 SOURCES_TESTS = ["tests/test_training_sources.py", "tests/test_trainer_worker_training.py"]
 P3_SOURCES_TESTS = ["tests/p3-sources.test.ts"]
+SMOKE_TESTS = ["tests/test_smoke.py"]
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ STORE, RUNNER = "app/trainer_worker/store.py", "app/trainer_worker/runner.py"
 SERVICE = "backend/src/logic/training-jobs.service.ts"
 SOURCES = "app/trainer_worker/sources.py"
 P3_SOURCES = "backend/src/logic/p3-sources.service.ts"
+SMOKE = "app/tracking/smoke.py"
 
 MUTANTS = [
     # --- Las 5 mutaciones citadas en la descripción de #53 ---
@@ -160,7 +162,7 @@ MUTANTS = [
         "D03-03 test",
         "cargar los píxeles de test en el dataset del trainer",
         SOURCES,
-        'test=())',
+        "test=())",
         'test=samples("test"))',
         SOURCES_TESTS,
     ),
@@ -181,6 +183,52 @@ MUTANTS = [
         "    if (!parsed.success) {",
         "    if (false) {",
         P3_SOURCES_TESTS,
+    ),
+    # --- D03-04: verificador del smoke real ---
+    Mutant(
+        "app",
+        "D03-04 smoke",
+        "aceptar un model.pt cuyo sha256 no es el del tag",
+        SMOKE,
+        '    if report.checkpoint_sha256 != run.data.tags.get("checkpoint_sha256"):',
+        "    if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 smoke",
+        "aceptar métricas de test en el run",
+        SMOKE,
+        "    if leaked:",
+        "    if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 smoke",
+        "aceptar un run fuera de p3-cnn-classifier",
+        SMOKE,
+        "    if experiment != P3_EXPERIMENT:",
+        "    if False:",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 smoke",
+        "cargar el checkpoint sin exigir que sea del modelo de la config",
+        SMOKE,
+        "strict=True)",
+        "strict=False)",
+        SMOKE_TESTS,
+    ),
+    Mutant(
+        "app",
+        "D03-04 smoke",
+        "no contrastar training_config.json con la config del job",
+        SMOKE,
+        '    if stored_config != job["config"]:',
+        "    if False:",
+        SMOKE_TESTS,
     ),
 ]
 
