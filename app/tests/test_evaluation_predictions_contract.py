@@ -19,6 +19,7 @@ fixture_paths = sorted(FIXTURES_DIR.glob("*.json"))
 # Motivo esperado de cada fixture inválido (mensaje de la regla que lo rechaza).
 FIXTURE_REASONS = {
     "invalid-crop-id-not-increasing": "orden estrictamente creciente",
+    "invalid-impossible-evaluated-at": "evaluated_at no es una fecha/hora real",
     "invalid-missing-class-probability": "una probabilidad por clase declarada",
     "invalid-n-test-mismatch": "exactamente n_test predicciones",
     "invalid-predicted-not-argmax": "argmax",
