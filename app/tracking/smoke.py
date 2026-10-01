@@ -57,7 +57,7 @@ REQUIRED_TAGS = (
     "job_id",
     "checkpoint_sha256",
 )
-CHECKPOINT_FILES = ("model.pt", "training_config.json", "class_map.json")
+CHECKPOINT_FILES = ("model.pt", "training_config.json", "class_map.json", "sources.json")
 
 
 @dataclass
@@ -142,21 +142,114 @@ def _check_run(job: dict, run, client, report: SmokeReport) -> None:
         problems.append(f"el run tiene métricas de test (prohibidas antes de D06-01): {leaked}")
 
     histories = {name: client.get_metric_history(run.info.run_id, name) for name in EPOCH_METRICS}
-    lengths = {name: len(points) for name, points in histories.items()}
-    report.epochs_logged = lengths["val_accuracy"]
+    report.epochs_logged = len(histories["val_accuracy"])
     epoch = (job.get("progress") or {}).get("epoch")
-    if set(lengths.values()) != {epoch}:
-        problems.append(f"épocas registradas {lengths} no coinciden con el progreso {epoch}")
-
-    if "best_epoch" not in metrics or "best_val_accuracy" not in metrics:
-        problems.append("falta el resumen best_epoch/best_val_accuracy")
+    if not isinstance(epoch, int) or epoch < 1:
+        problems.append(f"progreso del job inválido: {epoch!r}")
         return
-    report.best_epoch = int(metrics["best_epoch"])
+    # Cada curva debe tener exactamente una entrada por época real: 1..epoch.
+    curves: dict[str, dict[int, float]] = {}
+    for name, points in histories.items():
+        steps = [point.step for point in points]
+        duplicated = sorted({step for step in steps if steps.count(step) > 1})
+        if duplicated:
+            problems.append(f"historial de {name} con épocas duplicadas: {duplicated}")
+        elif sorted(steps) != list(range(1, epoch + 1)):
+            problems.append(
+                f"historial de {name} no tiene exactamente las épocas 1..{epoch}: {sorted(steps)}"
+            )
+        curves[name] = {point.step: point.value for point in points}
+
+    _check_best(metrics, curves, epoch, report)
+
+
+BEST_SUMMARY = (
+    ("best_val_accuracy", "val_accuracy"),
+    ("best_val_macro_f1", "val_macro_f1"),
+    ("best_val_loss", "val_loss"),
+)
+
+
+def _check_best(metrics, curves, epoch: int, report: SmokeReport) -> None:
+    """best_epoch es una época registrada y cada best_* es la curva en esa época
+    (misma tolerancia de 1e-4 que el contrato experiment_runs_response)."""
+    problems = report.problems
+    missing = [
+        name for name in ("best_epoch", *(s for s, _ in BEST_SUMMARY)) if name not in metrics
+    ]
+    if missing:
+        problems.append(f"falta el resumen del run: {missing}")
+        return
+    raw = metrics["best_epoch"]
+    if not float(raw).is_integer() or not 1 <= int(raw) <= epoch:
+        problems.append(f"best_epoch={raw} no es una época registrada (1..{epoch})")
+        return
+    best = int(raw)
+    report.best_epoch = best
     report.best_val_accuracy = metrics["best_val_accuracy"]
-    report.best_val_macro_f1 = metrics.get("best_val_macro_f1")
-    at_epoch = {point.step: point.value for point in histories["val_accuracy"]}
-    if abs(at_epoch.get(report.best_epoch, float("nan")) - report.best_val_accuracy) > 1e-4:
-        problems.append("best_val_accuracy no corresponde a la curva en best_epoch")
+    report.best_val_macro_f1 = metrics["best_val_macro_f1"]
+    for summary, curve in BEST_SUMMARY:
+        at_best = curves[curve].get(best)
+        if at_best is None or abs(at_best - metrics[summary]) > 1e-4:
+            problems.append(
+                f"{summary}={metrics[summary]} no corresponde a {curve} en best_epoch {best} "
+                f"({at_best})"
+            )
+
+
+def _check_provenance(job: dict, tags: dict, sources: dict, problems: list[str]) -> None:
+    """Contrasta la procedencia del run con las fuentes oficiales que publica la API
+    (release aprobado por el resolver y manifest congelado verificado), no solo con
+    lo que el propio run declara."""
+    from presentation.manifest_candidate import _dvc_release_hash
+    from training.class_map import CLASS_MAP
+
+    manifest = sources["manifest"]
+    release = next(
+        (
+            r
+            for r in sources["releases"]["approved"]
+            if r["dataset_version"] == job["dataset_version"]
+        ),
+        None,
+    )
+    if release is None:
+        problems.append(
+            f"el release {job['dataset_version']} del job no está aprobado (GET /releases)"
+        )
+    if (job["dataset_version"], job["manifest_hash"]) != (
+        manifest["dataset_version"],
+        manifest["manifest_hash"],
+    ):
+        problems.append("el job no usa el manifest congelado oficial (GET /manifest)")
+
+    frozen_classes = ",".join(sorted(CLASS_MAP, key=CLASS_MAP.__getitem__))
+    if ",".join(manifest["classes"]) != frozen_classes:
+        problems.append(f"las clases del manifest {manifest['classes']} no son {frozen_classes}")
+    expected = {
+        "manifest_version": manifest["manifest_version"],
+        "manifest_hash": manifest["manifest_hash"],
+        "dvc_release_hash": manifest["dvc_release_hash"],
+        "classes": frozen_classes,
+    }
+    if release is not None:
+        expected |= {
+            "dvc_release": release["dataset_version"],
+            "dvc_images_md5": release["images_md5"],
+            "dvc_annotations_md5": release["annotations_md5"],
+        }
+    for name, value in expected.items():
+        if tags.get(name) != value:
+            problems.append(
+                f"tag {name}={tags.get(name)!r} no corresponde a la fuente oficial ({value!r})"
+            )
+    if release is not None:
+        recomputed = _dvc_release_hash(release["images_md5"], release["annotations_md5"])
+        if tags.get("dvc_release_hash") != recomputed:
+            problems.append(
+                "tag dvc_release_hash no es el recalculado sha256(images_md5:annotations_md5) "
+                f"del release oficial ({recomputed})"
+            )
 
 
 def _check_checkpoint(job: dict, run, client, workdir: Path, report: SmokeReport) -> None:
@@ -183,6 +276,22 @@ def _check_checkpoint(job: dict, run, client, workdir: Path, report: SmokeReport
     class_map = json.loads(files["class_map.json"].read_text(encoding="utf-8"))
     if class_map != dict(CLASS_MAP):
         problems.append(f"class_map.json {class_map} distinto del class map congelado {CLASS_MAP}")
+
+    tags = run.data.tags
+    recorded = json.loads(files["sources.json"].read_text(encoding="utf-8"))
+    expected_sources = {
+        "dataset_version": job["dataset_version"],
+        "manifest_version": tags.get("manifest_version"),
+        "manifest_hash": job["manifest_hash"],
+        "dvc_release_hash": tags.get("dvc_release_hash"),
+        "best_epoch": report.best_epoch,
+        "checkpoint_sha256": tags.get("checkpoint_sha256"),
+    }
+    for name, value in expected_sources.items():
+        if recorded.get(name) != value:
+            problems.append(
+                f"sources.json {name}={recorded.get(name)!r} no corresponde al run ({value!r})"
+            )
 
     try:
         report.loaded_classes, report.probabilities_sum = _load_and_classify(
@@ -237,6 +346,7 @@ def verify_smoke(job: dict, *, tracking_uri: str, workdir: Path, sources: dict) 
     client = MlflowClient(tracking_uri=tracking_uri)
     run = client.get_run(report.run_id)
     _check_run(job, run, client, report)
+    _check_provenance(job, run.data.tags, sources, report.problems)
     _check_checkpoint(job, run, client, Path(workdir), report)
     return report
 
