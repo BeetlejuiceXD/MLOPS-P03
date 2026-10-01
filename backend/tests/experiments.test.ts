@@ -32,7 +32,7 @@ const T0 = Date.parse('2026-09-30T23:40:13Z');
 interface FakeRun {
   run_id: string;
   experiment_id: string;
-  status: 'RUNNING' | 'FINISHED' | 'FAILED' | 'KILLED';
+  status: string;
   start_time: number;
   end_time: number | null;
   tags: Record<string, string>;
@@ -443,6 +443,49 @@ describe('GET /experiments/runs — listado desde MLflow', () => {
     expect(listed.campaign_eligible).toBe(false);
     expect(listed.ineligible_reasons.join(' ')).toMatch(/RUNNING/);
   });
+
+  it('SCHEDULED se conserva tal cual (no se convierte en FAILED) y no es elegible', async () => {
+    const run = trainingRun({ status: 'SCHEDULED', end_time: null, metrics: [] });
+    delete run.tags.checkpoint_sha256;
+    const aux = { ...auxiliaryRun('controlled_task'), status: 'SCHEDULED', end_time: null };
+    const api = await setup(run, aux);
+    const { body } = await getJson(`${api}/experiments/runs`);
+
+    expect(experimentRunsResponseSchema.safeParse(body).success).toBe(true);
+    const [listed] = body.runs;
+    expect(listed.status).toBe('SCHEDULED');
+    expect(listed.history).toEqual([]);
+    expect(listed.end_time).toBeNull();
+    expect(listed.campaign_eligible).toBe(false);
+    expect(listed.ineligible_reasons.join(' ')).toMatch(/SCHEDULED/);
+    expect(body.excluded).toEqual([
+      expect.objectContaining({ run_id: aux.run_id, status: 'SCHEDULED' }),
+    ]);
+  });
+
+  it('un estado que MLflow no define no se sustituye por otro: 503 con el motivo', async () => {
+    const api = await setup(trainingRun({ status: 'PAUSED' }));
+    const { status, body } = await getJson(`${api}/experiments/runs`);
+    expect(status).toBe(503);
+    expect(body.error).toMatch(/PAUSED/);
+  });
+
+  it.each([['test_accuracy'], ['test_loss'], ['test_macro_f1']])(
+    'un training con la métrica %s queda excluded (frozen test, #33), nunca elegible',
+    async (key) => {
+      const run = trainingRun();
+      run.metrics.push({ key, value: 0.9, step: 0 });
+      const api = await setup(run);
+      const { body } = await getJson(`${api}/experiments/runs`);
+
+      expect(body.runs).toEqual([]);
+      expect(body.excluded).toEqual([
+        expect.objectContaining({ run_id: run.run_id, run_kind: 'training' }),
+      ]);
+      expect(body.excluded[0].reasons.join(' ')).toMatch(new RegExp(`métricas de test.*${key}`));
+      expect((await getJson(`${api}/experiments/runs/${run.run_id}`)).status).toBe(409);
+    },
+  );
 
   it('FINISHED no basta: sin checkpoint_sha256 no es elegible', async () => {
     const run = trainingRun();
