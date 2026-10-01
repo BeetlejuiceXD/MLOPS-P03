@@ -42,6 +42,10 @@ export { buildDashboardSummary, buildThumbnailUrl } from './dashboard.builder.js
 export { getDashboardSummary } from './dashboard.service.js';
 // Errores tipados: la capa UI los mapea a códigos HTTP (SPEC-VALID-001).
 export { ConflictError, NotFoundError, ValidationError } from './errors.js';
+// API de evaluación y exportación por muestra (D04-05)
+export { mariaDbEvaluationRepository } from './evaluation.repository.js';
+export type { EvaluationService } from './evaluation.service.js';
+export { createEvaluationService } from './evaluation.service.js';
 // D04-01: adaptador MLflow → portal.
 export type { ExperimentsService } from './experiments.service.js';
 export { createExperimentsService } from './experiments.service.js';

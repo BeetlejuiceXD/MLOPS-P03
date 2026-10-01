@@ -1,0 +1,122 @@
+{
+  "evaluation": {
+    "state": "ready",
+    "selection": {
+      "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "metric": "val_accuracy",
+      "closed_at": "2026-10-01T13:00:00.456Z"
+    },
+    "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "evaluated_at": "2026-10-01T14:00:00.000Z",
+    "n_test": 6,
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "confusion_matrix": {
+      "labels": [
+        "cat",
+        "dog"
+      ],
+      "rows": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ]
+    },
+    "metrics": {
+      "accuracy": 0.6666666666666666,
+      "macro_f1": 0.6666666666666666,
+      "per_class": [
+        {
+          "class_name": "cat",
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "support": 3
+        },
+        {
+          "class_name": "dog",
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "support": 3
+        }
+      ]
+    },
+    "majority_baseline_accuracy": 0.5
+  },
+  "predictions": {
+    "namespace": "synthetic",
+    "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "test_split_hash": "898c9b54504a279db6e8ce4a86037a0a05b4be37942924398d539af86188dcc8",
+    "evaluated_at": "2026-10-01T14:00:00.000Z",
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "n_test": 6,
+    "predictions": [
+      {
+        "crop_id": 3,
+        "true_class": "cat",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.9,
+          "dog": 0.1
+        }
+      },
+      {
+        "crop_id": 7,
+        "true_class": "cat",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.8,
+          "dog": 0.2
+        }
+      },
+      {
+        "crop_id": 12,
+        "true_class": "cat",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.3,
+          "dog": 0.7
+        }
+      },
+      {
+        "crop_id": 20,
+        "true_class": "dog",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.25,
+          "dog": 0.75
+        }
+      },
+      {
+        "crop_id": 21,
+        "true_class": "dog",
+        "predicted_class": "cat",
+        "probabilities": {
+          "cat": 0.6,
+          "dog": 0.4
+        }
+      },
+      {
+        "crop_id": 30,
+        "true_class": "dog",
+        "predicted_class": "dog",
+        "probabilities": {
+          "cat": 0.1,
+          "dog": 0.9
+        }
+      }
+    ]
+  }
+}

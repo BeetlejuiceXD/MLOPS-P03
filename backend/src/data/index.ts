@@ -24,6 +24,7 @@ export {
   updateAnnotationRow,
 } from './repositories/annotation.repository.js';
 export { listCategories } from './repositories/category.repository.js';
+export { readEvaluation } from './repositories/evaluation.repository.js';
 export type {
   ClassSearch,
   FindImagesOptions,

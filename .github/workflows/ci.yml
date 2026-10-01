@@ -274,6 +274,16 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npx vitest run tests/model-selection.mariadb.test.ts
+      - name: Evaluación sintética productor Python → MariaDB → API (D04-05)
+        # Migración 0007. El productor corre en la imagen de trainer-worker contra la
+        # MariaDB real; guardas, rechazos y aislamiento del namespace sintético vía API.
+        run: python3 .github/scripts/evaluation_e2e.py
+      - name: Lectura real de la evaluación sintética (D04-05)
+        working-directory: backend
+        env:
+          P3_EVALUATION_MARIADB_TEST: "1"
+          DATABASE_URL: mysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3306/image_repo
+        run: npx vitest run tests/evaluation.mariadb.test.ts
       - name: Logs de los servicios
         if: failure()
         run: docker compose logs --no-color backend trainer-worker mlflow
@@ -438,6 +448,10 @@ jobs:
         run: >-
           docker run --rm p3-app-check python -c
           "from training.class_map import CLASS_MAP; assert CLASS_MAP == {'cat': 0, 'dog': 1}; print(CLASS_MAP)"
+      - name: El productor de la evaluación se importa dentro de la imagen (D04-05)
+        run: >-
+          docker run --rm p3-app-check python -c
+          "from evaluation.producer import produce_evaluation; from evaluation.store import EvaluationStore; print('evaluation OK')"
 
   backend-image:
     name: Imagen backend (arranca desde cero)
