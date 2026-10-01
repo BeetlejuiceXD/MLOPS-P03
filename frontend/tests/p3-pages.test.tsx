@@ -167,7 +167,10 @@ describe("errores y respuestas incompatibles", () => {
   it("un endpoint que todavía no existe (404) no se confunde con datos vacíos", async () => {
     mockApi({});
     renderAt("/ml/experiments");
-    expect(await screen.findByText("El servidor respondió con estado 404.")).toBeInTheDocument();
+    // D04-02: Experiments muestra el motivo que da la API (como el 503 de MLflow caído).
+    expect(
+      await screen.findByText("El servidor respondió con estado 404: Recurso no encontrado.")
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("p3-state-empty")).not.toBeInTheDocument();
   });
 

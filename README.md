@@ -1564,3 +1564,26 @@ curl -s -o model.pt http://localhost:8080/api/experiments/runs/<run_id>/artifact
 
 `campaign_eligible` es elegibilidad estructural. Que el run pertenezca a la matriz OFAT de
 la campaña y la selección por validation son de D04-03/D04-04.
+
+## D04-02 — Experiments en el portal
+
+`http://localhost:8080/ml/experiments` muestra los runs reales del experimento
+`p3-cnn-classifier` tal como los sirve el adaptador de D04-01 (`/api/experiments/runs`).
+
+- **Conteo:** runs de training, elegibles para campaña y, aparte, auxiliares y excluidos.
+  Los auxiliares (`controlled_task`, `short_run_instrumentation`, `persistence_check`) y los
+  runs excluidos aparecen en su propia sección con el motivo: no suman al conteo ni se pueden
+  elegir para comparar.
+- **Filtros:** estado, elegibilidad, seed, capas entrenables, optimizador y learning rate. Las
+  opciones salen de los runs presentes.
+- **Comparar:** marca dos o más runs. Se muestran los 15 campos de `TrainingConfig` lado a lado
+  (resaltando los que difieren), las mejores métricas de validation y las curvas de
+  `val_accuracy` y `val_loss` superpuestas.
+- **Ver:** abre el detalle desde `/api/experiments/runs/<run_id>`. Muestra provenance, resumen,
+  curvas por época con su tabla de valores y artefactos descargables
+  (`checkpoint/model.pt`, etc.).
+- **Actualizar:** vuelve a pedir los runs a la API, por ejemplo mientras un job está `RUNNING`.
+- Si MLflow no responde, la página muestra el motivo (`503 mlflow_unavailable`), nunca una
+  lista vacía.
+
+La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
