@@ -43,6 +43,13 @@
       "when": 1790736963243,
       "tag": "0005_p3_training_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1790860971729,
+      "tag": "0006_p3_model_selection",
+      "breakpoints": true
     }
   ]
 }

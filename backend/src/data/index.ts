@@ -44,6 +44,11 @@ export {
   findRecentImages,
   updateImageStatus,
 } from './repositories/image.repository.js';
+export {
+  closeModelSelection,
+  readModelSelection,
+  saveModelSelectionCandidate,
+} from './repositories/model-selection.repository.js';
 export { readP3TrainingSource } from './repositories/p3-sources.repository.js';
 export type { TrainingJobInsert } from './repositories/training-job.repository.js';
 export {

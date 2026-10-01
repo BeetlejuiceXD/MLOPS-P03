@@ -294,3 +294,20 @@ export const trainingJobLogs = mysqlTable(
 
 export type TrainingJobRow = typeof trainingJobs.$inferSelect;
 export type TrainingJobLogRow = typeof trainingJobLogs.$inferSelect;
+
+/**
+ * D04-04 — Estado de la selección del candidato (un único registro, `id = 1`, que crea la
+ * migración en `open`). `outcome` guarda el ranking SOLO de validation, los runs
+ * excluidos y la referencia del manifest congelado; `outcome_hash` es lo que el cierre
+ * exige que no haya cambiado. `closed` es definitivo (MODEL SELECTION CLOSED).
+ */
+export const p3ModelSelection = mysqlTable('p3_model_selection', {
+  id: int('id').primaryKey(),
+  status: mysqlEnum('status', ['open', 'candidate', 'closed']).notNull(),
+  outcome: json('outcome'),
+  outcomeHash: char('outcome_hash', { length: 64 }),
+  proposedAt: timestamp('proposed_at', { fsp: 3 }),
+  closedAt: timestamp('closed_at', { fsp: 3 }),
+});
+
+export type P3ModelSelectionRow = typeof p3ModelSelection.$inferSelect;

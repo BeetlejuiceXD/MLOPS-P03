@@ -7,6 +7,7 @@ import {
   createEligibilityGate,
   createExperimentsService,
   createMlflowReader,
+  createModelSelectionService,
   createP3SourcesService,
   createSettingsService,
   createTrainingJobsService,
@@ -20,8 +21,10 @@ import {
   idParamSchema,
   imageSearchSchema,
   initializeApplication,
+  mariaDbModelSelectionRepository,
   mariaDbP3SourcesRepository,
   mariaDbTrainingJobRepository,
+  runsAdapterPendingSource,
   searchImages,
   setImageStatus,
   updateAnnotation,
@@ -29,6 +32,7 @@ import {
 } from '../logic/index.js';
 import { createExperimentsRouter } from './experiments.routes.js';
 import { sendError } from './http-errors.js';
+import { createModelSelectionRouter } from './model-selection.routes.js';
 import { createP3SourcesRouter } from './p3-sources.routes.js';
 import { createTrainingRouter } from './training.routes.js';
 
@@ -74,6 +78,19 @@ app.use(
   '/training',
   createTrainingRouter(
     createTrainingJobsService(mariaDbTrainingJobRepository, createEligibilityGate(p3Sources)),
+  ),
+);
+
+// D04-04: selección SOLO por validation (estado persistido) y bloqueo de Evaluation hasta
+// MODEL SELECTION CLOSED. Los runs llegarán por el adaptador MLflow de D04-01; mientras
+// tanto proponer/cerrar responden 503 con el motivo.
+app.use(
+  createModelSelectionRouter(
+    createModelSelectionService(
+      mariaDbModelSelectionRepository,
+      runsAdapterPendingSource,
+      p3Sources,
+    ),
   ),
 );
 
