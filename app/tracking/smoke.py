@@ -214,8 +214,11 @@ def _load_and_classify(model_path: Path, config, class_map: dict[str, int]):
     return classes, float(probabilities.sum())
 
 
-def verify_smoke(job: dict, *, tracking_uri: str, workdir: Path) -> SmokeReport:
-    """Contrasta un job terminado con su run y su checkpoint en el servidor."""
+def verify_smoke(job: dict, *, tracking_uri: str, workdir: Path, sources: dict) -> SmokeReport:
+    """Contrasta un job terminado con su run y su checkpoint en el servidor.
+
+    `sources` son las fuentes oficiales que publica la API del portal:
+    `{"releases": GET /releases, "manifest": GET /manifest}`."""
     report = SmokeReport(run_id=job.get("mlflow_run_id"), manifest_hash=job.get("manifest_hash"))
     if job.get("task") != "training" or job.get("status") != "succeeded":
         report.problems.append(
@@ -282,7 +285,7 @@ def run_smoke(args: argparse.Namespace) -> int:
     api = args.api.rstrip("/")
     started = time.monotonic()
     try:
-        approved, manifest = _sources(api)
+        approved, manifest, releases = _sources(api)
     except (ApiError, urllib.error.URLError) as error:
         print(f"Fuentes no disponibles en {api}: {error}", file=sys.stderr)
         return UNAVAILABLE
@@ -299,17 +302,17 @@ def run_smoke(args: argparse.Namespace) -> int:
     request = build_request(manifest, args)
     job = _http("POST", f"{api}/training/jobs", request)
     print(f"Job #{job['id']} creado ({job['status']})", flush=True)
-    return _finish(api, job, args, started, approved, manifest, request)
+    return _finish(api, job, args, started, releases, manifest, request)
 
 
 def _sources(api: str):
     releases = _http("GET", f"{api}/releases")
     manifest = _http("GET", f"{api}/manifest")
     approved = [r["dataset_version"] for r in releases["approved"]]
-    return approved, manifest
+    return approved, manifest, releases
 
 
-def _finish(api, job, args, started, approved, manifest, request) -> int:
+def _finish(api, job, args, started, releases, manifest, request) -> int:
     """Sigue el job hasta su estado terminal, verifica job/run/checkpoint y deja evidencia."""
     last = None
     deadline = time.monotonic() + args.timeout
@@ -327,7 +330,13 @@ def _finish(api, job, args, started, approved, manifest, request) -> int:
     logs = _http("GET", f"{api}/training/jobs/{job['id']}/logs")
 
     with tempfile.TemporaryDirectory() as tmp:
-        report = verify_smoke(job, tracking_uri=args.tracking_uri, workdir=Path(tmp))
+        report = verify_smoke(
+            job,
+            tracking_uri=args.tracking_uri,
+            workdir=Path(tmp),
+            sources={"releases": releases, "manifest": manifest},
+        )
+    approved = [r["dataset_version"] for r in releases["approved"]]
     evidence = {
         "label": args.label,
         "api": api,
@@ -357,13 +366,13 @@ def verify_job(args: argparse.Namespace) -> int:
     api = args.api.rstrip("/")
     started = time.monotonic()
     try:
-        approved, manifest = _sources(api)
+        _, manifest, releases = _sources(api)
         job = _http("GET", f"{api}/training/jobs/{args.job_id}")
     except (ApiError, urllib.error.URLError) as error:
         print(f"API no disponible en {api}: {error}", file=sys.stderr)
         return UNAVAILABLE
     print(f"Job #{job['id']} ({job['task']}/{job['status']}) lanzado desde el portal", flush=True)
-    return _finish(api, job, args, started, approved, manifest, None)
+    return _finish(api, job, args, started, releases, manifest, None)
 
 
 def main(argv: list[str] | None = None) -> int:
