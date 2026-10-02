@@ -1671,3 +1671,28 @@ fuera del entrenamiento, sin memoria ni estado del trainer. El detalle está en
 python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 --out /tmp/smoke-package
 python -m model_package predict --package /tmp/smoke-package   # proceso limpio
 ```
+
+## D05-04 — Motor de inferencia con el paquete smoke
+
+`app/inference_engine/` carga un paquete de D05-01 y clasifica imágenes. El detalle está en
+`app/inference_engine/README.md`.
+
+- **Carga:** usa `load_package` de D05-01, así que la transformación, el `class_map` y la
+  config salen del paquete y no de los defaults del portal. Antes de aceptar imágenes,
+  coteja la salida de referencia del paquete y, si se le pasa, el `checkpoint_sha256`
+  esperado.
+- **Predicción:** devuelve la clase, las probabilidades en el orden del `class_map` y la
+  identidad del paquete (`package_id`, `mlflow_run_id`, `checkpoint_sha256`). La
+  identidad sale del mismo paquete que predijo. No guarda etiquetas humanas.
+- **Errores:** distingue imagen rechazada, paquete rechazado e inferencia incoherente.
+  Ninguno de los tres emite predicción.
+- **HTTP para D05-07:** `GET /identity` y `POST /predict`, con el contrato de
+  `INFERENCE_ENGINE_URL`.
+
+```bash
+# proceso limpio: carga, predice y escribe JSON
+python -m inference_engine predict --package ./smoke-package --image gato.jpg \
+  --expected-sha256 <checkpoint_sha256>
+# servicio para el portal (INFERENCE_ENGINE_URL=http://<host>:8090)
+python -m inference_engine serve --package ./smoke-package --port 8090
+```
