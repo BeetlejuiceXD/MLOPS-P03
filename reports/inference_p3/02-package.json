@@ -1,0 +1,49 @@
+{
+  "format": "p3-model-package",
+  "format_version": "1.0.0",
+  "kind": "smoke",
+  "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+  "created_at": "2026-10-02T22:48:02Z",
+  "source": {
+    "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+    "experiment": "p3-cnn-classifier",
+    "checkpoint_artifact": "checkpoint/model.pt",
+    "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
+    "best_epoch": 7,
+    "dataset_version": "v0.1.1",
+    "manifest_version": "p3-v0.1.1-s42",
+    "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+    "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+  },
+  "files": {
+    "model.pt": {
+      "sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
+      "size_bytes": 44781003
+    },
+    "training_config.json": {
+      "sha256": "c02aceb1f2acd3683f04cc0b2fbe77e1685d4b777b97228f1039c6f02edae3e6",
+      "size_bytes": 342
+    },
+    "class_map.json": {
+      "sha256": "efa7072de3f35baf750a75e6e0cfcd6ebb432d67a06f0b7c93e88477f55542e3",
+      "size_bytes": 27
+    },
+    "preprocessing.json": {
+      "sha256": "4edc4880fe35202470bdd9fbc61e055fd8b420e7642336771e3cae6dc0f04639",
+      "size_bytes": 232
+    },
+    "dependencies.json": {
+      "sha256": "a6a25cdbfc0b1631c6fd2b463a80b6a9a4c02fdbd4a57c9b96b5ee426b9bc4c2",
+      "size_bytes": 411
+    },
+    "reference_output.json": {
+      "sha256": "96a1bda1d4a13a4da8fb72e754ddb0e7db4ceac8248d6c48c79bee6a65ef63a0",
+      "size_bytes": 383
+    },
+    "smoke_card.json": {
+      "sha256": "e13ca56fd69664f91f31dd5ae1105afd6d756630ab152f537f0954bbc243e9b7",
+      "size_bytes": 353
+    }
+  },
+  "note": "format_version es la versión del formato del paquete smoke; no es el semver del modelo, que asigna D06-02 al package final."
+}
