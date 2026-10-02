@@ -1,0 +1,49 @@
+{
+  "contract": "evaluation_details",
+  "valid": true,
+  "why": "Detalle de la evaluación official: procedencia completa, 59/66 >= 0.85 y ejemplos por crop_id",
+  "payload": {
+    "namespace": "official",
+    "final": true,
+    "provenance": {
+      "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "campaign_row": 3,
+      "best_epoch": 5,
+      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "git_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dataset_version": "v0.1.1",
+      "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "test_split_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "closed_at": "2026-09-28T20:00:00Z",
+      "evaluated_at": "2026-09-29T15:00:00Z",
+      "n_test": 66
+    },
+    "target": {
+      "accuracy": 0.85,
+      "correct": 59,
+      "n_test": 66,
+      "met": true
+    },
+    "examples": {
+      "n_correct": 59,
+      "n_errors": 7,
+      "correct": [
+        {
+          "crop_id": 12,
+          "true_class": "cat",
+          "predicted_class": "cat",
+          "confidence": 0.998
+        }
+      ],
+      "errors": [
+        {
+          "crop_id": 57,
+          "true_class": "dog",
+          "predicted_class": "cat",
+          "confidence": 0.91
+        }
+      ]
+    }
+  }
+}

@@ -96,7 +96,7 @@ describe("Evaluation: bloqueada, pendiente, resultado y fallo son estados distin
     const content = await appears("p3-content");
     expect(namespaceIn(content)).toBe("official");
     expect(text(screen.getByTestId("evaluation-provenance"))).toContain("dddddddd");
-    expect(text(content)).toContain("59 / 66");
+    expect(text(content)).toContain("89.39%");
     absent("evaluation-synthetic-warning");
   });
 
