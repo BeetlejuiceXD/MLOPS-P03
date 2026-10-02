@@ -102,7 +102,7 @@ app.use(createModelSelectionRouter(modelSelection));
 // namespace `official`: los recorridos sintéticos nunca se sirven como evaluación oficial.
 app.use(
   createEvaluationRouter(
-    createEvaluationService(mariaDbEvaluationRepository, modelSelection, 'official'),
+    createEvaluationService(mariaDbEvaluationRepository, modelSelection, 'official', experiments),
   ),
 );
 

@@ -3,6 +3,7 @@ import { useEvaluation } from "../api";
 import { FetchBoundary } from "../components/FetchBoundary";
 import { StatePanel } from "../components/StatePanel";
 import { dateTime, percent, shortHash } from "../format";
+import { EvaluationDetailsView } from "./EvaluationDetails";
 
 /**
  * D01-05 — Evaluation: frozen test. La API responde `blocked` hasta MODEL
@@ -12,6 +13,10 @@ import { dateTime, percent, shortHash } from "../format";
  * nada): `blocked` (selección abierta), `pending` (cerrada, sin evaluación todavía),
  * `ready` con su namespace visible (`synthetic` se rotula como recorrido de prueba) y el
  * error de la API con su motivo (fallo del servicio o datos incoherentes, 503).
+ *
+ * D06-05 — Con `ready`, además: procedencia completa, umbral 0.85 con conteos, métricas por
+ * clase, ejemplos por crop_id y predicciones consultables/exportables (`EvaluationDetails`).
+ * La página no calcula cifras: el conteo de aciertos también viene de la API.
  */
 function NamespaceBadge({ namespace }: Readonly<{ namespace: "official" | "synthetic" }>) {
   return (
@@ -67,7 +72,6 @@ export function EvaluationPage() {
             );
           }
           const { labels, rows } = data.confusion_matrix;
-          const hits = labels.reduce((sum, _label, i) => sum + (rows[i]?.[i] ?? 0), 0);
           return (
             <div data-testid="p3-content" className="flex flex-col gap-6">
               {data.namespace === "synthetic" && (
@@ -100,8 +104,8 @@ export function EvaluationPage() {
                 </div>
                 <div>
                   <h2 className="text-xs text-ink-muted">Accuracy top-1 (test)</h2>
-                  <p className="text-sm font-semibold text-ink">{`${hits} / ${data.n_test}`}</p>
-                  <p className="text-xs text-ink-muted">{percent(data.metrics.accuracy)}</p>
+                  <p className="text-sm font-semibold text-ink">{percent(data.metrics.accuracy)}</p>
+                  <p className="text-xs text-ink-muted">{`n_test = ${data.n_test}`}</p>
                 </div>
                 <div>
                   <h2 className="text-xs text-ink-muted">Macro F1 · baseline mayoritario</h2>
@@ -138,6 +142,7 @@ export function EvaluationPage() {
                   ))}
                 </tbody>
               </table>
+              <EvaluationDetailsView evaluation={data} />
             </div>
           );
         }}

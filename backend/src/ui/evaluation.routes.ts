@@ -12,6 +12,8 @@ import { sendError } from './http-errors.js';
  * - `GET /evaluation/predictions[?format=json|csv]`: exportación por muestra
  *   (`evaluation_predictions`); 409 antes del cierre, 404 sin evaluación. Con `csv` se
  *   descarga el mismo contenido como archivo.
+ * - `GET /evaluation/details` (D06-05): `evaluation_details`, con procedencia, umbral y
+ *   ejemplos; mismas guardas (409/404) y 503 si el run cerrado en MLflow no cuadra.
  */
 export function createEvaluationRouter(service: EvaluationService): express.Router {
   const router = express.Router();
@@ -21,6 +23,14 @@ export function createEvaluationRouter(service: EvaluationService): express.Rout
       res.json(await service.evaluation());
     } catch (error) {
       sendError(res, error, 'No se pudo leer la evaluación.');
+    }
+  });
+
+  router.get('/evaluation/details', async (_req, res) => {
+    try {
+      res.json(await service.details());
+    } catch (error) {
+      sendError(res, error, 'No se pudo leer el detalle de la evaluación.');
     }
   });
 

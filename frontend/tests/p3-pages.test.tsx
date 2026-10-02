@@ -218,10 +218,17 @@ describe("contenido con datos válidos", () => {
   });
 
   it("Evaluation con selección cerrada muestra matriz y accuracy sin redondear antes de comparar", async () => {
-    mockApi({ "/api/evaluation": ok("evaluation_response", "valid-ready") });
+    mockApi({
+      "/api/evaluation": ok("evaluation_response", "valid-ready"),
+      // D06-05: el conteo de aciertos viene de la API (detalle), no se calcula en la página.
+      "/api/evaluation/details": ok("evaluation_details", "valid-official"),
+      "/api/evaluation/predictions": ok("evaluation_predictions", "valid-official"),
+    });
     renderAt("/ml/evaluation");
     const content = await screen.findByTestId("p3-content");
-    expect(within(content).getByText("59 / 66")).toBeInTheDocument();
+    expect((await within(content).findByTestId("evaluation-target")).textContent).toContain(
+      "59 / 66"
+    );
     expect(within(content).getByTestId("confusion-matrix")).toBeInTheDocument();
   });
 
