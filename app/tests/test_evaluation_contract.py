@@ -50,6 +50,11 @@ FIXTURE_REASONS = {
     "invalid-matrix-sum-mismatch": "La matriz debe sumar n_test",
     "invalid-selected-by-test": "'val_accuracy'",
     "invalid-support-mismatch": "support de cat",
+    # D05-05: namespace visible y estado `pending` (cerrada, sin resultado).
+    "invalid-ready-without-namespace": "namespace",
+    "invalid-ready-local-test-namespace": "'synthetic'",
+    "invalid-pending-with-results": "confusion_matrix",
+    "invalid-pending-selected-by-test": "'val_accuracy'",
 }
 
 
@@ -78,6 +83,12 @@ def test_at_least_the_known_fixture_files_are_present():
         "invalid-matrix-sum-mismatch.json",
         "invalid-selected-by-test.json",
         "invalid-support-mismatch.json",
+        "valid-ready-synthetic.json",
+        "valid-pending.json",
+        "invalid-ready-without-namespace.json",
+        "invalid-ready-local-test-namespace.json",
+        "invalid-pending-with-results.json",
+        "invalid-pending-selected-by-test.json",
     }
 
 

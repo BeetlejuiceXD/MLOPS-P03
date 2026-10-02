@@ -254,6 +254,7 @@ def test_incompatible_inputs_are_rejected(y_true, y_pred):
 # --- Salida contractual consumible por la pantalla Evaluation / D06-01 -------------------
 
 SELECTION = {
+    "namespace": "official",
     "candidate_run_id": "a" * 32,
     "closed_at": "2026-09-28T20:00:00Z",
     "manifest_hash": "d" * 64,

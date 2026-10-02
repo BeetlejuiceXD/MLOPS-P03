@@ -1,17 +1,16 @@
 {
   "contract": "evaluation_response",
   "valid": false,
-  "why": "El test se evalúa solo después de cerrar la selección",
+  "why": "Un resultado sin namespace no permite distinguir official de synthetic",
   "payload": {
     "state": "ready",
-    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",
       "closed_at": "2026-09-28T20:00:00Z"
     },
     "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-    "evaluated_at": "2026-09-28T10:00:00Z",
+    "evaluated_at": "2026-09-29T15:00:00Z",
     "n_test": 66,
     "classes": [
       "cat",

@@ -1,6 +1,7 @@
 {
   "evaluation": {
     "state": "ready",
+    "namespace": "synthetic",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",
