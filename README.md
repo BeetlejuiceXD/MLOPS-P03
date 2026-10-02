@@ -1672,7 +1672,7 @@ python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:500
 python -m model_package predict --package /tmp/smoke-package   # proceso limpio
 ```
 
-## D05-07 — Inference con motor y cola de anotación (preparación)
+## D05-07 — Inference con motor y cola de anotación
 
 `http://localhost:8080/ml/inference` clasifica una imagen con el modelo que sirve el
 **motor de inferencia de D05-04**. La clase la calcula el motor, nunca el portal: la API
@@ -1718,12 +1718,23 @@ El backend llama al motor en `INFERENCE_ENGINE_URL` (`backend/src/logic/inferenc
 | `GET /identity` | `inference_engine`: identidad del paquete cargado y clases `cat`, `dog` |
 | `POST /predict` | Recibe los bytes de la imagen (`Content-Type: image/*`) y responde `inference_engine_prediction`. Un 4xx = imagen rechazada; un 5xx = modelo o servicio no disponible |
 
-Sin `INFERENCE_ENGINE_URL`, Inference responde 503 con el motivo. D06-06 solo cambia esa
-URL a un motor con el modelo official recargado de AWS (`source: "official"`, con semver):
-el resto del portal no cambia.
+En compose, el motor es el servicio `inference-engine` (perfil `inference`) y el backend
+lo llama por defecto en `http://inference-engine:8090`. Sin el perfil (o sin paquete),
+Inference responde 503 con el motivo. D06-06 solo cambia la fuente (otra URL o el paquete
+official recargado de AWS, con `source: "official"` y semver): el resto del portal no cambia.
 
-Para **cerrar #90** falta el motor real de D05-04 (Esteban). Los tests usan un motor de
-**fixture**: prueban la API, la validación y la persistencia, no el motor.
+Para levantarlo con un paquete smoke real (D05-01) construido desde un run de MLflow:
+
+```bash
+docker compose run --rm --no-deps -v "$PWD/data:/out" app \
+  python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 \
+  --out /out/inference-package          # queda fuera de Git (data/.gitignore)
+docker compose --profile inference up -d inference-engine backend frontend
+curl http://localhost:8080/api/inference/engine   # identidad smoke del paquete
+```
+
+Los tests de la API usan un motor de **fixture** (validación y persistencia); el
+recorrido con el motor real se acredita en `reports/inference_p3/`.
 
 ## D05-04 — Motor de inferencia con el paquete smoke
 

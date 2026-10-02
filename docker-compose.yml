@@ -120,7 +120,7 @@ services:
       MAX_UPLOAD_SIZE_BYTES: 5242880
       # D05-07: URL del motor de inferencia de D05-04. Vacía = Inference responde 503 con el
       # motivo (motor aún no integrado); D06-06 la apunta al modelo official recargado.
-      INFERENCE_ENGINE_URL: ${INFERENCE_ENGINE_URL:-}
+      INFERENCE_ENGINE_URL: ${INFERENCE_ENGINE_URL:-http://inference-engine:8090}
       PIPELINE_CONFIG_ROOT: /pipeline
       # D04-01: el portal lee runs, curvas y artefactos de MLflow por su API REST.
       MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -162,6 +162,18 @@ services:
       - ./reports:/app/reports
       - ./app/policies:/app/policies:ro
       - ./app/splits:/app/splits:ro
+    restart: on-failure:5
+
+  # D05-07: motor de inferencia de D05-04 sirviendo el paquete smoke de D05-01. El paquete
+  # vive fuera de Git (INFERENCE_PACKAGE_DIR, por defecto ./data/inference-package) y se
+  # monta de solo lectura. Perfil `inference`: sin paquete no se levanta, y el portal
+  # responde 503 con el motivo. D06-06 cambia solo la fuente (otro paquete o URL).
+  inference-engine:
+    build: ./app
+    profiles: ["inference"]
+    command: ["python", "-m", "inference_engine", "serve", "--package", "/package", "--port", "8090"]
+    volumes:
+      - ${INFERENCE_PACKAGE_DIR:-./data/inference-package}:/package:ro
     restart: on-failure:5
 
   # D02-05: ejecuta los jobs de entrenamiento fuera del request HTTP. Hace polling de
