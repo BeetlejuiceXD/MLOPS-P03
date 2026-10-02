@@ -1,0 +1,29 @@
+# Override de puertos para el stack de restore AISLADO de #104.
+# Nunca se usa junto al stack productor con el mismo nombre de proyecto.
+# Mismo build/entorno que docker-compose.yml — solo cambian los puertos de
+# host, para poder correr ambos stacks (productor + restore) en la misma
+# máquina al mismo tiempo sin chocar.
+#
+# IMPORTANTE: Docker Compose CONCATENA listas entre archivos (-f base -f
+# override), no las reemplaza. `!override` fuerza el reemplazo completo de
+# la lista en vez de concatenarla (a diferencia de `!reset`, que solo la
+# limpia a vacío sin permitir asignar un valor nuevo).
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.restore-isolated.yml \
+#     -p mlops-p03-restore up -d --wait mariadb minio
+
+services:
+  mariadb:
+    ports: !override
+      - "3307:3306"
+  minio:
+    ports: !override
+      - "9010:9000"
+      - "9011:9001"
+  mlflow:
+    ports: !override
+      - "5001:5000"
+  backend:
+    ports: !override
+      - "3101:3100"
