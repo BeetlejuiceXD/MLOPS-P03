@@ -48,6 +48,12 @@ def _write_checkpoint(folder: Path, config: TrainingConfig, *, seed: int) -> Pat
     """Misma forma que sube el trainer de D03-04 a `checkpoint/` en MLflow."""
     folder.mkdir(parents=True)
     model = build_model(config.model_copy(update={"pretrained": False, "seed": seed}))
+    # Como un checkpoint entrenado: la cabeza ya no es la inicialización de build_model,
+    # así que solo reproduce la salida quien cargue ESTOS pesos.
+    generator = torch.Generator().manual_seed(seed + 100)
+    with torch.no_grad():
+        for parameter in model.fc.parameters():
+            parameter.add_(torch.randn(parameter.shape, generator=generator) * 0.5)
     torch.save(model.state_dict(), folder / "model.pt")
     sha = _sha256(folder / "model.pt")
     files = {
@@ -327,6 +333,41 @@ def test_incompatible_dependency_version_is_rejected(package, no_model_built):
         load_package(package)
 
 
+def test_incompatible_minor_dependency_version_is_rejected(package, no_model_built):
+    deps = _json(package, "dependencies.json")
+    major, minor = deps["required"]["torch"].split(".")[:2]
+    deps["required"]["torch"] = f"{major}.{int(minor) + 1}.0"
+    _rewrite(package, "dependencies.json", deps)
+    with pytest.raises(PackageError, match=r"torch.*incompatible"):
+        load_package(package)
+
+
+def test_manifest_inventory_must_be_exactly_the_format_files(package, no_model_built):
+    manifest = _manifest(package)
+    manifest["files"]["notas.txt"] = manifest["files"].pop("smoke_card.json")
+    (package / MANIFEST_FILE).write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(PackageError, match=r"inventario.*notas\.txt.*smoke_card\.json"):
+        load_package(package)
+
+
+def test_output_different_from_the_reference_is_reported_and_fails_the_cli(package):
+    reference = _json(package, "reference_output.json")
+    reference["probabilities"] = dict.fromkeys(reference["probabilities"], 0.5)
+    _rewrite(package, "reference_output.json", reference)
+    check = load_package(package).check_reference()
+    assert check["matches"] is False
+    assert check["max_abs_diff"] > 1e-3
+    result = subprocess.run(
+        [sys.executable, "-m", "model_package", "predict", "--package", str(package)],
+        cwd=APP_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["reference"]["matches"] is False
+
+
 def test_missing_file_is_rejected_without_fallback(package, no_model_built):
     (package / "preprocessing.json").unlink()
     with pytest.raises(PackageError, match=r"falta preprocessing\.json"):
@@ -384,5 +425,6 @@ def test_build_never_overwrites_an_existing_package(checkpoint, built):
 
 
 def test_build_refuses_another_experiment(checkpoint, tmp_path):
-    with pytest.raises(PackageError, match="p3-cnn-classifier"):
+    with pytest.raises(PackageError, match="experimento 'otro', no de p3-cnn-classifier"):
         build_smoke_package(checkpoint, tmp_path / "out", run_id=RUN_ID, experiment="otro")
+    assert not (tmp_path / "out").exists()
