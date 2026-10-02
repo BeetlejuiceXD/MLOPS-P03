@@ -1,15 +1,16 @@
 {
   "contract": "annotation_queue_item",
   "valid": false,
-  "why": "Debe referenciar una imagen real del portal",
+  "why": "La sugerencia viene del modelo, no de una persona",
   "payload": {
     "queue_item_id": 3,
     "inference_id": 1,
+    "image_id": 42,
     "annotation_id": null,
     "status": "pending",
     "human_label": null,
     "suggestion": {
-      "source": "model",
+      "source": "human",
       "predicted_class": "dog",
       "probabilities": {
         "cat": 0.0587,

@@ -1,13 +1,14 @@
 {
   "contract": "annotation_queue_item",
   "valid": false,
-  "why": "Debe referenciar una imagen real del portal",
+  "why": "Enviar a anotación nunca crea una etiqueta humana",
   "payload": {
     "queue_item_id": 3,
     "inference_id": 1,
+    "image_id": 42,
     "annotation_id": null,
     "status": "pending",
-    "human_label": null,
+    "human_label": "dog",
     "suggestion": {
       "source": "model",
       "predicted_class": "dog",

@@ -1,11 +1,12 @@
 {
   "contract": "annotation_queue_item",
-  "valid": false,
-  "why": "Debe referenciar una imagen real del portal",
+  "valid": true,
+  "why": "Crop: referencia la imagen y la anotación de origen",
   "payload": {
-    "queue_item_id": 3,
-    "inference_id": 1,
-    "annotation_id": null,
+    "queue_item_id": 4,
+    "inference_id": 2,
+    "image_id": 42,
+    "annotation_id": 7,
     "status": "pending",
     "human_label": null,
     "suggestion": {

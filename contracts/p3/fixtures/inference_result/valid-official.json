@@ -1,7 +1,7 @@
 {
   "contract": "inference_result",
-  "valid": false,
-  "why": "Debe traer probabilidad para cada clase",
+  "valid": true,
+  "why": "Modelo official (D06-06): misma forma, con semver",
   "payload": {
     "inference_id": 1,
     "created_at": "2026-10-02T15:00:00.000Z",
@@ -16,13 +16,14 @@
     },
     "predicted_class": "dog",
     "probabilities": {
-      "dog": 1.0
+      "cat": 0.0587,
+      "dog": 0.9413
     },
     "model": {
-      "source": "smoke",
-      "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+      "source": "official",
+      "package_id": "p3-cnn-classifier-1.0.0",
       "format_version": "1.0.0",
-      "model_version": null,
+      "model_version": "1.0.0",
       "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
       "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97"
     },

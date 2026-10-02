@@ -1,0 +1,12 @@
+{
+  "contract": "inference_engine_prediction",
+  "valid": false,
+  "why": "El motor siempre dice con qué paquete predijo",
+  "payload": {
+    "predicted_class": "dog",
+    "probabilities": {
+      "cat": 0.0587,
+      "dog": 0.9413
+    }
+  }
+}
