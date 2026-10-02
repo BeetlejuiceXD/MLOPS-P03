@@ -272,9 +272,10 @@ describe('GET /models/local-test/:semver — integridad comprobada ahora', () =>
     expect((await getJson('/models/local-test/no-semver')).status).toBe(400);
   });
 
-  it('una versión official no se lee por la ruta local-test', async () => {
+  it('una versión official no se lee por la ruta local-test (ni detalle ni objeto)', async () => {
     await publish('official', '1.0.0');
     expect((await getJson('/models/local-test/1.0.0')).status).toBe(404);
+    expect((await getJson('/models/local-test/1.0.0/object')).status).toBe(404);
   });
 });
 
@@ -313,6 +314,24 @@ describe('GET /models/local-test/:semver/object — versión exacta', () => {
     await publish('local_test', '0.0.2');
     store.broken = true;
     expect((await getJson('/models/local-test/0.0.2/object')).status).toBe(503);
+  });
+
+  it('una versión failed con VersionId no se entrega: el error dice que está failed', async () => {
+    const service = registry('local_test');
+    await service.register({
+      semver: '0.0.4',
+      ...IDENTITY,
+      sha256: sha(PACKAGE),
+      size_bytes: PACKAGE.length,
+    });
+    await service.upload('0.0.4', PACKAGE);
+    store.objects.clear(); // el objeto desaparece antes de verify → failed object_missing
+    await service.verify('0.0.4');
+    const entry = await repo.find('local_test', '0.0.4');
+    expect(entry).toMatchObject({ status: 'failed', version_id: 'ver-1' });
+    const { status, body } = await getJson('/models/local-test/0.0.4/object');
+    expect(status).toBe(409);
+    expect(body.error).toMatch(/está failed/);
   });
 
   it('un borrador o una versión fallida no tienen objeto que entregar (409)', async () => {
