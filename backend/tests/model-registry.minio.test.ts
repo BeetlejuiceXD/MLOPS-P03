@@ -122,9 +122,12 @@ describe.skipIf(!enabled || phase !== 'write')('registro de modelos real — esc
       expect(overwrite.versionId).not.toBe(versionId);
       expect(await service.audit('0.0.1')).toEqual({ ok: true });
 
-      // 2. Hash incorrecto al subir: failed y ningún objeto en su clave.
+      // 2. Hash incorrecto al subir (mismo tamaño, un bit distinto): failed y ningún
+      //    objeto en su clave.
+      const flipped = Buffer.from(BODY);
+      flipped[1] = flipped[1] ^ 1;
       await service.register(identity('0.0.2'));
-      const wrong = await service.upload('0.0.2', OTHER);
+      const wrong = await service.upload('0.0.2', flipped);
       expect(wrong.failure?.reason).toBe('sha256_mismatch');
       expect(wrong.model.status).toBe('failed');
       await expect(client.statObject(bucket, wrong.model.s3_key)).rejects.toMatchObject({
