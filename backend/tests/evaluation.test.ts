@@ -481,7 +481,7 @@ describe('API de evaluación', () => {
 
     const evaluation = await get('/evaluation');
     expect(evaluation.status).toBe(200);
-    expect(await evaluation.json()).toEqual(SYNTHETIC.evaluation);
+    expect(await evaluation.json()).toEqual(official().evaluation);
 
     const json = await get('/evaluation/predictions');
     expect(json.status).toBe(200);

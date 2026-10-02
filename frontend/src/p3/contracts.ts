@@ -462,14 +462,33 @@ const evaluationBlockedSchema = z.strictObject({
   detail: z.string(),
 });
 
+// D05-05: `synthetic` = recorridos de prueba con predicciones conocidas; nunca se presenta
+// como evaluación oficial. `local_test` es del registro de modelos (D04-06), no de aquí.
+export const evaluationNamespaces = ["official", "synthetic"] as const;
+const evaluationNamespaceSchema = z.enum(evaluationNamespaces);
+
+const evaluationSelectionSchema = z.strictObject({
+  candidate_run_id: mlflowRunIdSchema,
+  metric: z.literal("val_accuracy"),
+  closed_at: timestampSchema,
+});
+
+// D05-05: selección cerrada, pero todavía no hay evaluación guardada en ese namespace
+// (resultado ausente; ni bloqueo ni fallo). Solo identidad de la selección, sin resultados.
+const evaluationPendingSchema = z.strictObject({
+  state: z.literal("pending"),
+  namespace: evaluationNamespaceSchema,
+  reason: z.literal("evaluation_missing"),
+  selection: evaluationSelectionSchema,
+  manifest_hash: sha256Schema,
+  detail: z.string(),
+});
+
 const evaluationReadySchema = z
   .strictObject({
     state: z.literal("ready"),
-    selection: z.strictObject({
-      candidate_run_id: mlflowRunIdSchema,
-      metric: z.literal("val_accuracy"),
-      closed_at: timestampSchema,
-    }),
+    namespace: evaluationNamespaceSchema,
+    selection: evaluationSelectionSchema,
     manifest_hash: sha256Schema,
     evaluated_at: timestampSchema,
     n_test: positiveInt,
@@ -547,6 +566,7 @@ const evaluationReadySchema = z
 
 export const evaluationResponseSchema = z.discriminatedUnion("state", [
   evaluationBlockedSchema,
+  evaluationPendingSchema,
   evaluationReadySchema,
 ]);
 export type EvaluationResponse = z.infer<typeof evaluationResponseSchema>;
@@ -557,7 +577,6 @@ export type EvaluationResponse = z.infer<typeof evaluationResponseSchema>;
 // recorridos de prueba, que nunca se sirven como evaluación oficial. El backend verifica
 // además `test_split_hash` contra los crop_id y la matriz contra `evaluation_response`.
 // ---------------------------------------------------------------------------
-export const evaluationNamespaces = ["official", "synthetic"] as const;
 
 const evaluationSampleSchema = z.strictObject({
   crop_id: positiveInt,

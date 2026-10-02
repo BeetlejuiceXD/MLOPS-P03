@@ -24,5 +24,7 @@ export const useExperimentRuns = () =>
   useValidatedFetch("/experiments/runs", experimentRunsResponseSchema, WITH_REASON);
 export const useExperimentRun = (runId: string) =>
   useValidatedFetch(`/experiments/runs/${runId}`, experimentRunDetailSchema, WITH_REASON);
-export const useEvaluation = () => useValidatedFetch("/evaluation", evaluationResponseSchema);
+// D05-05: el 503 de una evaluación incoherente o MariaDB caída trae el motivo; se muestra.
+export const useEvaluation = () =>
+  useValidatedFetch("/evaluation", evaluationResponseSchema, WITH_REASON);
 export const useModels = () => useValidatedFetch("/models", modelsResponseSchema);
