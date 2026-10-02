@@ -28,10 +28,14 @@ jobs:
       - name: Initialize and validate all roots
         shell: bash
         run: |
-          for root in environments/dev environments/prod bootstrap/github-oidc bootstrap/remote-state; do
+          for root in environments/dev environments/prod bootstrap/github-oidc bootstrap/remote-state p3-models; do
             terraform -chdir="terraform/$root" init -backend=false -input=false -lockfile=readonly
             terraform -chdir="terraform/$root" validate
           done
+      - name: Test the P3 models bucket and operational policy (mock provider, no AWS)
+        # D06-03: `terraform test` con provider simulado: versioning, SSE AES256, bloqueo
+        # público, DenyInsecureTransport, versiones conservadas y permiso de mínimo privilegio.
+        run: terraform -chdir="terraform/p3-models" test
 
   oidc:
     name: Verify AWS OIDC on main only

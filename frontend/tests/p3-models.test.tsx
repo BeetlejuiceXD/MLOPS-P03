@@ -48,6 +48,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("Models official (D06-03): identidad exacta del objeto y su tarjeta", () => {
+  it("cada versión official muestra bucket/key, VersionId y SHA-256 completos, y su tarjeta", async () => {
+    mockApi({
+      "/api/models": ok("models_response", "valid-published-and-draft"),
+      "/api/models/local-test": ok("local_test_models_response", "valid-empty"),
+    });
+    renderModels();
+    const row = await screen.findByTestId("official-row-1.0.0");
+    expect(row).toHaveTextContent(
+      "mlops-p2-prod-models-example/models/p3-cnn-classifier/1.0.0/model.pt"
+    );
+    expect(row).toHaveTextContent("3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY");
+    expect(row).toHaveTextContent("f".repeat(64));
+    expect(row).toHaveTextContent("models/p3-cnn-classifier/1.0.0/model_card.json");
+    expect(row).toHaveTextContent("aB3.cardVersionId-01");
+    expect(row).toHaveTextContent("Tarjeta verificada");
+    expect(screen.getByTestId("official-row-1.1.0")).toHaveTextContent("Sin tarjeta");
+  });
+});
+
 describe("Models: official y local_test separados", () => {
   it("las pruebas locales salen rotuladas aparte y nunca en la lista official", async () => {
     mockApi({

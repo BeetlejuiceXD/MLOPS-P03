@@ -15,7 +15,14 @@
         "version_id": null,
         "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "status": "published",
-        "published_at": "2026-09-29T18:00:00Z"
+        "published_at": "2026-09-29T18:00:00Z",
+        "model_card": {
+          "s3_key": "models/p3-cnn-classifier/1.0.0/model_card.json",
+          "version_id": "aB3.cardVersionId-01",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size_bytes": 2048,
+          "status": "published"
+        }
       }
     ]
   }
