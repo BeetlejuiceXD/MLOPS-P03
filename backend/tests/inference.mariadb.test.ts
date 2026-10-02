@@ -6,7 +6,7 @@
  * `DATABASE_URL` hacia una base desechable con las migraciones aplicadas (job de CI
  * "Jobs persistentes"). Datos sintéticos; ningún modelo real.
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 const enabled = process.env.P3_INFERENCE_MARIADB_TEST === '1';
 if (enabled && !process.env.DATABASE_URL) {
@@ -23,6 +23,11 @@ const SMOKE = {
 };
 
 describe.skipIf(!enabled)('p3_inference y p3_annotation_queue en MariaDB', () => {
+  afterAll(async () => {
+    const { pool } = await import('../src/data/db/client.js');
+    await pool.end();
+  });
+
   it('guarda la inferencia con su identidad, encola una sola vez y se relee tras reconectar', async () => {
     const { db, pool } = await import('../src/data/db/client.js');
     const { images } = await import('../src/data/db/schema.js');
@@ -122,7 +127,77 @@ describe.skipIf(!enabled)('p3_inference y p3_annotation_queue en MariaDB', () =>
         await pool.query('DELETE FROM p3_inference WHERE id = ?', [inferenceId]);
       }
       if (imageId !== undefined) await pool.query('DELETE FROM images WHERE id = ?', [imageId]);
-      await pool.end();
+    }
+  });
+
+  it('archivo nuevo a la cola: imagen y elemento en UNA transacción; si falla el elemento no queda la imagen', async () => {
+    const { pool } = await import('../src/data/db/client.js');
+    const { mariaDbInferenceRepository: repo } = await import(
+      '../src/logic/inference.repository.js'
+    );
+    const { DuplicateQueueItemError } = await import('../src/logic/inference.service.js');
+    const storageKey = `inference/mariadb-tx-${Date.now()}`;
+    const createdAt = new Date('2026-10-02T16:00:00.000Z');
+    const image = {
+      filename: 'sintetica-tx.png',
+      storageKey,
+      mimeType: 'image/png',
+      width: 32,
+      height: 32,
+      sizeBytes: 1234,
+    };
+    const countImages = async () => {
+      const [rows] = await pool.query('SELECT COUNT(*) AS n FROM images WHERE storage_key LIKE ?', [
+        `${storageKey}%`,
+      ]);
+      return Number((rows as { n: number }[])[0]?.n);
+    };
+    let inferenceId: number | undefined;
+    try {
+      inferenceId = await repo.insert({
+        created_at: createdAt,
+        input: {
+          kind: 'upload',
+          filename: 'sintetica-tx.png',
+          mime_type: 'image/png',
+          size_bytes: 1234,
+          width: 32,
+          height: 32,
+          sha256: 'd'.repeat(64),
+        },
+        storage_key: storageKey,
+        predicted_class: 'cat',
+        probabilities: { cat: 0.9, dog: 0.1 },
+        model: SMOKE,
+      });
+      const item = await repo.insertQueueItemWithNewImage(image, {
+        inference_id: inferenceId,
+        annotation_id: null,
+        created_at: createdAt,
+      });
+      expect(await countImages()).toBe(1);
+      const [status] = await pool.query('SELECT status FROM images WHERE id = ?', [item.image_id]);
+      expect((status as { status: string }[])[0]?.status).toBe('pending');
+
+      // Otra imagen válida (otra key), pero el elemento viola el índice único de la cola:
+      // la imagen que ya se había insertado dentro de la misma transacción se revierte.
+      await expect(
+        repo.insertQueueItemWithNewImage(
+          { ...image, storageKey: `${storageKey}-retry` },
+          {
+            inference_id: inferenceId,
+            annotation_id: null,
+            created_at: createdAt,
+          },
+        ),
+      ).rejects.toThrow(DuplicateQueueItemError);
+      expect(await countImages()).toBe(1);
+    } finally {
+      if (inferenceId !== undefined) {
+        await pool.query('DELETE FROM p3_annotation_queue WHERE inference_id = ?', [inferenceId]);
+        await pool.query('DELETE FROM p3_inference WHERE id = ?', [inferenceId]);
+      }
+      await pool.query('DELETE FROM images WHERE storage_key LIKE ?', [`${storageKey}%`]);
     }
   });
 });

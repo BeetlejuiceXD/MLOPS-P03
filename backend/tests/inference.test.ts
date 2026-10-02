@@ -83,6 +83,11 @@ class MemoryRepo implements InferenceRepository {
   queue: QueueRecord[] = [];
   failInsert = false;
   failQueueInsert = false;
+  /** MariaDB caída para lecturas: cualquier select falla con el mensaje de drizzle. */
+  failReads = false;
+  private readFails() {
+    if (this.failReads) throw new Error('Failed query: select * from `p3_inference`\nparams: 1');
+  }
   async insert(record: NewInference) {
     if (this.failInsert) {
       throw new Error(
@@ -94,12 +99,15 @@ class MemoryRepo implements InferenceRepository {
     return id;
   }
   async find(id: number) {
+    this.readFails();
     return this.inferences.find((row) => row.id === id) ?? null;
   }
   async list(limit: number) {
+    this.readFails();
     return [...this.inferences].reverse().slice(0, limit);
   }
   async findQueueItem(inferenceId: number) {
+    this.readFails();
     return this.queue.find((row) => row.inference_id === inferenceId) ?? null;
   }
   async insertQueueItem(item: Omit<QueueRecord, 'id'>) {
@@ -109,6 +117,7 @@ class MemoryRepo implements InferenceRepository {
     return record;
   }
   async listQueue() {
+    this.readFails();
     return [...this.queue].reverse();
   }
 }
@@ -120,6 +129,10 @@ class MemoryImages implements PortalImages {
   createdImages: number[] = [];
   deletedImages: number[] = [];
   createdAnnotations = 0;
+  /** La limpieza compensatoria también falla (MariaDB caída a la mitad). */
+  failDelete = false;
+  /** MariaDB/MinIO caídos para las lecturas del portal. */
+  failReads = false;
   private seq = 100;
   async storeInput(bytes: Buffer) {
     const key = `inference/${this.objects.size + 1}`;
@@ -130,6 +143,7 @@ class MemoryImages implements PortalImages {
     this.objects.delete(key);
   }
   async findAnnotation(id: number) {
+    if (this.failReads) throw new Error('Failed query: select * from `annotations`');
     const found = this.annotations.get(id);
     return found ? { annotation_id: id, ...found } : null;
   }
@@ -140,6 +154,7 @@ class MemoryImages implements PortalImages {
     return { bytes, mimeType: image.mimeType };
   }
   async imageExists(imageId: number) {
+    if (this.failReads) throw new Error('Failed query: select * from `images`');
     return this.images.has(imageId);
   }
   async createPendingImage(image: { storageKey: string; mimeType: string }) {
@@ -149,6 +164,7 @@ class MemoryImages implements PortalImages {
     return id;
   }
   async deleteImageRow(id: number) {
+    if (this.failDelete) throw new Error('connect ECONNREFUSED mariadb:3306');
     this.images.delete(id);
     this.deletedImages.push(id);
   }
@@ -467,6 +483,45 @@ describe('POST /inference/:id/annotation-queue', () => {
     repo.failQueueInsert = false;
     expect((await enqueue(1)).status).toBe(201);
     expect(repo.queue).toHaveLength(1);
+  });
+
+  it('MariaDB cae entre crear la imagen y el elemento: no queda imagen pending ni elemento', async () => {
+    await postFile(await png(30, 20), 'image/png');
+    const before = images.images.size;
+    repo.failQueueInsert = true;
+    images.failDelete = true; // tampoco funcionaría una limpieza compensatoria
+    const failed = await enqueue(1);
+    expect(failed.status).toBe(503);
+    expect((await failed.json()).error).not.toMatch(/ECONNREFUSED|Failed query/);
+    expect(images.images.size).toBe(before);
+    expect([...images.images.values()].filter((image) => image.status === 'pending')).toEqual([]);
+    expect(repo.queue).toHaveLength(0);
+  });
+
+  it('lecturas con MariaDB caída → 503 sin detalle interno, nunca 500', async () => {
+    await postFile(await png(30, 20), 'image/png');
+    repo.failReads = true;
+    for (const [method, path] of [
+      ['GET', '/inference'],
+      ['GET', '/inference/1'],
+      ['GET', '/inference/annotation-queue'],
+      ['POST', '/inference/1/annotation-queue'],
+    ] as const) {
+      const res = await fetch(`${base}${path}`, { method });
+      expect(res.status, `${method} ${path}`).toBe(503);
+      expect((await res.json()).error).not.toMatch(/Failed query|params|select/);
+    }
+    expect(repo.queue).toHaveLength(0);
+  });
+
+  it('crop con la base del portal caída → 503 sin detalle; no se guarda inferencia', async () => {
+    await portalImageWithBox();
+    images.failReads = true;
+    const res = await postCrop(7);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).not.toMatch(/Failed query|select/);
+    expect(repo.inferences).toHaveLength(0);
+    expect(engine.calls).toHaveLength(0);
   });
 
   it('GET /inference/annotation-queue lista los elementos persistidos', async () => {
