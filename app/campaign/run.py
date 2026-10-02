@@ -65,6 +65,7 @@ def _run_details(tracking_uri: str, run_id: str) -> dict:
         "device": run.data.tags.get("device"),
         "git_commit": run.data.tags.get("git_commit"),
         "start_time": run.info.start_time,
+        "run_kind": run.data.tags.get("p3.run_kind"),
     }
 
 
@@ -165,8 +166,11 @@ def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
         problems.append(f"request.task={request.get('task')!r}, se esperaba 'training'")
     if job.get("task") != "training":
         problems.append(f"job.task={job.get('task')!r}, se esperaba 'training'")
-    if succeeded and report.get("tags", {}).get("p3.run_kind") != "training":
-        problems.append("tag p3.run_kind del run no es 'training'")
+    # p3.run_kind NO se valida aquí: `verify_smoke` (D03-04) ya lo compara
+    # contra los tags reales (sin filtrar) y deja el problema en
+    # report["problems"] si no coincide — report["tags"] solo incluye
+    # REQUIRED_TAGS, que no incluye p3.run_kind, así que comparar contra
+    # ese diccionario filtrado siempre fallaría sin decir nada real.
     if succeeded and report.get("tags", {}).get("job_id") != str(job.get("id")):
         tag_job_id = report.get("tags", {}).get("job_id")
         problems.append(f"tag job_id del run ({tag_job_id!r}) != job.id ({job.get('id')!r})")
@@ -338,7 +342,7 @@ def summarize(results: list[dict]) -> dict:
                     "peak_memory_mb": details.get("peak_memory_mb"),
                     "device": details.get("device"),
                     "git_commit": details.get("git_commit"),
-                    "run_kind": (chosen.get("report") or {}).get("tags", {}).get("p3.run_kind"),
+                    "run_kind": details.get("run_kind"),
                 },
             }
         )

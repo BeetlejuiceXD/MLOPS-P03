@@ -61,6 +61,7 @@ def _ok(
             "peak_memory_mb": 512.0,
             "device": "cpu",
             "git_commit": "abc123",
+            "run_kind": "training",
         },
     }
 
@@ -386,9 +387,14 @@ def test_job_id_mismatch_versus_run_tag_invalidates_the_row():
     assert any("tag job_id" in p for p in row_1["problems"])
 
 
-def test_run_kind_tag_other_than_training_invalidates_the_row():
-    wrong_kind = _ok(1, run_id="run-1")
-    wrong_kind["report"]["tags"] = {"p3.run_kind": "controlled_task"}
+def test_run_kind_mismatch_reported_by_verify_smoke_invalidates_the_row():
+    # p3.run_kind lo valida `verify_smoke` (D03-04) contra los tags reales
+    # sin filtrar, no `campaign.run` — así que un run_kind incorrecto llega
+    # aquí como un problema ya puesto en report["problems"], no como un tag
+    # que campaign.run reinterprete.
+    wrong_kind = _failed(
+        1, ["tag p3.run_kind='controlled_task' no corresponde al job ('training')"]
+    )
 
     results = [wrong_kind] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
