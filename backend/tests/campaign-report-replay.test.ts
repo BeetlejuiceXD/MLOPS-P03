@@ -1,7 +1,8 @@
 /**
  * D05-02 sobre la evidencia REAL de D04-03 (`reports/campaign_p3.json`, PR #82) y el
- * manifest congelado (`reports/manifest_p3.json`). Solo métricas de validation: el reporte
- * no trae ni puede traer el frozen test.
+ * manifest congelado (`reports/manifest_p3.json`), contrastada con la respuesta de la API
+ * sobre el MLflow real (`reports/selection_p3/`). Solo métricas de validation: ninguno de
+ * estos archivos trae ni puede traer el frozen test.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,10 +13,12 @@ const REPORTS = path.resolve('../reports');
 const read = (name: string) => JSON.parse(fs.readFileSync(path.join(REPORTS, name), 'utf8'));
 const evidence = (): CampaignReport => read('campaign_p3.json');
 const manifest = () => read('manifest_p3.json');
+const api = (name: string) => read(`selection_p3/${name}`);
 
-// Inventario conciliado por D04-07 (#76): fila → job → run del representante.
+// Inventario de D04-07 (#76), filas 2–12: fila → job → run del representante. La fila 1
+// tiene varios intentos con la misma config; su representante es el de menor start_time
+// entre los que trae el reporte (ver el test de la fila 1).
 const INVENTORY: [number, number, string][] = [
-  [1, 3, 'd7965d2980a645f8b3ec74613ddd66a0'],
   [2, 6, 'a09c7b6e5102491f9dfc2391b88bb9b8'],
   [3, 7, '2d56233c886142b7824e1551b90e8327'],
   [4, 8, '379b553913254241a2efece3ed451d2d'],
@@ -33,7 +36,7 @@ describe('D05-02 · expediente sobre la campaña real de D04-03', () => {
   const result = replayCampaignReport(evidence(), manifest());
 
   it('concilia las 12 filas con el inventario de D04-07 y deja la campaña lista', () => {
-    expect(result.attempts).toBe(13);
+    expect(result.attempts).toBe(evidence().results.length);
     expect(result.accepted_rows).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(result.close_blockers).toEqual([]);
     expect(result.unattributed).toEqual([]);
@@ -51,13 +54,54 @@ describe('D05-02 · expediente sobre la campaña real de D04-03', () => {
     }
   });
 
-  it('fila 1: el job 5 es retry posterior y no agrega configuración', () => {
+  it('fila 1: representa el intento más temprano; los demás son retry y no agregan filas', () => {
+    const reported = evidence()
+      .results.filter((attempt) => attempt.row === 1)
+      .sort((a, b) => a.details.start_time - b.details.start_time);
+    expect(reported.length).toBeGreaterThan(1);
     const attempts = result.rows.find((entry) => entry.row === 1)?.attempts ?? [];
-    expect(attempts.map((a) => [a.job_id, a.role])).toEqual([
-      [3, 'representative'],
+    expect(attempts.map((a) => [a.run_id, a.role])).toEqual(
+      reported.map((attempt, i) => [attempt.report.run_id, i === 0 ? 'representative' : 'retry']),
+    );
+    expect(result.ranking.filter((entry) => entry.campaign_row === 1)).toHaveLength(1);
+  });
+
+  it('coincide con GET /selection/campaign y la propuesta sobre el MLflow real', () => {
+    const dossier = api('2-expediente.json');
+    const proposal = api('3-propuesta.json');
+    expect(dossier).toMatchObject({
+      ready_to_close: true,
+      close_blockers: [],
+      unattributed: [],
+      matches_proposal: true,
+      accepted_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    });
+    expect(dossier.reference).toEqual(result.reference);
+    expect(proposal.status).toBe('candidate');
+    expect(proposal.outcome_hash).toBe(dossier.outcome_hash);
+    // Misma decisión: candidato con identidad completa y mismo orden y métricas por fila.
+    expect(dossier.candidate).toEqual(result.candidate);
+    expect(proposal.candidate.run_id).toBe(result.candidate?.run_id);
+    const byRow = (ranking: { campaign_row: number; val_accuracy: number }[]) =>
+      ranking.map(({ campaign_row, val_accuracy }) => [campaign_row, val_accuracy]);
+    expect(byRow(dossier.ranking)).toEqual(byRow(result.ranking));
+    // La API ve los 5 intentos de la fila 1 y elige el más temprano (job 1).
+    const row1 = dossier.rows.find((entry: { row: number }) => entry.row === 1);
+    expect(row1.attempts.map((a: { job_id: number; role: string }) => [a.job_id, a.role])).toEqual([
+      [1, 'representative'],
+      [2, 'retry'],
+      [3, 'retry'],
+      [4, 'retry'],
       [5, 'retry'],
     ]);
-    expect(result.ranking.filter((entry) => entry.campaign_row === 1)).toHaveLength(1);
+  });
+
+  it('con la selección en candidate el test sigue bloqueado', () => {
+    expect(api('4-estado-final.json')).toMatchObject({ status: 'candidate', closed_at: null });
+    expect(api('5-evaluation.json')).toMatchObject({
+      state: 'blocked',
+      reason: 'model_selection_open',
+    });
   });
 
   it('ranking validation-only: empate a 4 decimales en accuracy y F1 lo decide el val_loss', () => {
