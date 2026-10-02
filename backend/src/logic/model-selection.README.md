@@ -113,11 +113,30 @@ fila esté.
 Si alguna fuente cae o no cumple su contrato, la operación responde **503** con el
 motivo y no escribe nada.
 
+## Recálculo desde la evidencia de D04-03
+
+`src/cli/replay-campaign-report.ts` pasa `reports/campaign_p3.json` (PR #82) por el
+mismo expediente y la misma selección, con la referencia del manifest congelado
+(`reports/manifest_p3.json`). No lee MLflow ni el test y no escribe estado. Sirve para
+reproducir la propuesta desde los IDs y hashes entregados y para contrastarla con
+`GET /selection/campaign` sobre el MLflow real: deben coincidir el ranking y el
+candidato. El `outcome_hash` también cubre los runs excluidos (smoke, short-run), que no
+están en el reporte, así que solo coincide si MLflow no tiene ninguno.
+
+```bash
+cd backend
+npx tsx src/cli/replay-campaign-report.ts   # sale con 1 si la campaña no está lista
+```
+
+El reporte no trae las curvas por época, así que `history` se rellena con las métricas
+del mejor checkpoint. Eso no interviene en la selección, que usa el `summary`.
+`tests/campaign-report-replay.test.ts` fija el resultado sobre la evidencia real.
+
 ## Tests y mutation testing
 
 ```bash
 cd backend
-npx vitest run tests/model-selection.test.ts tests/campaign-dossier.test.ts
+npx vitest run tests/model-selection.test.ts tests/campaign-dossier.test.ts tests/campaign-report-replay.test.ts
 # Persistencia real (solo contra una MariaDB desechable con migraciones; la corre CI):
 P3_SELECTION_MARIADB_TEST=1 DATABASE_URL=mysql://... npx vitest run tests/model-selection.mariadb.test.ts
 cd .. && python .github/scripts/run_model_selection_mutations.py   # copia aislada
