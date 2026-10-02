@@ -158,7 +158,11 @@ describe("estados bloqueados", () => {
 
 describe("errores y respuestas incompatibles", () => {
   it("un error HTTP muestra el estado de error con reintento", async () => {
-    mockApi({ "/api/models": { status: 500, body: { error: "Fallo interno." } } });
+    mockApi({
+      "/api/models": { status: 500, body: { error: "Fallo interno." } },
+      // D05-06: Models también pide el registro local_test; aquí responde bien.
+      "/api/models/local-test": ok("local_test_models_response", "valid-empty"),
+    });
     renderAt("/ml/models");
     expect(await screen.findByText("El servidor respondió con estado 500.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();

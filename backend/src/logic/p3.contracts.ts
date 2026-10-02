@@ -663,6 +663,84 @@ export type ModelVersion = z.infer<typeof modelVersionSchema>;
 
 export const modelsResponseSchema = z.strictObject({ models: z.array(modelVersionSchema) });
 
+// D05-06: registro `local_test` (MinIO) que muestra Models aparte de `official`. Mismos campos
+// que model_version más namespace, tamaño y motivo de fallo; nunca una publicación AWS.
+const registryFailureReasons = [
+  'sha256_mismatch',
+  'size_mismatch',
+  'object_missing',
+  'version_id_missing',
+  'version_mismatch',
+] as const;
+export const localTestModelSchema = z
+  .strictObject({
+    namespace: z.literal('local_test'),
+    semver: modelSemverSchema,
+    mlflow_run_id: mlflowRunIdSchema,
+    manifest_hash: sha256Schema,
+    dvc_release: datasetVersionSchema,
+    dvc_release_hash: sha256Schema,
+    s3_bucket: z.string().min(3),
+    s3_key: z.string().min(1),
+    version_id: z.string().min(1).nullable(),
+    sha256: sha256Schema,
+    size_bytes: positiveInt,
+    status: z.enum(['draft', 'published', 'failed']),
+    published_at: timestampSchema.nullable(),
+    failure_reason: z.enum(registryFailureReasons).nullable(),
+    failure_detail: z.string().min(1).nullable(),
+  })
+  .superRefine((model, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: 'custom', path: [path], message });
+    if (!model.s3_key.startsWith(`models/${P3_EXPERIMENT}/${model.semver}/`)) {
+      issue('s3_key', `s3_key debe estar bajo models/${P3_EXPERIMENT}/<semver>/`);
+    }
+    if (
+      model.status === 'published' &&
+      (model.version_id === null || model.published_at === null)
+    ) {
+      issue('status', 'published exige VersionId y published_at (objeto verificado)');
+    }
+    if (model.status !== 'published' && model.published_at !== null) {
+      issue('published_at', 'Solo una versión publicada tiene published_at');
+    }
+    if ((model.status === 'failed') !== (model.failure_reason !== null)) {
+      issue('failure_reason', 'failed ⇔ motivo de fallo');
+    }
+    if ((model.failure_reason === null) !== (model.failure_detail === null)) {
+      issue('failure_detail', 'El motivo de fallo va con su detalle');
+    }
+  });
+export type LocalTestModel = z.infer<typeof localTestModelSchema>;
+
+export const localTestModelsResponseSchema = z.strictObject({
+  namespace: z.literal('local_test'),
+  models: z.array(localTestModelSchema),
+});
+
+/** Integridad comprobada AHORA (head + get por VersionId); no cambia el registro. */
+export const localTestModelDetailSchema = z
+  .strictObject({
+    model: localTestModelSchema,
+    integrity: z
+      .strictObject({
+        checked_at: timestampSchema,
+        ok: z.boolean(),
+        reason: z.enum(registryFailureReasons).nullable(),
+        detail: z.string().min(1).nullable(),
+      })
+      .refine((i) => i.ok === (i.reason === null) && (i.reason === null) === (i.detail === null), {
+        message: 'ok ⇔ sin motivo; un motivo va con su detalle',
+      })
+      .nullable(),
+  })
+  .refine((d) => (d.integrity !== null) === (d.model.status === 'published'), {
+    message: 'Solo una versión published se audita',
+    path: ['integrity'],
+  });
+export type LocalTestModelDetail = z.infer<typeof localTestModelDetailSchema>;
+
 // ---------------------------------------------------------------------------
 // Inferencia y cola de anotación.
 // ---------------------------------------------------------------------------
@@ -711,6 +789,8 @@ export const P3_CONTRACTS = {
   evaluation_response: evaluationResponseSchema,
   evaluation_predictions: evaluationPredictionsSchema,
   models_response: modelsResponseSchema,
+  local_test_models_response: localTestModelsResponseSchema,
+  local_test_model_detail: localTestModelDetailSchema,
   inference_result: inferenceResultSchema,
   annotation_queue_item: annotationQueueItemSchema,
   api_error: apiErrorSchema,
@@ -731,6 +811,9 @@ export const P3_ENDPOINTS = {
   getEvaluation: 'GET /api/evaluation',
   exportEvaluationPredictions: 'GET /api/evaluation/predictions',
   listModels: 'GET /api/models',
+  listLocalTestModels: 'GET /api/models/local-test',
+  getLocalTestModel: 'GET /api/models/local-test/:semver',
+  getLocalTestModelObject: 'GET /api/models/local-test/:semver/object',
   publishModel: 'POST /api/models/:semver/publish',
   runInference: 'POST /api/inference',
   sendToAnnotationQueue: 'POST /api/inference/:id/annotation-queue',

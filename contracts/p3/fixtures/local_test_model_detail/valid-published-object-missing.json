@@ -1,0 +1,30 @@
+{
+  "contract": "local_test_model_detail",
+  "valid": true,
+  "why": "El registro sigue published, pero la comprobación actual dice que el objeto ya no está (sin cambiar el registro)",
+  "payload": {
+    "model": {
+      "namespace": "local_test",
+      "semver": "0.0.1",
+      "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+      "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+      "dvc_release": "v0.1.1",
+      "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+      "s3_bucket": "p3-models-local",
+      "s3_key": "models/p3-cnn-classifier/0.0.1/model.pt",
+      "version_id": "6f3c2e1a-0d4b-4c1e-9a77-2b5f1c0e8d11",
+      "sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
+      "size_bytes": 44781003,
+      "status": "published",
+      "published_at": "2026-10-02T05:00:00Z",
+      "failure_reason": null,
+      "failure_detail": null
+    },
+    "integrity": {
+      "checked_at": "2026-10-02T05:10:00Z",
+      "ok": false,
+      "reason": "object_missing",
+      "detail": "No existe p3-models-local/models/p3-cnn-classifier/0.0.1/model.pt@6f3c…"
+    }
+  }
+}
