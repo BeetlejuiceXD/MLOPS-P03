@@ -84,7 +84,11 @@ class MemoryRepo implements InferenceRepository {
   failInsert = false;
   failQueueInsert = false;
   async insert(record: NewInference) {
-    if (this.failInsert) throw new Error("ER_NO_SUCH_TABLE: Table 'p3_inference' doesn't exist");
+    if (this.failInsert) {
+      throw new Error(
+        'Failed query: insert into `p3_inference` (`input`) values (?)\nparams: gato.jpg',
+      );
+    }
     const id = this.inferences.length + 1;
     this.inferences.push({ ...record, id });
     return id;
@@ -331,7 +335,10 @@ describe('POST /inference con un archivo nuevo', () => {
     repo.failInsert = true;
     const res = await postFile(await png(16, 16), 'image/png');
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toMatch(/no se pudo guardar la inferencia/i);
+    const { error } = await res.json();
+    expect(error).toMatch(/no se pudo guardar la inferencia/i);
+    // El motivo interno (SQL y parámetros) no sale de la API.
+    expect(error).not.toMatch(/Failed query|insert into|params|gato\.jpg/);
     expect(images.objects.size).toBe(0);
   });
 });
@@ -452,7 +459,9 @@ describe('POST /inference/:id/annotation-queue', () => {
     repo.failQueueInsert = true;
     const failed = await enqueue(1);
     expect(failed.status).toBe(503);
-    expect((await failed.json()).error).toMatch(/no se pudo guardar el elemento de la cola/i);
+    const { error } = await failed.json();
+    expect(error).toMatch(/no se pudo guardar el elemento de la cola/i);
+    expect(error).not.toMatch(/ECONNREFUSED|mariadb:3306/);
     expect(images.deletedImages).toEqual(images.createdImages);
     expect(repo.queue).toHaveLength(0);
     repo.failQueueInsert = false;
