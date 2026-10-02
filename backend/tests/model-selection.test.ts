@@ -303,18 +303,18 @@ describe('solo runs válidos y comparables', () => {
     expect(reasonOf(outcome, 'a')).toBe('not_finished');
   });
 
-  it.each([
-    'RUNNING',
-    'SCHEDULED',
-  ] as const)('un intento %s de la matriz impide cerrar el conteo, aunque haya 12 filas', (status) => {
-    // D05-02: con intentos pendientes no se cierra el conteo ni se propone ganador final.
-    const running = makeRun({ id: '0', row: 1, status, start: '2026-10-01T08:00:00Z' });
-    const outcome = selectCandidate([...campaign(), running], REFERENCE);
-    expect(outcome.campaign_rows).toHaveLength(12);
-    expect(outcome.candidate?.run_id).toBe(runId('c'));
-    expect(outcome.ready_to_close).toBe(false);
-    expect(reasonOf(outcome, '0')).toBe('not_finished');
-  });
+  it.each(['RUNNING', 'SCHEDULED'] as const)(
+    'un intento %s de la matriz impide cerrar el conteo, aunque haya 12 filas',
+    (status) => {
+      // D05-02: con intentos pendientes no se cierra el conteo ni se propone ganador final.
+      const running = makeRun({ id: '0', row: 1, status, start: '2026-10-01T08:00:00Z' });
+      const outcome = selectCandidate([...campaign(), running], REFERENCE);
+      expect(outcome.campaign_rows).toHaveLength(12);
+      expect(outcome.candidate?.run_id).toBe(runId('c'));
+      expect(outcome.ready_to_close).toBe(false);
+      expect(reasonOf(outcome, '0')).toBe('not_finished');
+    },
+  );
 
   it('un run en curso fuera de la matriz (p. ej. un smoke) no bloquea el cierre', () => {
     const smoke = makeRun({ id: '0', row: 1, status: 'RUNNING', config: { max_epochs: 10 } });
