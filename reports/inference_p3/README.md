@@ -52,13 +52,33 @@ anotaciones, 422 originales solo de train).
 | `17-neg-tamano.json` | Archivo de 6 MiB | 413 | Excede el tamaño máximo |
 | `18-neg-anotacion-inexistente.json` | `{annotation_id: 999999999}` | 404 | La anotación no existe |
 | `19-neg-motor-caido.json`, `20-engine-motor-caido.json` | Con `inference-engine` detenido | 503 | Motor de inferencia (D05-04) no disponible |
-| `21b-neg-mariadb-caida.json` | Con MariaDB detenida y el motor listo | 503 | No se guardó la inferencia (ver nota) |
+| `mariadb-caida/` | Con MariaDB **realmente detenida** (código `ee674df`), ver abajo | 503 | Sin SQL ni detalle interno; nada parcial |
 
-`14b-lista-antes.json` y `22b-lista-despues.json`: 2 inferencias antes y después de la
-prueba con MariaDB caída. `23b-cola-final.json`: siguen 2 elementos en la cola.
+`14b-lista-antes.json`, `22b-lista-despues.json` y `23b-cola-final.json`: estado antes y
+después de los negativos anteriores (2 inferencias, 2 elementos).
 
-**Nota sobre `21b`:** esa respuesta, capturada antes de la corrección, traía la consulta SQL
-de drizzle. Desde `582a060` el 503 dice solo que la base no está disponible y que no se
-guardó nada; la consulta va únicamente al log del servidor
-(`backend/tests/inference.test.ts`). En la base nunca se guardó nada a medias y la imagen
-subida se borró.
+## MariaDB caída con el código corregido (`mariadb-caida/`)
+
+Corrida con el backend en `ee674df` (cola atómica en una transacción y guarda de 503). Se
+crea la inferencia 4 con la base arriba (`00-predict-archivo.json`), se toma el estado,
+se **detiene MariaDB** (`docker compose stop mariadb`), se repiten las operaciones y se vuelve
+a tomar el estado con la base arriba:
+
+| Archivo | Request con MariaDB detenida | HTTP | Respuesta |
+|---|---|---|---|
+| `04-neg-predict-mariadb-caida.json` | `POST /api/inference` (archivo) | 503 | No se pudo guardar la inferencia: la base de datos no está disponible. No se guardó nada. |
+| `05-neg-cola-mariadb-caida.json` | `POST /api/inference/4/annotation-queue` | 503 | No se pudo leer la inferencia: la base de datos o el almacenamiento no están disponibles. |
+| `06-neg-lista-mariadb-caida.json` | `GET /api/inference` | 503 | No se pudo leer las inferencias: … |
+| `07-neg-cola-lectura-mariadb-caida.json` | `GET /api/inference/annotation-queue` | 503 | No se pudo leer la cola de anotación: … |
+
+Ninguna respuesta contiene SQL, parámetros ni host. Antes (`01`–`03`) y después (`08`–`10`),
+las respuestas son **idénticas**: 4 inferencias, 3 elementos en la cola y una sola imagen
+`pending` (la #2). `11-inferencia-sin-elemento.json`: la inferencia 4 sigue sin elemento
+(`annotation_queue_item_id: null`). No quedó nada parcial.
+
+La respuesta anterior a la corrección (que traía la consulta SQL) se quitó del repo.
+
+La atomicidad del envío de un archivo a la cola (imagen pending + elemento en una sola
+transacción) también se prueba contra MariaDB real en `backend/tests/inference.mariadb.test.ts`:
+si el elemento viola el índice único, la imagen insertada en la misma transacción se
+revierte. Si esos inserts se sacan de la transacción, el test falla.
