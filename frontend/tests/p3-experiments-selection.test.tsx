@@ -218,6 +218,16 @@ describe("Experiments con la selección", () => {
     expect(screen.getAllByText("Candidato propuesto")).toHaveLength(1);
   });
 
+  it("el panel muestra el job del candidato, tomado de su run de MLflow", async () => {
+    const runs = campaignRuns();
+    const candidateRun = runs.runs.find((r) => r.run_id === CANDIDATE.candidate?.run_id);
+    (candidateRun as ExperimentRun).tags.job_id = 7;
+    mockApi({ "/api/experiments/runs": { body: runs }, "/api/selection": { body: CANDIDATE } });
+    renderExperiments();
+    const panel = await screen.findByTestId("experiments-selection");
+    expect(panel).toHaveTextContent(`fila OFAT ${CANDIDATE.candidate?.campaign_row} · job 7 ·`);
+  });
+
   it("los auxiliares y el training fuera de la campaña no suman a las filas aceptadas", async () => {
     mockApi({
       "/api/experiments/runs": { body: campaignRuns() },
