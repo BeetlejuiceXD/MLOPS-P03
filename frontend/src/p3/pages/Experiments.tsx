@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { PageHeader } from "@/pipeline/components/PageHeader";
-import { useExperimentRuns, useSelection } from "../api";
+import { useCampaignDossier, useExperimentRuns, useSelection } from "../api";
 import { FetchBoundary } from "../components/FetchBoundary";
 import { StatePanel } from "../components/StatePanel";
 import type { ExcludedRun, ExperimentRun, SelectionState } from "../contracts";
 import {
   ALL,
+  acceptedCounts,
   campaignCounts,
   type EligibilityFilter,
   EMPTY_FILTERS,
@@ -17,7 +18,13 @@ import { CompareRuns } from "../experiments/CompareRuns";
 import { RunDetail } from "../experiments/RunDetail";
 import { SelectionPanel } from "../experiments/SelectionPanel";
 import { dateTime, percent, shortHash } from "../format";
-import { campaignRows, selectionCrossCheck } from "../selection";
+import {
+  type AttemptMark,
+  attemptLabel,
+  attemptMarks,
+  campaignRows,
+  selectionCrossCheck,
+} from "../selection";
 
 const selectClass =
   "rounded-lg border border-border bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40";
@@ -31,6 +38,7 @@ const selectClass =
 export function ExperimentsPage() {
   const runs = useExperimentRuns();
   const selection = useSelection();
+  const dossier = useCampaignDossier();
   const [filters, setFilters] = useState<RunFilters>(EMPTY_FILTERS);
   const [compared, setCompared] = useState<string[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -54,6 +62,7 @@ export function ExperimentsPage() {
           onClick={() => {
             runs.reload();
             selection.reload();
+            dossier.reload();
             setRefreshKey((key) => key + 1);
           }}
         >
@@ -62,11 +71,13 @@ export function ExperimentsPage() {
       </div>
       <FetchBoundary results={[runs]}>
         {(data) => {
-          const counts = campaignCounts(data);
           const marks = selectionMarks(
             data.runs,
-            selection.status === "success" ? selection.data : null
+            selection.status === "success" ? selection.data : null,
+            dossier.status === "success" ? dossier.data : null
           );
+          const counts = campaignCounts(data);
+          const accepted = acceptedCounts(data.runs, marks.accepted);
           const shown = filterRuns(data.runs, filters, marks.accepted);
           const selected = compared
             .map((id) => data.runs.find((run) => run.run_id === id))
@@ -78,7 +89,18 @@ export function ExperimentsPage() {
                 className="flex flex-wrap gap-x-6 gap-y-1 rounded-2xl border border-border bg-surface px-5 py-3 text-sm"
               >
                 <span>Runs de training: {counts.training}</span>
-                <span>Elegibles para campaña: {counts.eligible}</span>
+                {accepted === null ? (
+                  <span>Elegibles para campaña: {counts.eligible}</span>
+                ) : (
+                  <>
+                    <span>
+                      Cuentan para la campaña (filas aceptadas por D05-02): {accepted.accepted}
+                    </span>
+                    <span className="text-ink-muted">
+                      Reintentos y no aceptados: {accepted.notAccepted} (no cuentan)
+                    </span>
+                  </>
+                )}
                 <span className="text-ink-muted">
                   Auxiliares y excluidos: {counts.excluded} (no cuentan para la campaña)
                 </span>
@@ -347,6 +369,7 @@ function ExcludedRuns({ excluded }: Readonly<{ excluded: readonly ExcludedRun[] 
 
 type SelectionMarks = {
   accepted: ReadonlySet<string>;
+  attempts: ReadonlyMap<string, AttemptMark>;
   rows: ReadonlyMap<string, number>;
   candidateId: string | null;
   candidateLabel: string;
@@ -354,6 +377,7 @@ type SelectionMarks = {
 
 const NO_MARKS: SelectionMarks = {
   accepted: new Set(),
+  attempts: new Map(),
   rows: new Map(),
   candidateId: null,
   candidateLabel: "",
@@ -365,13 +389,15 @@ const NO_MARKS: SelectionMarks = {
  */
 function selectionMarks(
   runs: readonly ExperimentRun[],
-  selection: SelectionState | null
+  selection: SelectionState | null,
+  dossier: Parameters<typeof attemptMarks>[0]
 ): SelectionMarks {
   if (selection === null || selection.candidate === null) return NO_MARKS;
   if (selectionCrossCheck(runs, selection).problems.length > 0) return NO_MARKS;
   const rows = campaignRows(selection);
   return {
     accepted: new Set(rows.keys()),
+    attempts: attemptMarks(dossier),
     rows,
     candidateId: selection.candidate.run_id,
     candidateLabel:
@@ -381,7 +407,16 @@ function selectionMarks(
 
 function SelectionBadges({ runId, marks }: Readonly<{ runId: string; marks: SelectionMarks }>) {
   const row = marks.rows.get(runId);
-  if (row === undefined) return null;
+  if (row === undefined) {
+    if (marks.accepted.size === 0) return null;
+    return (
+      <span className="mt-1 flex flex-wrap gap-1">
+        <span className="rounded-full bg-status-pending-soft px-2 py-0.5 text-status-pending">
+          {attemptLabel(marks.attempts.get(runId))}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="mt-1 flex flex-wrap gap-1">
       <span className="rounded-full bg-surface px-2 py-0.5 font-mono">Fila {row}</span>

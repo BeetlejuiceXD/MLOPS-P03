@@ -14,7 +14,12 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import type { ExperimentRun } from "../src/p3/contracts";
-import { campaignRows, selectionCrossCheck } from "../src/p3/selection";
+import {
+  attemptLabel,
+  attemptMarks,
+  campaignRows,
+  selectionCrossCheck,
+} from "../src/p3/selection";
 import { fixturePayload } from "./p3-fixtures";
 
 type Selection = {
@@ -164,6 +169,27 @@ describe("cotejo selección ↔ Experiments (sin segundo ranking)", () => {
     const rows = campaignRows(CANDIDATE);
     expect(rows.get(CANDIDATE.ranking[0]?.run_id as string)).toBe(1);
     expect(rows.size).toBe(CANDIDATE.ranking.length);
+  });
+
+  it("el expediente solo rotula intentos no representantes, con su fila", () => {
+    const marks = attemptMarks({
+      rows: [
+        {
+          row: 1,
+          attempts: [
+            { run_id: "a".repeat(32), role: "representative", reason: null },
+            { run_id: RETRY_ID, role: "retry", reason: "duplicate_campaign_row" },
+            { run_id: null, role: "excluded", reason: "job_failed" },
+          ],
+        },
+      ],
+      unattributed: [{ run_id: "b".repeat(32), role: "excluded", reason: "adapter_excluded" }],
+    });
+    expect([...marks.keys()]).toEqual([RETRY_ID, "b".repeat(32)]);
+    expect(attemptLabel(marks.get(RETRY_ID))).toBe("Reintento · fila 1");
+    expect(attemptLabel(marks.get("b".repeat(32)))).toBe("Excluido");
+    expect(attemptLabel(undefined)).toBe("No aceptado por D05-02");
+    expect(attemptMarks(null).size).toBe(0);
   });
 
   it("selección abierta: no hay candidato que cotejar", () => {

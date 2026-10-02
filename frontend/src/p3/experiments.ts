@@ -89,6 +89,19 @@ export function campaignCounts(response: {
   };
 }
 
+/**
+ * D05-03 — Con filas aceptadas por la selección (D05-02) solo cuentan esos runs; el resto
+ * de runs de training (reintentos, no aceptados) se cuenta aparte. `null` sin aceptación.
+ */
+export function acceptedCounts(
+  runs: readonly ExperimentRun[],
+  accepted: ReadonlySet<string>
+): { accepted: number; notAccepted: number } | null {
+  if (accepted.size === 0) return null;
+  const counted = runs.filter((run) => accepted.has(run.run_id)).length;
+  return { accepted: counted, notAccepted: runs.length - counted };
+}
+
 export const CONFIG_KEYS = Object.keys(
   trainingConfigSchema.shape
 ) as (keyof ExperimentRun["params"])[];
