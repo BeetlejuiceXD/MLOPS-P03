@@ -69,7 +69,7 @@
         }
       },
       "job": {
-        "id": 1,
+        "id": 5,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -95,16 +95,16 @@
           "epoch": 9,
           "total_epochs": 30
         },
-        "mlflow_run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
+        "mlflow_run_id": "7576d02bb5564dbf94429373e9587a3a",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T17:43:13.000Z",
-        "started_at": "2026-10-01T17:43:14.000Z",
-        "finished_at": "2026-10-01T17:46:17.000Z"
+        "created_at": "2026-10-02T04:11:55.000Z",
+        "started_at": "2026-10-02T04:12:16.000Z",
+        "finished_at": "2026-10-02T04:15:03.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
+        "run_id": "7576d02bb5564dbf94429373e9587a3a",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 9,
@@ -114,7 +114,7 @@
         "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -123,7 +123,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "1",
+          "job_id": "5",
           "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
         },
         "loaded_classes": [
@@ -133,7 +133,12 @@
         "probabilities_sum": 1.0000001192092896
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=b11df1c49f5d42a99c93bf2b60ecf900 not found"
+        "duration_seconds": 161.5594136990003,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790914339768,
+        "run_kind": "training"
       }
     },
     {
@@ -162,7 +167,7 @@
         }
       },
       "job": {
-        "id": 2,
+        "id": 6,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -188,16 +193,16 @@
           "epoch": 22,
           "total_epochs": 30
         },
-        "mlflow_run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
+        "mlflow_run_id": "a09c7b6e5102491f9dfc2391b88bb9b8",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T17:46:24.000Z",
-        "started_at": "2026-10-01T17:46:26.000Z",
-        "finished_at": "2026-10-01T17:50:59.000Z"
+        "created_at": "2026-10-02T04:15:09.000Z",
+        "started_at": "2026-10-02T04:15:09.000Z",
+        "finished_at": "2026-10-02T04:19:05.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
+        "run_id": "a09c7b6e5102491f9dfc2391b88bb9b8",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 22,
@@ -207,7 +212,7 @@
         "checkpoint_sha256": "2aa2549e125c20330815a8ee8acd8cbc082c7efbc96b258aec85b0a9ec1ef9b2",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -216,7 +221,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "2",
+          "job_id": "6",
           "checkpoint_sha256": "2aa2549e125c20330815a8ee8acd8cbc082c7efbc96b258aec85b0a9ec1ef9b2"
         },
         "loaded_classes": [
@@ -226,7 +231,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=eba1e1f3e40f4bc69c0453cf6c7a11a0 not found"
+        "duration_seconds": 229.72683618799965,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790914514045,
+        "run_kind": "training"
       }
     },
     {
@@ -255,7 +265,7 @@
         }
       },
       "job": {
-        "id": 3,
+        "id": 7,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -281,16 +291,16 @@
           "epoch": 10,
           "total_epochs": 30
         },
-        "mlflow_run_id": "d082014552c8458f90e9c67f54b46056",
+        "mlflow_run_id": "2d56233c886142b7824e1551b90e8327",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T17:51:02.000Z",
-        "started_at": "2026-10-01T17:51:03.000Z",
-        "finished_at": "2026-10-01T17:54:14.000Z"
+        "created_at": "2026-10-02T04:19:11.000Z",
+        "started_at": "2026-10-02T04:19:11.000Z",
+        "finished_at": "2026-10-02T04:21:53.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "d082014552c8458f90e9c67f54b46056",
+        "run_id": "2d56233c886142b7824e1551b90e8327",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 10,
@@ -300,7 +310,7 @@
         "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -309,7 +319,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "3",
+          "job_id": "7",
           "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b"
         },
         "loaded_classes": [
@@ -319,7 +329,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=d082014552c8458f90e9c67f54b46056 not found"
+        "duration_seconds": 156.90300598899967,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790914754954,
+        "run_kind": "training"
       }
     },
     {
@@ -348,7 +363,7 @@
         }
       },
       "job": {
-        "id": 4,
+        "id": 8,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -374,16 +389,16 @@
           "epoch": 16,
           "total_epochs": 30
         },
-        "mlflow_run_id": "72304af32b664085851cb2fd42b77c36",
+        "mlflow_run_id": "379b553913254241a2efece3ed451d2d",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T17:54:19.000Z",
-        "started_at": "2026-10-01T17:54:20.000Z",
-        "finished_at": "2026-10-01T17:59:12.000Z"
+        "created_at": "2026-10-02T04:21:57.000Z",
+        "started_at": "2026-10-02T04:21:58.000Z",
+        "finished_at": "2026-10-02T04:26:10.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "72304af32b664085851cb2fd42b77c36",
+        "run_id": "379b553913254241a2efece3ed451d2d",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 16,
@@ -393,7 +408,7 @@
         "checkpoint_sha256": "e9b36b93bbca243c9ef4a58af329e91a92cb2ff55df46a8903646fab52f3b4ef",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -402,7 +417,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "4",
+          "job_id": "8",
           "checkpoint_sha256": "e9b36b93bbca243c9ef4a58af329e91a92cb2ff55df46a8903646fab52f3b4ef"
         },
         "loaded_classes": [
@@ -412,7 +427,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=72304af32b664085851cb2fd42b77c36 not found"
+        "duration_seconds": 246.4538905700001,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790914922026,
+        "run_kind": "training"
       }
     },
     {
@@ -441,7 +461,7 @@
         }
       },
       "job": {
-        "id": 5,
+        "id": 9,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -467,16 +487,16 @@
           "epoch": 16,
           "total_epochs": 30
         },
-        "mlflow_run_id": "26f2a1d2787f40439880a56cee11999a",
+        "mlflow_run_id": "c2adc19a9fb94b6999937289bf2a1f2c",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T17:59:17.000Z",
-        "started_at": "2026-10-01T17:59:21.000Z",
-        "finished_at": "2026-10-01T18:04:12.000Z"
+        "created_at": "2026-10-02T04:26:14.000Z",
+        "started_at": "2026-10-02T04:26:14.000Z",
+        "finished_at": "2026-10-02T04:30:30.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "26f2a1d2787f40439880a56cee11999a",
+        "run_id": "c2adc19a9fb94b6999937289bf2a1f2c",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 16,
@@ -486,7 +506,7 @@
         "checkpoint_sha256": "1e7ab9b07ac9e5d5c9cd4a0d342af16992729a50d8b0ec8dca27012a756cc1a5",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -495,7 +515,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "5",
+          "job_id": "9",
           "checkpoint_sha256": "1e7ab9b07ac9e5d5c9cd4a0d342af16992729a50d8b0ec8dca27012a756cc1a5"
         },
         "loaded_classes": [
@@ -505,7 +525,12 @@
         "probabilities_sum": 0.9999999403953552
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=26f2a1d2787f40439880a56cee11999a not found"
+        "duration_seconds": 250.7034826549998,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790915178189,
+        "run_kind": "training"
       }
     },
     {
@@ -534,7 +559,7 @@
         }
       },
       "job": {
-        "id": 6,
+        "id": 10,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -560,16 +585,16 @@
           "epoch": 9,
           "total_epochs": 60
         },
-        "mlflow_run_id": "2676521bda51460082ca41029637a43e",
+        "mlflow_run_id": "6646544b73734ac1abdf413d1b63b3d9",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:04:16.000Z",
-        "started_at": "2026-10-01T18:04:19.000Z",
-        "finished_at": "2026-10-01T18:07:08.000Z"
+        "created_at": "2026-10-02T04:30:36.000Z",
+        "started_at": "2026-10-02T04:30:37.000Z",
+        "finished_at": "2026-10-02T04:33:05.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "2676521bda51460082ca41029637a43e",
+        "run_id": "6646544b73734ac1abdf413d1b63b3d9",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 9,
@@ -579,7 +604,7 @@
         "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -588,7 +613,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "6",
+          "job_id": "10",
           "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
         },
         "loaded_classes": [
@@ -598,7 +623,12 @@
         "probabilities_sum": 1.0000001192092896
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=2676521bda51460082ca41029637a43e not found"
+        "duration_seconds": 142.28053252300015,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790915441488,
+        "run_kind": "training"
       }
     },
     {
@@ -627,7 +657,7 @@
         }
       },
       "job": {
-        "id": 7,
+        "id": 11,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -653,16 +683,16 @@
           "epoch": 9,
           "total_epochs": 30
         },
-        "mlflow_run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
+        "mlflow_run_id": "a8b7545b465b465990fe7e7c594c1798",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:07:13.000Z",
-        "started_at": "2026-10-01T18:07:15.000Z",
-        "finished_at": "2026-10-01T18:10:01.000Z"
+        "created_at": "2026-10-02T04:33:08.000Z",
+        "started_at": "2026-10-02T04:33:09.000Z",
+        "finished_at": "2026-10-02T04:35:40.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
+        "run_id": "a8b7545b465b465990fe7e7c594c1798",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 9,
@@ -672,7 +702,7 @@
         "checkpoint_sha256": "9ef31508c65d7bb085e8c7bb35e6c506b5c017aec66dfb1535362f6a76110571",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -681,7 +711,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "7",
+          "job_id": "11",
           "checkpoint_sha256": "9ef31508c65d7bb085e8c7bb35e6c506b5c017aec66dfb1535362f6a76110571"
         },
         "loaded_classes": [
@@ -691,7 +721,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=1f93e75aa3c7437d80ce36d7e90ca902 not found"
+        "duration_seconds": 145.31807069100023,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790915593424,
+        "run_kind": "training"
       }
     },
     {
@@ -720,7 +755,7 @@
         }
       },
       "job": {
-        "id": 8,
+        "id": 12,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -746,16 +781,16 @@
           "epoch": 12,
           "total_epochs": 30
         },
-        "mlflow_run_id": "128e8c5b6c594ea38799ad2caca1425e",
+        "mlflow_run_id": "5fe9d9d9ca46440b9e591daff45acf35",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:10:05.000Z",
-        "started_at": "2026-10-01T18:10:07.000Z",
-        "finished_at": "2026-10-01T18:13:55.000Z"
+        "created_at": "2026-10-02T04:35:45.000Z",
+        "started_at": "2026-10-02T04:35:45.000Z",
+        "finished_at": "2026-10-02T04:39:10.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "128e8c5b6c594ea38799ad2caca1425e",
+        "run_id": "5fe9d9d9ca46440b9e591daff45acf35",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 12,
@@ -765,7 +800,7 @@
         "checkpoint_sha256": "69e7426935d4cc1121695a9a583a4caede467d026756d8c8e56a1311861407c0",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -774,7 +809,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "8",
+          "job_id": "12",
           "checkpoint_sha256": "69e7426935d4cc1121695a9a583a4caede467d026756d8c8e56a1311861407c0"
         },
         "loaded_classes": [
@@ -784,7 +819,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=128e8c5b6c594ea38799ad2caca1425e not found"
+        "duration_seconds": 199.07842188200038,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790915749017,
+        "run_kind": "training"
       }
     },
     {
@@ -813,7 +853,7 @@
         }
       },
       "job": {
-        "id": 9,
+        "id": 13,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -839,16 +879,16 @@
           "epoch": 15,
           "total_epochs": 30
         },
-        "mlflow_run_id": "9f85634bfc2346e98bde77387241692f",
+        "mlflow_run_id": "02397ddadec047809ac0dd2421aeff7b",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:13:58.000Z",
-        "started_at": "2026-10-01T18:13:59.000Z",
-        "finished_at": "2026-10-01T18:18:51.000Z"
+        "created_at": "2026-10-02T04:39:11.000Z",
+        "started_at": "2026-10-02T04:39:12.000Z",
+        "finished_at": "2026-10-02T04:43:26.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "9f85634bfc2346e98bde77387241692f",
+        "run_id": "02397ddadec047809ac0dd2421aeff7b",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 15,
@@ -858,7 +898,7 @@
         "checkpoint_sha256": "a6534599c9eecb76ec51fed0fe3797cd34d29351bc819597ffc7cfef5bc40ee3",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -867,7 +907,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "9",
+          "job_id": "13",
           "checkpoint_sha256": "a6534599c9eecb76ec51fed0fe3797cd34d29351bc819597ffc7cfef5bc40ee3"
         },
         "loaded_classes": [
@@ -877,7 +917,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=9f85634bfc2346e98bde77387241692f not found"
+        "duration_seconds": 249.1219747389996,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790915955455,
+        "run_kind": "training"
       }
     },
     {
@@ -906,7 +951,7 @@
         }
       },
       "job": {
-        "id": 10,
+        "id": 14,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -932,16 +977,16 @@
           "epoch": 10,
           "total_epochs": 30
         },
-        "mlflow_run_id": "192646f7f412414c944d4b3f86ff49e8",
+        "mlflow_run_id": "438cc06bdf32461fa2982963e8be3727",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:18:56.000Z",
-        "started_at": "2026-10-01T18:18:56.000Z",
-        "finished_at": "2026-10-01T18:22:09.000Z"
+        "created_at": "2026-10-02T04:43:28.000Z",
+        "started_at": "2026-10-02T04:43:30.000Z",
+        "finished_at": "2026-10-02T04:46:22.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "192646f7f412414c944d4b3f86ff49e8",
+        "run_id": "438cc06bdf32461fa2982963e8be3727",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 10,
@@ -951,7 +996,7 @@
         "checkpoint_sha256": "fa92d3915df21139ae5efa510805f3bf418f5200a5dfffab32cc7c1fc1be8471",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -960,7 +1005,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "7",
-          "job_id": "10",
+          "job_id": "14",
           "checkpoint_sha256": "fa92d3915df21139ae5efa510805f3bf418f5200a5dfffab32cc7c1fc1be8471"
         },
         "loaded_classes": [
@@ -970,7 +1015,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=192646f7f412414c944d4b3f86ff49e8 not found"
+        "duration_seconds": 167.68463607600006,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790916213135,
+        "run_kind": "training"
       }
     },
     {
@@ -999,7 +1049,7 @@
         }
       },
       "job": {
-        "id": 11,
+        "id": 15,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -1025,16 +1075,16 @@
           "epoch": 7,
           "total_epochs": 30
         },
-        "mlflow_run_id": "93c5f6d696184324afba01c103c020f2",
+        "mlflow_run_id": "33715e5e663e4ace82265b3d05b48158",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:22:12.000Z",
-        "started_at": "2026-10-01T18:22:13.000Z",
-        "finished_at": "2026-10-01T18:24:26.000Z"
+        "created_at": "2026-10-02T04:46:24.000Z",
+        "started_at": "2026-10-02T04:46:24.000Z",
+        "finished_at": "2026-10-02T04:48:26.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "93c5f6d696184324afba01c103c020f2",
+        "run_id": "33715e5e663e4ace82265b3d05b48158",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 7,
@@ -1044,7 +1094,7 @@
         "checkpoint_sha256": "b95de4b773d2748c313e876d99bada03f5cb8fed7e1ac434c1d5705e81cdf55b",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -1053,7 +1103,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "21",
-          "job_id": "11",
+          "job_id": "15",
           "checkpoint_sha256": "b95de4b773d2748c313e876d99bada03f5cb8fed7e1ac434c1d5705e81cdf55b"
         },
         "loaded_classes": [
@@ -1063,7 +1113,12 @@
         "probabilities_sum": 1.0
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=93c5f6d696184324afba01c103c020f2 not found"
+        "duration_seconds": 115.91426009599945,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790916388367,
+        "run_kind": "training"
       }
     },
     {
@@ -1092,7 +1147,7 @@
         }
       },
       "job": {
-        "id": 12,
+        "id": 16,
         "task": "training",
         "status": "succeeded",
         "dataset_version": "v0.1.1",
@@ -1118,16 +1173,16 @@
           "epoch": 7,
           "total_epochs": 30
         },
-        "mlflow_run_id": "205ad479795442c0b3dd4b2dc6601f69",
+        "mlflow_run_id": "bd4ee53765bc4a9c96ff3cb3b1f5330d",
         "error": null,
         "cancel_requested": false,
-        "created_at": "2026-10-01T18:24:28.000Z",
-        "started_at": "2026-10-01T18:24:30.000Z",
-        "finished_at": "2026-10-01T18:26:41.000Z"
+        "created_at": "2026-10-02T04:48:31.000Z",
+        "started_at": "2026-10-02T04:48:32.000Z",
+        "finished_at": "2026-10-02T04:50:33.000Z"
       },
       "report": {
         "problems": [],
-        "run_id": "205ad479795442c0b3dd4b2dc6601f69",
+        "run_id": "bd4ee53765bc4a9c96ff3cb3b1f5330d",
         "run_status": "FINISHED",
         "experiment": "p3-cnn-classifier",
         "epochs_logged": 7,
@@ -1137,7 +1192,7 @@
         "checkpoint_sha256": "55857f4fbe603634d864f3a55371054a49e2b177dc42d8ae4293e971f963f369",
         "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
         "tags": {
-          "git_commit": "1ed4b62ed14e15905b491d92b2937ae5dcce63e1",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "dvc_release": "v0.1.1",
           "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
           "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
@@ -1146,7 +1201,7 @@
           "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
           "classes": "cat,dog",
           "seed": "77",
-          "job_id": "12",
+          "job_id": "16",
           "checkpoint_sha256": "55857f4fbe603634d864f3a55371054a49e2b177dc42d8ae4293e971f963f369"
         },
         "loaded_classes": [
@@ -1156,230 +1211,236 @@
         "probabilities_sum": 0.9999999403953552
       },
       "details": {
-        "error": "no se pudo leer detalles: RESOURCE_DOES_NOT_EXIST: Run with id=205ad479795442c0b3dd4b2dc6601f69 not found"
+        "duration_seconds": 116.47275309399993,
+        "peak_memory_mb": 1312.86328125,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790916515638,
+        "run_kind": "training"
       }
     }
   ],
   "summary": {
-    "valid_count": 0,
-    "valid_rows": [],
+    "valid_count": 12,
+    "valid_rows": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
     "min_required": 10,
-    "meets_minimum": false,
+    "meets_minimum": true,
     "rows": [
       {
         "row": 1,
         "change": "Baseline",
-        "job_id": 1,
+        "job_id": 5,
         "job_status": "succeeded",
-        "run_id": "b11df1c49f5d42a99c93bf2b60ecf900",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "7576d02bb5564dbf94429373e9587a3a",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 161.5594136990003,
+          "peak_memory_mb": 1302.97265625,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 2,
         "change": "trainable_layers",
-        "job_id": 2,
+        "job_id": 6,
         "job_status": "succeeded",
-        "run_id": "eba1e1f3e40f4bc69c0453cf6c7a11a0",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "a09c7b6e5102491f9dfc2391b88bb9b8",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 229.72683618799965,
+          "peak_memory_mb": 1302.97265625,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 3,
         "change": "learning_rate",
-        "job_id": 3,
+        "job_id": 7,
         "job_status": "succeeded",
-        "run_id": "d082014552c8458f90e9c67f54b46056",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "2d56233c886142b7824e1551b90e8327",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 156.90300598899967,
+          "peak_memory_mb": 1302.97265625,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 4,
         "change": "optimizer",
-        "job_id": 4,
+        "job_id": 8,
         "job_status": "succeeded",
-        "run_id": "72304af32b664085851cb2fd42b77c36",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "379b553913254241a2efece3ed451d2d",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 246.4538905700001,
+          "peak_memory_mb": 1302.97265625,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 5,
         "change": "batch_size",
-        "job_id": 5,
+        "job_id": 9,
         "job_status": "succeeded",
-        "run_id": "26f2a1d2787f40439880a56cee11999a",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "c2adc19a9fb94b6999937289bf2a1f2c",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 250.7034826549998,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 6,
         "change": "max_epochs",
-        "job_id": 6,
+        "job_id": 10,
         "job_status": "succeeded",
-        "run_id": "2676521bda51460082ca41029637a43e",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "6646544b73734ac1abdf413d1b63b3d9",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 142.28053252300015,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 7,
         "change": "image_size",
-        "job_id": 7,
+        "job_id": 11,
         "job_status": "succeeded",
-        "run_id": "1f93e75aa3c7437d80ce36d7e90ca902",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "a8b7545b465b465990fe7e7c594c1798",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 145.31807069100023,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 8,
         "change": "hidden_layers",
-        "job_id": 8,
+        "job_id": 12,
         "job_status": "succeeded",
-        "run_id": "128e8c5b6c594ea38799ad2caca1425e",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "5fe9d9d9ca46440b9e591daff45acf35",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 199.07842188200038,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 9,
         "change": "dropout",
-        "job_id": 9,
+        "job_id": 13,
         "job_status": "succeeded",
-        "run_id": "9f85634bfc2346e98bde77387241692f",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "02397ddadec047809ac0dd2421aeff7b",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 249.1219747389996,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 10,
         "change": "hidden_layers+dropout",
-        "job_id": 10,
+        "job_id": 14,
         "job_status": "succeeded",
-        "run_id": "192646f7f412414c944d4b3f86ff49e8",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "438cc06bdf32461fa2982963e8be3727",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 167.68463607600006,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 11,
         "change": "Réplica de varianza (seed)",
-        "job_id": 11,
+        "job_id": 15,
         "job_status": "succeeded",
-        "run_id": "93c5f6d696184324afba01c103c020f2",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "33715e5e663e4ace82265b3d05b48158",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 115.91426009599945,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       },
       {
         "row": 12,
         "change": "Réplica de varianza (seed)",
-        "job_id": 12,
+        "job_id": 16,
         "job_status": "succeeded",
-        "run_id": "205ad479795442c0b3dd4b2dc6601f69",
-        "valid": false,
-        "problems": [
-          "tag p3.run_kind del run no es 'training'"
-        ],
+        "run_id": "bd4ee53765bc4a9c96ff3cb3b1f5330d",
+        "valid": true,
+        "problems": [],
         "retries": 0,
         "resources": {
-          "duration_seconds": null,
-          "peak_memory_mb": null,
-          "device": null,
-          "git_commit": null
+          "duration_seconds": 116.47275309399993,
+          "peak_memory_mb": 1312.86328125,
+          "device": "cpu",
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "run_kind": "training"
         }
       }
     ]
