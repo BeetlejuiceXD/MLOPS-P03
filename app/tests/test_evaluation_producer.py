@@ -122,6 +122,8 @@ def test_known_predictions_give_the_expected_matrix_metrics_and_export():
 
     assert record.namespace == "synthetic"
     assert evaluation["state"] == "ready"
+    # D05-05: el resultado lleva su namespace; la UI lo muestra y la API oficial lo exige.
+    assert evaluation["namespace"] == "synthetic"
     assert evaluation["confusion_matrix"] == {"labels": ["cat", "dog"], "rows": [[2, 1], [1, 2]]}
     assert evaluation["n_test"] == 6
     assert evaluation["metrics"]["accuracy"] == 4 / 6
@@ -237,6 +239,14 @@ def test_duplicated_crop_is_refused():
 
 def test_unknown_namespace_is_refused():
     _refused("unknown_namespace", lambda: _build(namespace="test"))
+
+
+@pytest.mark.parametrize("namespace", ["official", "synthetic"])
+def test_evaluation_and_export_declare_the_same_namespace(namespace):
+    """D05-05: el namespace viaja en los dos JSON; uno sintético nunca dice official."""
+    record = _build(namespace=namespace)
+    assert record.evaluation.namespace == namespace
+    assert record.predictions.namespace == namespace
 
 
 def test_evaluation_not_after_the_close_is_refused():

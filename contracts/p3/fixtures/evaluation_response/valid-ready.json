@@ -4,6 +4,7 @@
   "why": "Matriz 2x2 de ejemplo: filas reales, columnas predichas; suma = n_test",
   "payload": {
     "state": "ready",
+    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",
