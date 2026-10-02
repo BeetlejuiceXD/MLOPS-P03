@@ -10,6 +10,7 @@ import {
   createMlflowReader,
   createModelSelectionService,
   createP3SourcesService,
+  createRegistryModelsPortal,
   createSettingsService,
   createTrainingJobsService,
   deleteAnnotation,
@@ -36,6 +37,7 @@ import { createEvaluationRouter } from './evaluation.routes.js';
 import { createExperimentsRouter } from './experiments.routes.js';
 import { sendError } from './http-errors.js';
 import { createModelSelectionRouter } from './model-selection.routes.js';
+import { createModelsRouter } from './models.routes.js';
 import { createP3SourcesRouter } from './p3-sources.routes.js';
 import { createTrainingRouter } from './training.routes.js';
 
@@ -74,6 +76,10 @@ app.use(
   '/experiments',
   createExperimentsRouter(createExperimentsService(createMlflowReader(env.MLFLOW_TRACKING_URI))),
 );
+
+// D05-06: Models lee el registro de D04-06. `/models` solo sirve `official`; las pruebas
+// locales (MinIO, namespace `local_test`) van aparte y nunca se presentan como publicación AWS.
+app.use('/models', createModelsRouter(createRegistryModelsPortal(env.MODEL_S3_BUCKET)));
 
 // D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`, que
 // vuelve a verificar las fuentes contra los archivos antes de entrenar (D03-03).
