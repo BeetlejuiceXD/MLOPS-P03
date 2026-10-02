@@ -1,0 +1,27 @@
+{
+  "contract": "local_test_models_response",
+  "valid": false,
+  "why": "failed exige su motivo",
+  "payload": {
+    "namespace": "local_test",
+    "models": [
+      {
+        "namespace": "local_test",
+        "semver": "0.0.2",
+        "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+        "s3_bucket": "p3-models-local",
+        "s3_key": "models/p3-cnn-classifier/0.0.2/model.pt",
+        "version_id": "7a1b",
+        "sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
+        "size_bytes": 44781003,
+        "status": "failed",
+        "published_at": null,
+        "failure_reason": null,
+        "failure_detail": "SHA-256 del contenido de p3-models-local/models/p3-cnn-classifier/0.0.2/model.pt@7a1b = 00ff…; registrado e93d…"
+      }
+    ]
+  }
+}

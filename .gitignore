@@ -44,3 +44,4 @@ data/crops/
 # Bytecode de Python en cualquier carpeta (p. ej. .github/scripts al importarse en tests).
 __pycache__/
 /_smoke/
+reports/*.sql

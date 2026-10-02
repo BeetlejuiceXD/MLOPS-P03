@@ -1,0 +1,9 @@
+{
+  "contract": "local_test_models_response",
+  "valid": true,
+  "why": "Sin pruebas locales registradas",
+  "payload": {
+    "namespace": "local_test",
+    "models": []
+  }
+}

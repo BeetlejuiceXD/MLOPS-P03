@@ -3,10 +3,12 @@ import { useModels } from "../api";
 import { FetchBoundary } from "../components/FetchBoundary";
 import { StatePanel } from "../components/StatePanel";
 import { dateTime, shortHash } from "../format";
+import { LocalTestModels } from "../models/LocalTestModels";
 
 /**
- * D01-05 — Models: versiones del modelo y su trazabilidad. La versión del modelo
- * (semver propio) y la del dataset (release DVC) se muestran en columnas distintas.
+ * D01-05 / D05-06 — Models: versiones del modelo y su trazabilidad. La versión del modelo
+ * (semver propio) y la del dataset (release DVC) se muestran en columnas distintas. Arriba,
+ * solo `official` (GET /api/models); abajo y aparte, las pruebas locales `local_test`.
  */
 export function ModelsPage() {
   const models = useModels();
@@ -60,6 +62,7 @@ export function ModelsPage() {
           )
         }
       </FetchBoundary>
+      <LocalTestModels />
     </div>
   );
 }
