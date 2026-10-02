@@ -26,6 +26,7 @@ COPY tracking/ ./tracking/
 COPY trainer_worker/ ./trainer_worker/
 COPY trainer/ ./trainer/
 COPY manifest/ ./manifest/
+COPY campaign/ ./campaign/
 # D03-05/D04-05: motor de métricas y productor de la evaluación (lo usa D06-01).
 COPY evaluation/ ./evaluation/
 COPY model_package/ ./model_package/

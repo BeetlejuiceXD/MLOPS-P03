@@ -1,0 +1,516 @@
+"""D04-03 — Ejecuta la matriz OFAT congelada (12 filas, #33) como jobs reales
+de `task=training`, uno por fila, contra los servicios reales (API + MLflow).
+Cada job se audita individualmente con `tracking.smoke.verify_smoke` (D03-04)
+antes de contarlo — así ningún run con problemas de identidad, curvas,
+best_* o checkpoint cuenta para el mínimo.
+
+    python -m campaign.run run --api http://localhost:8080/api \\
+        --tracking-uri http://localhost:5000 --evidence reports/campaign_p3.json
+
+    python -m campaign.run audit --evidence reports/campaign_p3.json
+
+`run` reutiliza el ciclo de vida (crear job → poll → `verify_smoke`) del mismo
+modo que `tracking.smoke.run_smoke`, sobre las 12 filas en vez de un solo
+`--seed`. Igual que en D03-04, la parte que habla HTTP con servicios reales no
+se prueba con fixtures (se evidencia en el PR); `summarize` — el mínimo de 10,
+exclusión de fallidos/duplicados y cobertura de las 12 filas — sí, en
+`tests/test_campaign_run.py`.
+
+Códigos de salida: 0 = ≥10 filas válidas · 1 = menos de 10 o fuentes
+inconsistentes · 2 = servicios no disponibles.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+from campaign.matrix import MATRIX, CampaignRow, to_training_config_kwargs
+from tracking import smoke
+from training.config import TrainingConfig
+
+VERIFIED, MISMATCH, UNAVAILABLE = 0, 1, 2
+MIN_VALID_RUNS = 10
+
+
+def build_request(manifest: dict, row: CampaignRow) -> dict:
+    config = TrainingConfig(**to_training_config_kwargs(row)).model_dump()
+    return {
+        "task": "training",
+        "dataset_version": manifest["dataset_version"],
+        "manifest_hash": manifest["manifest_hash"],
+        "config": config,
+    }
+
+
+def _run_details(tracking_uri: str, run_id: str) -> dict:
+    """Evidencia que `verify_smoke` (D03-04) no captura porque no la
+    necesitaba: duración, memoria pico, dispositivo, commit y `start_time`
+    (milisegundos, el que MLflow asigna al crear el run). `start_time` es lo
+    que decide entre reintentos (#33: el run FINISHED más temprano, nunca el
+    de mejor métrica — eso sería p-hacking entre corridas reales)."""
+    from mlflow.tracking import MlflowClient
+
+    client = MlflowClient(tracking_uri=tracking_uri)
+    run = client.get_run(run_id)
+    return {
+        "duration_seconds": run.data.metrics.get("duration_seconds"),
+        "peak_memory_mb": run.data.metrics.get("peak_memory_mb"),
+        "device": run.data.tags.get("device"),
+        "git_commit": run.data.tags.get("git_commit"),
+        "start_time": run.info.start_time,
+        "run_kind": run.data.tags.get("p3.run_kind"),
+        "best_val_loss": run.data.metrics.get("best_val_loss"),
+    }
+
+
+def _git_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _run_one(
+    api: str,
+    tracking_uri: str,
+    manifest: dict,
+    releases: dict,
+    row: CampaignRow,
+    *,
+    timeout: float,
+    poll: float,
+) -> dict:
+    request = build_request(manifest, row)
+    job = smoke._http("POST", f"{api}/training/jobs", request)
+    print(f"Fila {row.index} ({row.change}): job #{job['id']} creado", flush=True)
+
+    deadline = time.monotonic() + timeout
+    last = None
+    while job["status"] not in smoke.TERMINAL:
+        if time.monotonic() > deadline:
+            return {
+                "row": row.index,
+                "change": row.change,
+                "job": job,
+                "problems": [f"timeout: sigue {job['status']}"],
+            }
+        time.sleep(poll)
+        job = smoke._http("GET", f"{api}/training/jobs/{job['id']}")
+        progress = (job.get("progress") or {}).get("epoch")
+        if (job["status"], progress) != last:
+            last = (job["status"], progress)
+            print(f"  fila {row.index}: {job['status']} época {progress}", flush=True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report = smoke.verify_smoke(
+            job,
+            tracking_uri=tracking_uri,
+            workdir=Path(tmp),
+            sources={"releases": releases, "manifest": manifest},
+        )
+
+    details = {}
+    if report.run_id:
+        try:
+            details = _run_details(tracking_uri, report.run_id)
+        except Exception as error:
+            details = {"error": f"no se pudo leer duracion/memoria/device/commit: {error}"}
+
+    return {
+        "row": row.index,
+        "change": row.change,
+        "request": request,
+        "job": job,
+        "report": asdict(report),
+        "details": details,
+    }
+
+
+def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
+    """Chequeos endurecidos sobre UN intento, además de lo que ya reporta
+    `verify_smoke`:
+    - fila (matriz OFAT congelada) -> request.config
+    - request.config -> job.config
+    - job.mlflow_run_id -> report.run_id
+    - request.task y job.task son "training"
+    - tag MLflow p3.run_kind=training y tag job_id == job.id
+    - el reporte de verify_smoke está completo (no a medias)
+    La unicidad de `run_id` es entre filas, no por intento — se audita
+    aparte en `summarize`."""
+    report = attempt.get("report") or {}
+    problems = list(attempt.get("problems") or []) + list(report.get("problems") or [])
+
+    request = attempt.get("request") or {}
+    job = attempt.get("job") or {}
+
+    expected_config = TrainingConfig(**to_training_config_kwargs(row)).model_dump()
+    if request.get("config") != expected_config:
+        problems.append("request.config no coincide con la fila OFAT congelada (#33)")
+    if request.get("config") != job.get("config"):
+        problems.append("job.config no coincide con el config enviado en el request")
+
+    succeeded = job.get("status") == "succeeded"
+    if succeeded and job.get("mlflow_run_id") != report.get("run_id"):
+        mismatch = f"{job.get('mlflow_run_id')!r} != {report.get('run_id')!r}"
+        problems.append(f"job.mlflow_run_id != report.run_id: {mismatch}")
+    if request.get("task") != "training":
+        problems.append(f"request.task={request.get('task')!r}, se esperaba 'training'")
+    if job.get("task") != "training":
+        problems.append(f"job.task={job.get('task')!r}, se esperaba 'training'")
+    # p3.run_kind NO se valida aquí: `verify_smoke` (D03-04) ya lo compara
+    # contra los tags reales (sin filtrar) y deja el problema en
+    # report["problems"] si no coincide — report["tags"] solo incluye
+    # REQUIRED_TAGS, que no incluye p3.run_kind, así que comparar contra
+    # ese diccionario filtrado siempre fallaría sin decir nada real.
+    if succeeded and report.get("tags", {}).get("job_id") != str(job.get("id")):
+        tag_job_id = report.get("tags", {}).get("job_id")
+        problems.append(f"tag job_id del run ({tag_job_id!r}) != job.id ({job.get('id')!r})")
+
+    if succeeded and report.get("run_status") != "FINISHED":
+        problems.append(f"run_status={report.get('run_status')!r}, se esperaba FINISHED")
+    if not job.get("id"):
+        problems.append("sin job_id")
+
+    details = attempt.get("details") or {}
+    if succeeded and _valid_start_time(details.get("start_time")) is None:
+        problems.append(
+            f"start_time ausente o inválido ({details.get('start_time')!r}): "
+            "un intento sin start_time real no puede ser candidato, ni siquiera "
+            "si es el único (#33)"
+        )
+
+    if succeeded:
+        required_report_fields = (
+            "run_id",
+            "run_status",
+            "best_epoch",
+            "best_val_accuracy",
+            "best_val_macro_f1",
+            "checkpoint_sha256",
+            "manifest_hash",
+        )
+        missing = [field for field in required_report_fields if report.get(field) is None]
+        if missing:
+            problems.append(f"reporte incompleto, faltan: {', '.join(missing)}")
+
+    return problems
+
+
+def _valid_start_time(value: object) -> int | None:
+    """Normaliza `start_time` a un entero válido, o `None` si es ausente,
+    cadena vacía, tipo incorrecto o no interpretable. Nunca se inventa ni se
+    asume un valor por defecto — un `start_time` inválido se trata igual
+    que uno ausente."""
+    if isinstance(value, bool):  # bool es subclase de int; nunca es un timestamp real
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def _retry_key(attempt: dict) -> dict:
+    report = attempt.get("report") or {}
+    details = attempt.get("details") or {}
+    return {
+        "run_id": report.get("run_id") or "",
+        "start_time": _valid_start_time(details.get("start_time")),
+    }
+
+
+def _earlier_retry(candidate: dict, current: dict) -> bool:
+    """¿`candidate` desplaza a `current` como el intento que cuenta para la
+    fila? Solo se llama cuando AMBOS ya tienen `start_time` no nulo —
+    `summarize` lo garantiza antes de comparar; `run_id` nunca sustituye un
+    tiempo faltante, solo desempata un tiempo exactamente igual (#33: nunca
+    por accuracy/F1/loss — eso sería elegir entre corridas reales por
+    resultado)."""
+    if candidate["start_time"] != current["start_time"]:
+        return candidate["start_time"] < current["start_time"]
+    return candidate["run_id"] < current["run_id"]
+
+
+def summarize(results: list[dict]) -> dict:
+    """Agregación pura (sin I/O): ≥10 filas válidas, sin duplicados ni filas
+    faltantes, cada problema documentado. `verify_smoke` ya garantiza por run
+    que no hay métricas de test y que la identidad/config/curvas/checkpoint
+    coinciden; `_attempt_problems` endurece fila→request→job.config,
+    job.mlflow_run_id↔report.run_id, task/run_kind=training y reporte
+    completo. Entre reintentos válidos, se elige por menor `start_time`
+    (#33) — nunca por métrica."""
+    by_row: dict[int, list[dict]] = {}
+    for result in results:
+        by_row.setdefault(result["row"], []).append(result)
+
+    rows_report = []
+    valid_rows: list[int] = []
+    claimed_run_ids: dict[str, int] = {}  # run_id -> primera fila que lo reclamó
+
+    for row in MATRIX:
+        attempts = by_row.get(row.index, [])
+        if not attempts:
+            rows_report.append(
+                {"row": row.index, "change": row.change, "status": "no ejecutada", "valid": False}
+            )
+            continue
+
+        retries = len(attempts) - 1
+        enriched = [
+            {**attempt, "problems": _attempt_problems(attempt, row)} for attempt in attempts
+        ]
+        candidates = [
+            a for a in enriched if a["job"]["status"] == "succeeded" and not a["problems"]
+        ]
+
+        if candidates:
+            # _attempt_problems ya exige start_time valido en TODO candidato
+            # (incluso si es el unico) - aqui ambos siempre lo tienen, nunca
+            # hace falta un caso especial ni sustituir por run_id.
+            chosen = candidates[0]
+            chosen_key = _retry_key(chosen)
+            for candidate in candidates[1:]:
+                candidate_key = _retry_key(candidate)
+                if _earlier_retry(candidate_key, chosen_key):
+                    chosen, chosen_key = candidate, candidate_key
+            valid = True
+        else:
+            chosen = enriched[-1]  # ninguno valido: se documenta el mas reciente, no se oculta
+            valid = False
+
+        run_id = (chosen.get("report") or {}).get("run_id")
+        if valid and run_id:
+            if run_id in claimed_run_ids:
+                valid = False
+                chosen = {
+                    **chosen,
+                    "problems": [
+                        *chosen["problems"],
+                        f"run_id duplicado: ya usado por la fila {claimed_run_ids[run_id]}",
+                    ],
+                }
+            else:
+                claimed_run_ids[run_id] = row.index
+
+        if valid:
+            valid_rows.append(row.index)
+
+        details = chosen.get("details") or {}
+        rows_report.append(
+            {
+                "row": row.index,
+                "change": row.change,
+                "job_id": chosen["job"].get("id"),
+                "job_status": chosen["job"]["status"],
+                "run_id": run_id,
+                "valid": valid,
+                "problems": chosen["problems"],
+                "retries": retries,
+                "resources": {
+                    "duration_seconds": details.get("duration_seconds"),
+                    "peak_memory_mb": details.get("peak_memory_mb"),
+                    "device": details.get("device"),
+                    "git_commit": details.get("git_commit"),
+                    "run_kind": details.get("run_kind"),
+                    "best_val_loss": details.get("best_val_loss"),
+                },
+            }
+        )
+
+    return {
+        "valid_count": len(valid_rows),
+        "valid_rows": valid_rows,
+        "min_required": MIN_VALID_RUNS,
+        "meets_minimum": len(valid_rows) >= MIN_VALID_RUNS,
+        "rows": rows_report,
+    }
+
+
+def _print_summary(summary: dict) -> int:
+    print(f"\nFilas válidas: {summary['valid_count']}/12 (mínimo {summary['min_required']})")
+    for row in summary["rows"]:
+        label = f"fila {row['row']:2d} ({row['change']})"
+        if not row["valid"]:
+            detail = row["problems"] if row.get("problems") else [row.get("status", "sin detalle")]
+            print(f"  {label}: {'; '.join(detail)}")
+            continue
+        retry_note = f" (tras {row['retries']} reintento(s))" if row["retries"] else ""
+        resources = row.get("resources") or {}
+        duration = resources.get("duration_seconds")
+        memory = resources.get("peak_memory_mb")
+        res_note = (
+            f" [{duration:.1f}s, {memory:.0f}MB, {resources.get('device')}]"
+            if duration is not None and memory is not None
+            else ""
+        )
+        print(f"  {label}: OK — job #{row['job_id']} run {row['run_id']}{retry_note}{res_note}")
+    return VERIFIED if summary["meets_minimum"] else MISMATCH
+
+
+def _parse_rows(value: str | None) -> set[int] | None:
+    """`--rows "1"` o `--rows "1,3,5"` -> {1} / {1,3,5}. `None` (default) =
+    las 12 filas. Usado para la corrida de verificación de una sola fila
+    antes de lanzar la matriz completa."""
+    if value is None:
+        return None
+    return {int(piece.strip()) for piece in value.split(",") if piece.strip()}
+
+
+def run_campaign(args: argparse.Namespace) -> int:
+    api = args.api.rstrip("/")
+    try:
+        approved, manifest, releases = smoke._sources(api)
+    except (smoke.ApiError, OSError) as error:
+        print(f"Fuentes no disponibles en {api}: {error}", file=sys.stderr)
+        return UNAVAILABLE
+    if not manifest.get("frozen") or manifest["dataset_version"] not in approved:
+        print(f"Sin manifest congelado sobre un release aprobado: {approved}", file=sys.stderr)
+        return UNAVAILABLE
+
+    selected = _parse_rows(args.rows)
+    rows_to_run = [row for row in MATRIX if selected is None or row.index in selected]
+    if selected is not None:
+        print(f"Verificación: solo fila(s) {sorted(selected)} de 12 (--rows)", flush=True)
+
+    results = [
+        _run_one(
+            api, args.tracking_uri, manifest, releases, row, timeout=args.timeout, poll=args.poll
+        )
+        for row in rows_to_run
+    ]
+    evidence = {"manifest": manifest, "results": results, "summary": summarize(results)}
+    args.evidence.parent.mkdir(parents=True, exist_ok=True)
+    args.evidence.write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return _print_summary(evidence["summary"])
+
+
+def audit_campaign(args: argparse.Namespace) -> int:
+    evidence = json.loads(args.evidence.read_text(encoding="utf-8"))
+    summary = summarize(evidence["results"])
+    return _print_summary(summary)
+
+
+def merge_campaign(args: argparse.Namespace) -> int:
+    """Combina los `results` de varios archivos de evidencia (p. ej. una
+    corrida de verificación de una fila + la campaña completa) en un solo
+    inventario, SIN descartar ningún intento. `summarize` decide el
+    representante de cada fila por `start_time` (#33) — los intentos que no
+    quedan como representante se quedan igual en `results`, documentados,
+    nunca ocultos."""
+    combined_results: list[dict] = []
+    manifest = None
+    for path in args.inputs:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        combined_results.extend(evidence["results"])
+        if manifest is None:
+            manifest = evidence.get("manifest")
+
+    summary = summarize(combined_results)
+    merged = {"manifest": manifest, "results": combined_results, "summary": summary}
+    args.evidence.write_text(
+        json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return _print_summary(summary)
+
+
+def enrich_campaign(args: argparse.Namespace) -> int:
+    """Rellena duration_seconds/peak_memory_mb/device/git_commit/start_time
+    desde MLflow sobre una evidencia YA escrita — consulta de solo lectura
+    sobre los 12 runs que ya existen. Nunca crea jobs ni reentrena nada."""
+    evidence = json.loads(args.evidence.read_text(encoding="utf-8"))
+    for result in evidence["results"]:
+        run_id = (result.get("report") or {}).get("run_id")
+        if not run_id:
+            continue
+        try:
+            result["details"] = _run_details(args.tracking_uri, run_id)
+        except Exception as error:
+            result["details"] = {"error": f"no se pudo leer detalles: {error}"}
+
+    summary = summarize(evidence["results"])
+    evidence["summary"] = summary
+    args.evidence.write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    head = _git_commit()
+    print(f"HEAD actual del repo: {head}")
+    run_commits = {
+        (r.get("details") or {}).get("git_commit")
+        for r in evidence["results"]
+        if (r.get("details") or {}).get("git_commit")
+    }
+    if run_commits - {head}:
+        print(
+            f"Nota: los 12 runs se entrenaron en commit(s) {sorted(run_commits)}, "
+            f"distinto del HEAD actual de este PR ({head}). El código de entrenamiento "
+            "(campaign/matrix.py, trainer/, training/) no cambió entre esos commits y "
+            "este HEAD — solo cambió el auditor/orquestador (campaign/run.py) — por eso "
+            "esta evidencia se completa sin reentrenar."
+        )
+
+    return _print_summary(summary)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="D04-03 - campaña de 12 runs OFAT (#33)")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    run = sub.add_parser("run", help="ejecuta las 12 filas como jobs reales y las audita")
+    run.add_argument("--api", default="http://localhost:8080/api")
+    run.add_argument("--tracking-uri", default="http://localhost:5000")
+    run.add_argument("--timeout", type=float, default=3600)
+    run.add_argument("--poll", type=float, default=5)
+    run.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+    run.add_argument(
+        "--rows",
+        default=None,
+        help="filas a ejecutar, ej. '1' o '1,3,5' (default: las 12 de la matriz)",
+    )
+
+    audit = sub.add_parser("audit", help="re-audita una evidencia ya escrita, sin red")
+    audit.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+
+    merge = sub.add_parser(
+        "merge", help="combina varios archivos de evidencia sin ocultar ningun intento"
+    )
+    merge.add_argument("inputs", nargs="+", type=Path, help="archivos de evidencia a combinar")
+    merge.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+
+    enrich = sub.add_parser(
+        "enrich",
+        help="rellena recursos/commit desde MLflow sobre runs YA existentes, sin reentrenar",
+    )
+    enrich.add_argument("--tracking-uri", default="http://localhost:5000")
+    enrich.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+
+    args = parser.parse_args(argv)
+    if args.command == "run":
+        return run_campaign(args)
+    if args.command == "enrich":
+        return enrich_campaign(args)
+    if args.command == "merge":
+        return merge_campaign(args)
+    return audit_campaign(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
