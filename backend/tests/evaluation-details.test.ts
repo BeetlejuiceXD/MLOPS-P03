@@ -209,6 +209,21 @@ describe('cálculos sin redondeo', () => {
     expect(accuracyTarget(56, 66).met).toBe(false); // 0.8484…
   });
 
+  it('ejemplos: orden por confianza descendente y, si empatan, por crop_id', () => {
+    const exported = structuredClone(evaluationPredictionsSchema.parse(SYNTHETIC.predictions));
+    const p = (cat: number) => ({ cat, dog: Number((1 - cat).toFixed(2)) });
+    exported.predictions = [
+      { crop_id: 1, true_class: 'cat', predicted_class: 'cat', probabilities: p(0.6) },
+      { crop_id: 2, true_class: 'cat', predicted_class: 'cat', probabilities: p(0.9) },
+      { crop_id: 3, true_class: 'cat', predicted_class: 'cat', probabilities: p(0.9) },
+      { crop_id: 4, true_class: 'dog', predicted_class: 'cat', probabilities: p(0.7) },
+      { crop_id: 5, true_class: 'dog', predicted_class: 'cat', probabilities: p(0.95) },
+    ];
+    const examples = evaluationExamples(exported);
+    expect(examples.correct.map((e) => e.crop_id)).toEqual([2, 3, 1]);
+    expect(examples.errors.map((e) => e.crop_id)).toEqual([5, 4]);
+  });
+
   it('ejemplos: mayor confianza primero, empate por crop_id, con tope por tipo', () => {
     const exported = evaluationPredictionsSchema.parse(SYNTHETIC.predictions);
     const examples = evaluationExamples(exported, 1);
@@ -275,7 +290,11 @@ describe('guardas y negativos: nada del test antes de tiempo, nada incoherente',
     selection.set('closed');
     evaluations.rows.set('official', asNamespace('official'));
     runs.failure = new Error('ECONNREFUSED mlflow:5000');
-    await expect(service().details()).rejects.toThrow(/ECONNREFUSED/);
+    const failure = service().details();
+    await expect(failure).rejects.toThrow(ServiceUnavailableError);
+    await expect(service().details()).rejects.toThrow(
+      `No se pudo leer el run cerrado ${CANDIDATE}: ECONNREFUSED`,
+    );
     await expect(service('official', null).details()).rejects.toThrow(/MLflow no está conectado/);
   });
 });
