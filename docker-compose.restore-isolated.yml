@@ -27,3 +27,16 @@ services:
   backend:
     ports: !override
       - "3101:3100"
+# Marca del restore (#104): los volúmenes del proyecto aislado se crean con estas
+# etiquetas. restore_guard.py solo permite un segundo restore sobre volúmenes que
+# las lleven con el mismo snapshot (md5 de data/mlflow_snapshot.dvc). Sin
+# P3_RESTORE_SNAPSHOT_ID (lo exporta restore.sh) esta configuración no resuelve.
+x-restore-marker: &restore-marker
+  labels:
+    org.p3.restore.marker: mlflow-snapshot-restore
+    org.p3.restore.snapshot: ${P3_RESTORE_SNAPSHOT_ID:?Ejecuta scripts/mlflow-snapshot/restore.sh}
+
+volumes:
+  mariadb_data: *restore-marker
+  minio_data: *restore-marker
+  torch_cache: *restore-marker
