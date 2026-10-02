@@ -32,8 +32,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "campaign", "tests"]
-src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "model_package", "tests"]
+src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "campaign", "model_package", "tests"]
 
 [tool.ruff.lint]
 # E/F: errores y pyflakes. I: orden de imports. B: bugbear (bugs probables).
@@ -42,8 +41,7 @@ src = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation"
 select = ["E", "F", "I", "B", "SIM", "C4", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "campaign"]
-known-first-party = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "model_package"]
+known-first-party = ["ingestion", "analyzers", "policies", "splits", "storage", "presentation", "copilot", "tracking", "training", "trainer_worker", "trainer", "evaluation", "campaign", "model_package"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

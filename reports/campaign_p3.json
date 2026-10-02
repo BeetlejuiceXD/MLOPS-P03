@@ -138,7 +138,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790914339768,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.158954248110305
       }
     },
     {
@@ -236,7 +237,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790914514045,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.1498487598415631
       }
     },
     {
@@ -334,7 +336,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790914754954,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.13173148013067557
       }
     },
     {
@@ -432,7 +435,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790914922026,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.17552780571268567
       }
     },
     {
@@ -530,7 +534,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790915178189,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.13506626536541466
       }
     },
     {
@@ -628,7 +633,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790915441488,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.158954248110305
       }
     },
     {
@@ -726,7 +732,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790915593424,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.31269411542522374
       }
     },
     {
@@ -824,7 +831,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790915749017,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.160326715586568
       }
     },
     {
@@ -922,7 +930,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790915955455,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.18807788551854554
       }
     },
     {
@@ -1020,7 +1029,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790916213135,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.21521837498606947
       }
     },
     {
@@ -1118,7 +1128,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790916388367,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.15969884045310875
       }
     },
     {
@@ -1216,7 +1227,8 @@
         "device": "cpu",
         "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
         "start_time": 1790916515638,
-        "run_kind": "training"
+        "run_kind": "training",
+        "best_val_loss": 0.12353167238075342
       }
     },
     {
@@ -1371,7 +1383,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.1498487598415631
         }
       },
       {
@@ -1389,7 +1401,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.13173148013067557
         }
       },
       {
@@ -1407,7 +1419,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.17552780571268567
         }
       },
       {
@@ -1425,7 +1437,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.13506626536541466
         }
       },
       {
@@ -1443,7 +1455,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.158954248110305
         }
       },
       {
@@ -1461,7 +1473,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.31269411542522374
         }
       },
       {
@@ -1479,7 +1491,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.160326715586568
         }
       },
       {
@@ -1497,7 +1509,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.18807788551854554
         }
       },
       {
@@ -1515,7 +1527,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.21521837498606947
         }
       },
       {
@@ -1533,7 +1545,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.15969884045310875
         }
       },
       {
@@ -1551,7 +1563,7 @@
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
           "run_kind": "training",
-          "best_val_loss": null
+          "best_val_loss": 0.12353167238075342
         }
       }
     ]
