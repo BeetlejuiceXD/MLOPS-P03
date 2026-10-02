@@ -55,6 +55,8 @@ function SelectionBody({
   }
   const candidate = state.candidate;
   const check = selectionCrossCheck(runs, state);
+  // El job sale del run de MLflow del candidato (tags.job_id), no de la selección.
+  const candidateJob = check.candidate?.tags.job_id;
   const rows = `Filas de campaña comparables: ${state.campaign_rows.length} (mínimo ${state.min_comparable_runs})`;
 
   if (check.problems.length > 0) {
@@ -82,9 +84,10 @@ function SelectionBody({
       <p>
         {state.status === "closed" ? "Candidato seleccionado" : "Candidato"}:{" "}
         <span className="font-mono text-xs">{candidate.run_id}</span> · fila OFAT{" "}
-        {candidate.campaign_row} · mejor época {candidate.best_epoch} · val accuracy{" "}
-        {percent(candidate.val_accuracy)} · macro-F1 {candidate.val_macro_f1.toFixed(4)} · val loss{" "}
-        {candidate.val_loss.toFixed(4)}
+        {candidate.campaign_row}
+        {candidateJob === undefined ? "" : ` · job ${candidateJob}`} · mejor época{" "}
+        {candidate.best_epoch} · val accuracy {percent(candidate.val_accuracy)} · macro-F1{" "}
+        {candidate.val_macro_f1.toFixed(4)} · val loss {candidate.val_loss.toFixed(4)}
       </p>
       {state.status === "closed" ? (
         <p className="text-status-done">MODEL SELECTION CLOSED el {dateTime(state.closed_at)}.</p>

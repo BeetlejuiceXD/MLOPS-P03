@@ -43,6 +43,8 @@ export function RunDetail({ runId, onClose }: Readonly<{ runId: string; onClose:
               <dd>
                 {dateTime(run.start_time)} → {dateTime(run.end_time)}
               </dd>
+              <dt className="text-ink-muted">Job</dt>
+              <dd data-testid="detail-job">{run.tags.job_id}</dd>
               <dt className="text-ink-muted">Commit</dt>
               <dd className="font-mono text-xs">{run.tags.git_commit}</dd>
               <dt className="text-ink-muted">Release / manifest</dt>

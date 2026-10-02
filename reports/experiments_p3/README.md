@@ -42,7 +42,9 @@ Conteo en Experiments: **16** runs de training, **12** cuentan para la campaña 
 aceptadas por D05-02) y **4** reintentos no cuentan. Antes de D05-03 decía "Elegibles para
 campaña: 16"; ese conteo solo se sigue mostrando mientras la selección no ha aceptado filas.
 
-**Candidato:** `2d56233c886142b7824e1551b90e8327`, fila 3, job 7. Experiments lo rotula
+**Candidato:** `2d56233c886142b7824e1551b90e8327`, fila 3, job 7 (`tags.job_id` = 7 en
+`1-experiments-runs.json`; `job_id` 7 en `3-mlflow-runs-search.json`). Experiments muestra
+"fila OFAT 3 · job 7" en el panel de selección y "Job 7" en el detalle del run; lo rotula
 "Candidato propuesto" y "Propuesta pendiente de cierre (D05-08)… No es un cierre formal".
 Detalle del run: commit `bb7deb5d`, release `v0.1.1`, manifest `p3-v0.1.1-s42`,
 `checkpoint_sha256` `0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b`,
