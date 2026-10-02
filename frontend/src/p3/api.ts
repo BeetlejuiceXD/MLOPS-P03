@@ -7,6 +7,7 @@ import {
   evaluationResponseSchema,
   experimentRunDetailSchema,
   experimentRunsResponseSchema,
+  localTestModelsResponseSchema,
   manifestSummarySchema,
   modelsResponseSchema,
   releasesResponseSchema,
@@ -26,3 +27,6 @@ export const useExperimentRun = (runId: string) =>
   useValidatedFetch(`/experiments/runs/${runId}`, experimentRunDetailSchema, WITH_REASON);
 export const useEvaluation = () => useValidatedFetch("/evaluation", evaluationResponseSchema);
 export const useModels = () => useValidatedFetch("/models", modelsResponseSchema);
+// D05-06: registro local_test (MinIO) de D04-06, aparte de la lista official.
+export const useLocalTestModels = () =>
+  useValidatedFetch("/models/local-test", localTestModelsResponseSchema, WITH_REASON);
