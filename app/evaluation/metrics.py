@@ -63,7 +63,13 @@ class MetricsReport:
         return meets_acceptance(self.correct, self.n_test)
 
     def to_ready_response(
-        self, *, candidate_run_id: str, closed_at: str, manifest_hash: str, evaluated_at: str
+        self,
+        *,
+        namespace: str,
+        candidate_run_id: str,
+        closed_at: str,
+        manifest_hash: str,
+        evaluated_at: str,
     ) -> EvaluationReady:
         """Salida contractual (`GET /api/evaluation`, estado `ready`) validada con las
         mismas reglas que backend y frontend. La validación rechaza `evaluated_at`
@@ -71,6 +77,7 @@ class MetricsReport:
         return EvaluationReady.model_validate(
             {
                 "state": "ready",
+                "namespace": namespace,
                 "selection": {
                     "candidate_run_id": candidate_run_id,
                     "metric": "val_accuracy",

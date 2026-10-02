@@ -259,10 +259,11 @@ MUTANTS = [
     # --- API ----------------------------------------------------------------------------
     Mutant(
         "R01",
-        "GET /evaluation cerrada responde 200 sin evaluación oficial",
-        ROUTES,
+        # Desde D04-05 GET /evaluation vive en evaluation.service.ts (antes en ROUTES).
+        "GET /evaluation ignora el bloqueo antes del cierre",
+        "src/logic/evaluation.service.ts",
         "if (blocked) return blocked;",
-        "return blocked ?? { state: 'ready' };",
+        "if (blocked) void blocked;",
     ),
     Mutant(
         "R02",

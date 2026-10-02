@@ -4,6 +4,7 @@
   "why": "accuracy = traza / n_test, sin redondear",
   "payload": {
     "state": "ready",
+    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",

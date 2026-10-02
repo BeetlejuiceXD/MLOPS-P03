@@ -7,7 +7,8 @@ import { sendError } from './http-errors.js';
  * D04-05 — Evaluation (`/api/...` detrás de nginx).
  *
  * - `GET /evaluation`: `evaluation_response`. `blocked` hasta MODEL SELECTION CLOSED;
- *   cerrada, `ready` con la evaluación oficial, o 404 mientras no exista (D06-01).
+ *   cerrada, `ready` con la evaluación oficial, o `pending` mientras no exista (D06-01,
+ *   D05-05). Un fallo (datos incoherentes, MariaDB caída) es 503 con el motivo.
  * - `GET /evaluation/predictions[?format=json|csv]`: exportación por muestra
  *   (`evaluation_predictions`); 409 antes del cierre, 404 sin evaluación. Con `csv` se
  *   descarga el mismo contenido como archivo.
