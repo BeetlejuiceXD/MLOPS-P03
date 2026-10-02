@@ -66,6 +66,18 @@ describe("Models official (D06-03): identidad exacta del objeto y su tarjeta", (
     expect(row).toHaveTextContent("Tarjeta verificada");
     expect(screen.getByTestId("official-row-1.1.0")).toHaveTextContent("Sin tarjeta");
   });
+
+  it("una tarjeta todavía sin verificar no se presenta como verificada", async () => {
+    mockApi({
+      "/api/models": ok("models_response", "valid-draft-with-draft-card"),
+      "/api/models/local-test": ok("local_test_models_response", "valid-empty"),
+    });
+    renderModels();
+    const row = await screen.findByTestId("official-row-1.2.0");
+    expect(row).toHaveTextContent("models/p3-cnn-classifier/1.2.0/model_card.json");
+    expect(row).toHaveTextContent("Tarjeta draft");
+    expect(row).not.toHaveTextContent("Tarjeta verificada");
+  });
 });
 
 describe("Models: official y local_test separados", () => {

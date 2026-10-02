@@ -1,0 +1,29 @@
+{
+  "contract": "models_response",
+  "valid": false,
+  "why": "Una tarjeta publicada tiene su VersionId (se verificó por versión exacta)",
+  "payload": {
+    "models": [
+      {
+        "semver": "1.2.0",
+        "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dvc_release": "v0.1.1",
+        "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "s3_bucket": "mlops-p2-prod-models-example",
+        "s3_key": "models/p3-cnn-classifier/1.2.0/model.pt",
+        "version_id": null,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "draft",
+        "published_at": null,
+        "model_card": {
+          "s3_key": "models/p3-cnn-classifier/1.2.0/model_card.json",
+          "version_id": null,
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "size_bytes": 2048,
+          "status": "published"
+        }
+      }
+    ]
+  }
+}

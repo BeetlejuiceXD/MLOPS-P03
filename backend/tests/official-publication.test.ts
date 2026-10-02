@@ -283,6 +283,11 @@ describe('ningún fallo termina como published', () => {
     expect(result.model.model.status).toBe('failed');
     expect(result.model.failure?.reason).toBe('model_card_failed');
     expect(store.puts).toEqual(['models/p3-cnn-classifier/1.0.0/model_card.json']);
+    // Models lo muestra tal cual: modelo y tarjeta failed, nada publicado.
+    const portal = createModelsPortalService({ repo: modelRepo, store, cardRepo, now: () => NOW });
+    const [listed] = (await portal.official()).models;
+    expect(listed?.status).toBe('failed');
+    expect(listed?.model_card).toMatchObject({ status: 'failed', version_id: null });
   });
 
   it('tarjeta ausente al verificar → el modelo no se sube y queda failed', async () => {
