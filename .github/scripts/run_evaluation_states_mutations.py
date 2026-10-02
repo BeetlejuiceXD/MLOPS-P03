@@ -7,8 +7,8 @@ del repo nunca se modifica:
   `evaluation_response`, del motor de métricas y del productor, `pyproject.toml`,
   `backend/src` (el test del productor compara columnas con las migraciones),
   `backend/tests/fixtures` y los fixtures compartidos.
-- `ts`: copia `backend/src`, los tests de evaluación, contratos y selección,
-  `package.json`, `tsconfig.json`, `backend/tests/fixtures`, los fixtures compartidos y el
+- `ts`: copia `backend/src`, los tests de evaluación, contratos y selección (con su
+  helper `tests/selection-runs.ts`), `package.json`, `tsconfig.json`, `backend/tests/fixtures`, los fixtures compartidos y el
   espejo `frontend/src/p3/contracts.ts`; `node_modules` se enlaza.
 - `fe`: copia `frontend/src`, los tests de la página Evaluation y de contratos,
   `tests/p3-fixtures.ts`, `package.json`, `tsconfig.json` y `vitest.config.ts`;
@@ -344,7 +344,7 @@ def build_isolated_copy(root: Path) -> tuple[Path, Path, Path]:
     backend = root / "backend"
     shutil.copytree(BACKEND / "src", backend / "src")
     (backend / "tests").mkdir(parents=True)
-    for name in TS_TESTS:
+    for name in [*TS_TESTS, "tests/selection-runs.ts"]:
         shutil.copy2(BACKEND / name, backend / name)
     shutil.copytree(BACKEND / "tests" / "fixtures", backend / "tests" / "fixtures")
     for name in ("package.json", "tsconfig.json"):

@@ -1,10 +1,11 @@
-"""Mutation testing de D04-04 (#73): selección por validation, estado y guardas del test.
+"""Mutation testing de D05-02 (#85): expediente de campaña, representante cronológico,
+intentos pendientes y guardas del cierre.
 
-Trabaja en una COPIA AISLADA: copia a un directorio temporal `backend/src`, el test
-`backend/tests/model-selection.test.ts` con su helper `tests/selection-runs.ts`,
-`package.json`, `tsconfig.json` y los fixtures
-de `contracts/p3/fixtures`; `node_modules` se enlaza (junction en Windows, symlink en
-Linux), no se copia ni se modifica. El árbol de trabajo del repo nunca se toca.
+Trabaja en una COPIA AISLADA: copia a un directorio temporal `backend/src`, los tests
+`backend/tests/model-selection.test.ts` y `backend/tests/campaign-dossier.test.ts` con su
+helper `tests/selection-runs.ts`, `package.json`, `tsconfig.json` y los fixtures de
+`contracts/p3/fixtures`; `node_modules` se enlaza (junction en Windows, symlink en Linux),
+no se copia ni se modifica. El árbol de trabajo del repo nunca se toca.
 
 Para cada mutante: el texto original debe aparecer exactamente una vez; se corre vitest
 con reporte JUnit, se registra QUÉ tests fallaron y CÓMO, y se restaura la copia.
@@ -22,8 +23,8 @@ Resultado por mutante:
 
 La base sin mutantes debe estar en verde. Sale con 0 solo si todos quedan KILLED.
 
-Uso (desde la raíz del repo, con `npm ci` hecho en backend/; ~3-5 min):
-    python .github/scripts/run_model_selection_mutations.py
+Uso (desde la raíz del repo, con `npm ci` hecho en backend/; ~4-6 min):
+    python .github/scripts/run_campaign_dossier_mutations.py
 """
 
 from __future__ import annotations
@@ -40,10 +41,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 BACKEND = REPO / "backend"
 SELECTION = "src/logic/model-selection.ts"
+DOSSIER = "src/logic/campaign-dossier.ts"
 SERVICE = "src/logic/model-selection.service.ts"
 ROUTES = "src/ui/model-selection.routes.ts"
-TEST = "tests/model-selection.test.ts"
-HELPER = "tests/selection-runs.ts"  # runs y jobs sintéticos compartidos (D05-02)
+TESTS = ["tests/model-selection.test.ts", "tests/campaign-dossier.test.ts"]
+HELPER = "tests/selection-runs.ts"
 
 
 @dataclass(frozen=True)
@@ -56,225 +58,213 @@ class Mutant:
 
 
 MUTANTS = [
-    # --- Ranking -----------------------------------------------------------------------
+    # --- Selección (D04-04 ampliada) --------------------------------------------------
     Mutant(
         "S01",
-        "menor val_accuracy primero",
+        "FINISHED sin checkpoint verificado sigue siendo elegible",
         SELECTION,
-        "at4(b.val_accuracy) - at4(a.val_accuracy) ||",
-        "at4(a.val_accuracy) - at4(b.val_accuracy) ||",
+        "if (!run.campaign_eligible) {",
+        "if (false) {",
     ),
     Mutant(
         "S02",
-        "val_accuracy sin igualdad a 4 decimales",
+        "un intento en curso de la matriz no bloquea el cierre",
         SELECTION,
-        "at4(b.val_accuracy) - at4(a.val_accuracy) ||",
-        "b.val_accuracy - a.val_accuracy ||",
+        "campaignRows.length >= MIN_COMPARABLE_RUNS && pending === 0,",
+        "campaignRows.length >= MIN_COMPARABLE_RUNS,",
     ),
     Mutant(
         "S03",
-        "sin desempate por macro-F1",
+        "SCHEDULED no cuenta como intento en curso",
         SELECTION,
-        "at4(b.val_macro_f1) - at4(a.val_macro_f1) ||",
-        "",
+        "pending: run.status === 'RUNNING' || run.status === 'SCHEDULED',",
+        "pending: run.status === 'RUNNING',",
     ),
     Mutant(
         "S04",
-        "macro-F1 sin igualdad a 4 decimales",
+        "un smoke en curso se toma como intento de la matriz",
         SELECTION,
-        "at4(b.val_macro_f1) - at4(a.val_macro_f1) ||",
-        "b.val_macro_f1 - a.val_macro_f1 ||",
+        "  if (campaignRow === null) {\n    return {\n      eligible: false,\n      reason: 'outside_campaign_matrix',",
+        "  if (campaignRow === null && run.status === 'FINISHED') {\n    return {\n      eligible: false,\n      reason: 'outside_campaign_matrix',",
+    ),
+    # --- Expediente: roles y orden --------------------------------------------------------
+    Mutant(
+        "D01",
+        "un retry se rotula como excluido, no como retry",
+        DOSSIER,
+        "role: excluded.reason === 'duplicate_campaign_row' ? 'retry' : 'excluded',",
+        "role: 'excluded',",
     ),
     Mutant(
-        "S05",
-        "gana la MAYOR val_loss",
-        SELECTION,
-        "at4(a.val_loss) - at4(b.val_loss) ||",
-        "at4(b.val_loss) - at4(a.val_loss) ||",
+        "D02",
+        "un intento activo no se marca pendiente",
+        DOSSIER,
+        "else if (active) verdict = { role: 'pending', reason: null, detail: null };",
+        "else if (false) verdict = { role: 'pending', reason: null, detail: null };",
     ),
     Mutant(
-        "S06",
-        "val_loss sin igualdad a 4 decimales",
-        SELECTION,
-        "at4(a.val_loss) - at4(b.val_loss) ||",
-        "a.val_loss - b.val_loss ||",
+        "D03",
+        "un job fallido sin run pierde su motivo",
+        DOSSIER,
+        "verdict = { role: 'excluded', reason: 'job_failed', detail: job.error };",
+        "verdict = { role: 'excluded', reason: null, detail: job.error };",
     ),
     Mutant(
-        "S07",
-        "gana el MAYOR run_id",
-        SELECTION,
-        "    compareText(a.run_id, b.run_id)\n  );",
-        "    compareText(b.run_id, a.run_id)\n  );",
+        "D04",
+        "un run excluido por D04-01 pierde sus motivos",
+        DOSSIER,
+        "return { role: 'excluded', reason: 'adapter_excluded', detail: adapter.reasons.join('; ') };",
+        "return { role: 'excluded', reason: 'adapter_excluded', detail: '' };",
     ),
     Mutant(
-        "S08",
-        "accuracy de la última época en vez del mejor checkpoint",
-        SELECTION,
-        "val_accuracy: run.summary.best_val_accuracy,",
-        "val_accuracy: run.history[run.history.length - 1]?.val_accuracy ?? 0,",
-    ),
-    # --- Elegibilidad --------------------------------------------------------------------
-    Mutant(
-        "S09",
-        "acepta runs no FINISHED con resumen",
-        SELECTION,
-        "if (run.status !== 'FINISHED' || run.summary === null) {",
-        "if (run.summary === null) {",
+        "D05",
+        "los intentos no van en orden cronológico",
+        DOSSIER,
+        "compareText(a.attempt.start_time ?? a.created_at, b.attempt.start_time ?? b.created_at) ||",
+        "0 ||",
     ),
     Mutant(
-        "S10",
-        "la fila de la matriz ignora la seed",
-        SELECTION,
-        "keys.every((key) => entry.config[key] === params[key]),",
-        "keys.every((key) => key === 'seed' || entry.config[key] === params[key]),",
+        "D06",
+        "la fila sale del request aunque el run entrenó otra config",
+        DOSSIER,
+        "row: campaignRowOf(run?.params ?? job.config),",
+        "row: campaignRowOf(job.config),",
     ),
     Mutant(
-        "S11",
-        "la fila de la matriz ignora ejes no barridos (patience)",
-        SELECTION,
-        "keys.every((key) => entry.config[key] === params[key]),",
-        "keys.every((key) => key === 'patience' || entry.config[key] === params[key]),",
+        "D07",
+        "los jobs controlled cuentan como intentos",
+        DOSSIER,
+        "if (job.task !== 'training') continue;",
+        "if (job.task === 'controlled' && false) continue;",
     ),
+    # --- Expediente: conciliación ---------------------------------------------------------
     Mutant(
-        "S12",
-        "sin comprobar el manifest congelado",
-        SELECTION,
-        "if (tags.manifest_hash !== reference.manifest_hash) {",
+        "C01",
+        "no compara el job_id que declara el run",
+        DOSSIER,
+        "if (run.tags.job_id !== job.id) {",
         "if (false) {",
     ),
     Mutant(
-        "S13",
-        "release comprobado sin dvc_release_hash",
-        SELECTION,
-        "tags.dvc_release !== reference.dataset_version ||\n"
-        "    tags.dvc_release_hash !== reference.dvc_release_hash",
-        "tags.dvc_release !== reference.dataset_version",
-    ),
-    Mutant(
-        "S14",
-        "sin comprobar sha256(images:annotations)",
-        SELECTION,
-        "if (tags.dvc_release_hash !== expectedHash) {",
+        "C02",
+        "no compara la config del run con el request",
+        DOSSIER,
+        "if (!sameConfig(job.config, run.params)) {",
         "if (false) {",
     ),
     Mutant(
-        "S15",
-        "fila repetida: cuenta la mejor, no la más temprana",
-        SELECTION,
-        "Date.parse(a.start_time) - Date.parse(b.start_time) || compareText(a.run_id, b.run_id),",
-        "compareRanked(a, b),",
+        "C03",
+        "no compara el manifest del job con el del run",
+        DOSSIER,
+        "if (job.manifest_hash !== run.tags.manifest_hash) {",
+        "if (false) {",
     ),
     Mutant(
-        "S16",
-        "fila repetida: cuentan todas las corridas",
-        SELECTION,
-        "if (first) ranking.push(first);",
-        "ranking.push(...candidates);",
+        "C04",
+        "no compara el release del job con el del run",
+        DOSSIER,
+        "if (job.dataset_version !== run.tags.dvc_release) {",
+        "if (false) {",
     ),
     Mutant(
-        "S17",
-        "cierre exige MÁS de 10 filas",
-        SELECTION,
-        # D05-02: además exige que no haya intentos de la matriz en curso.
-        "ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS && pending === 0,",
-        "ready_to_close: campaignRows.length > MIN_COMPARABLE_RUNS && pending === 0,",
+        "C05",
+        "no compara el estado del job con el del run",
+        DOSSIER,
+        "return RUN_STATUS_FOR_JOB[job.status].includes(runStatus)",
+        "return true",
     ),
     Mutant(
-        "S18",
-        "run_id repetido se ignora",
-        SELECTION,
-        "if (seen.has(id)) throw new ValidationError(`run_id repetido en la fuente: ${id}`);",
-        "if (seen.has(id)) continue;",
+        "C06",
+        "un job cuyo run no está en MLflow no es problema",
+        DOSSIER,
+        "if (runId !== null && !listedRuns.has(runId)) {",
+        "if (false) {",
     ),
-    # --- Estado y guardas ----------------------------------------------------------------
+    Mutant(
+        "C07",
+        "los runs sin job desaparecen del expediente",
+        DOSSIER,
+        "if (runId === null || claimed.has(runId)) continue;",
+        "if (true) continue;",
+    ),
+    Mutant(
+        "C08",
+        "un job_id repetido no es problema",
+        DOSSIER,
+        "if ((jobIds.get(job.id) ?? 0) > 1)",
+        "if (false)",
+    ),
+    Mutant(
+        "C09",
+        "un job fuera de contrato no bloquea",
+        DOSSIER,
+        "problems: ['el job no cumple el contrato training_job'],",
+        "problems: [],",
+    ),
+    # --- Expediente: bloqueos e identidad ------------------------------------------------
+    Mutant(
+        "B01",
+        "menos de 10 filas aceptadas no bloquea",
+        DOSSIER,
+        "if (acceptedRows.length < MIN_COMPARABLE_RUNS) {",
+        "if (false) {",
+    ),
+    Mutant(
+        "B02",
+        "las filas pendientes no bloquean",
+        DOSSIER,
+        "if (pendingRows.length > 0) {",
+        "if (false) {",
+    ),
+    Mutant(
+        "B03",
+        "los intentos que no concilian no bloquean",
+        DOSSIER,
+        "if (unreconciled.length > 0) {",
+        "if (false) {",
+    ),
+    Mutant(
+        "B04",
+        "ready_to_close ignora los bloqueos del expediente",
+        DOSSIER,
+        "ready_to_close: outcome.ready_to_close && closeBlockers.length === 0,",
+        "ready_to_close: outcome.ready_to_close,",
+    ),
+    Mutant(
+        "B05",
+        "la identidad del candidato no trae su job",
+        DOSSIER,
+        "job_id: tags.job_id,",
+        "job_id: 0,",
+    ),
+    Mutant(
+        "B06",
+        "la identidad del candidato no trae su checkpoint",
+        DOSSIER,
+        "checkpoint_sha256: run.checkpoint_sha256,",
+        "checkpoint_sha256: null,",
+    ),
+    # --- Servicio y API ----------------------------------------------------------------------
     Mutant(
         "V01",
-        "propose no se niega de entrada tras el cierre",
+        "el cierre ignora el expediente de campaña",
         SERVICE,
-        "if ((await repo.read()).status === 'closed') {\n"
-        "        throw new ConflictError('La selección ya está cerrada: no se vuelve a seleccionar.');",
-        "if (false) {\n"
-        "        throw new ConflictError('La selección ya está cerrada: no se vuelve a seleccionar.');",
+        "if (!dossier.ready_to_close) {",
+        "if (false) {",
     ),
     Mutant(
         "V02",
-        "propose guarda aunque no haya candidato",
+        "matches_proposal siempre dice que coincide",
         SERVICE,
-        "if (outcome.candidate === null) {",
-        "if (false) {",
+        "matches_proposal: proposedHash === null ? null : proposedHash === dossier.outcome_hash,",
+        "matches_proposal: proposedHash === null ? null : true,",
     ),
-    Mutant(
-        "V03",
-        "close no exige el run_id del candidato",
-        SERVICE,
-        "if (proposed.candidate.run_id !== runId.data) {",
-        "if (false) {",
-    ),
-    Mutant(
-        "V04",
-        "close no exige 10 filas comparables",
-        SERVICE,
-        "if (!proposed.ready_to_close) {",
-        "if (false) {",
-    ),
-    Mutant(
-        "V05",
-        "close no detecta que la campaña cambió",
-        SERVICE,
-        # D05-02: el recálculo sale de un snapshot compartido con el expediente.
-        "if (outcomeOf(snap).outcome_hash !== proposed.outcome_hash) {",
-        "if (false) {",
-    ),
-    Mutant(
-        "V06",
-        "close sin validar el formato del run_id",
-        SERVICE,
-        "if (!runId.success) {",
-        "if (false) {",
-    ),
-    Mutant(
-        "V07",
-        "close ignora el resultado de la escritura condicional",
-        SERVICE,
-        "if (!(await repo.close(proposed.outcome_hash, clock()))) {",
-        "if ((await repo.close(proposed.outcome_hash, clock())) && false) {",
-    ),
-    Mutant(
-        "V08",
-        "propose acepta un manifest no congelado",
-        SERVICE,
-        "if (!parsed.data.frozen) {",
-        "if (false) {",
-    ),
-    Mutant(
-        "V09",
-        "requireClosed acepta un candidato preparatorio",
-        SERVICE,
-        "if (status !== 'closed') {",
-        "if (status === 'open') {",
-    ),
-    Mutant(
-        "V10",
-        "Evaluation se desbloquea con un candidato preparatorio",
-        SERVICE,
-        "if ((await repo.read()).status === 'closed') return null;",
-        "if ((await repo.read()).status !== 'open') return null;",
-    ),
-    # --- API ----------------------------------------------------------------------------
     Mutant(
         "R01",
-        # Desde D04-05 GET /evaluation vive en evaluation.service.ts (antes en ROUTES).
-        "GET /evaluation ignora el bloqueo antes del cierre",
-        "src/logic/evaluation.service.ts",
-        "if (blocked) return blocked;",
-        "if (blocked) void blocked;",
-    ),
-    Mutant(
-        "R02",
-        "POST /selection/close lee otro campo del body",
+        "GET /selection/campaign no está montada",
         ROUTES,
-        "?.candidate_run_id),",
-        "?.run_id),",
+        "'/selection/campaign',",
+        "'/selection/campaigns',",
     ),
 ]
 
@@ -302,7 +292,7 @@ def build_isolated_copy(root: Path) -> Path:
     backend = root / "backend"
     shutil.copytree(BACKEND / "src", backend / "src")
     (backend / "tests").mkdir(parents=True)
-    for name in (TEST, HELPER):
+    for name in (*TESTS, HELPER):
         shutil.copy2(BACKEND / name, backend / name)
     for name in ("package.json", "tsconfig.json"):
         shutil.copy2(BACKEND / name, backend / name)
@@ -332,7 +322,7 @@ def run_vitest(backend: Path, report: Path) -> tuple[int, list[Failure], int]:
             node,
             "node_modules/vitest/vitest.mjs",
             "run",
-            TEST,
+            *TESTS,
             "--reporter=junit",
             f"--outputFile={report}",
         ],
@@ -369,6 +359,7 @@ def _detection(failures: list[Failure]) -> str:
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
     if not (BACKEND / "node_modules").is_dir():
         print("ERROR: falta backend/node_modules (corre `npm ci` en backend/).")
         return 2

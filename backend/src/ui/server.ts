@@ -27,7 +27,6 @@ import {
   mariaDbModelSelectionRepository,
   mariaDbP3SourcesRepository,
   mariaDbTrainingJobRepository,
-  runsAdapterPendingSource,
   searchImages,
   setImageStatus,
   updateAnnotation,
@@ -72,10 +71,8 @@ app.use(createP3SourcesRouter(p3Sources));
 
 // D04-01: runs reales del experimento p3-cnn-classifier (listado, detalle y artefactos),
 // leídos de MLflow por su API REST; MLflow caído → 503 con el motivo.
-app.use(
-  '/experiments',
-  createExperimentsRouter(createExperimentsService(createMlflowReader(env.MLFLOW_TRACKING_URI))),
-);
+const experiments = createExperimentsService(createMlflowReader(env.MLFLOW_TRACKING_URI));
+app.use('/experiments', createExperimentsRouter(experiments));
 
 // D05-06: Models lee el registro de D04-06. `/models` solo sirve `official`; las pruebas
 // locales (MinIO, namespace `local_test`) van aparte y nunca se presentan como publicación AWS.
@@ -83,20 +80,21 @@ app.use('/models', createModelsRouter(createRegistryModelsPortal(env.MODEL_S3_BU
 
 // D02-05: jobs de entrenamiento. La API solo encola; los ejecuta `trainer-worker`, que
 // vuelve a verificar las fuentes contra los archivos antes de entrenar (D03-03).
-app.use(
-  '/training',
-  createTrainingRouter(
-    createTrainingJobsService(mariaDbTrainingJobRepository, createEligibilityGate(p3Sources)),
-  ),
+const trainingJobs = createTrainingJobsService(
+  mariaDbTrainingJobRepository,
+  createEligibilityGate(p3Sources),
 );
+app.use('/training', createTrainingRouter(trainingJobs));
 
 // D04-04: selección SOLO por validation (estado persistido) y bloqueo de Evaluation hasta
-// MODEL SELECTION CLOSED. Los runs llegarán por el adaptador MLflow de D04-01; mientras
-// tanto proponer/cerrar responden 503 con el motivo.
+// MODEL SELECTION CLOSED. D05-02: los runs son los reales del adaptador MLflow (D04-01) y
+// los jobs de training concilian cada intento en el expediente `GET /selection/campaign`.
 const modelSelection = createModelSelectionService(
   mariaDbModelSelectionRepository,
-  runsAdapterPendingSource,
+  { list: () => experiments.listRuns() },
   p3Sources,
+  undefined,
+  { list: () => trainingJobs.list() },
 );
 app.use(createModelSelectionRouter(modelSelection));
 

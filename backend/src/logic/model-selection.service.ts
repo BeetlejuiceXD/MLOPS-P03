@@ -9,8 +9,11 @@
  *   candidato PREPARATORIO; se puede repetir mientras la selección no esté cerrada.
  * - `close` exige confirmar el run_id del candidato, al menos MIN_COMPARABLE_RUNS
  *   configuraciones de la matriz y que la campaña no haya cambiado desde la propuesta
- *   (se recalcula y se compara `outcome_hash`). La escritura es condicional: si otro
- *   proceso cambió el estado, no se cierra.
+ *   (se recalcula y se compara `outcome_hash`). D05-02: además, el expediente de campaña
+ *   no puede tener intentos pendientes ni intentos que no concilien request → job → run.
+ *   La escritura es condicional: si otro proceso cambió el estado, no se cierra.
+ * - `campaign` (D05-02) es el expediente de campaña de solo lectura: se recalcula con los
+ *   runs y jobs actuales en cualquier estado y nunca escribe.
  * - `closed` es definitivo: no se re-propone ni se vuelve a cerrar.
  * - `requireClosed` es la guarda de cualquier acceso a resultados del test, y
  *   `blockedEvaluation` la respuesta `blocked` de `GET /api/evaluation` mientras tanto.
@@ -19,6 +22,7 @@
  * oficial (MODEL SELECTION CLOSED) es de D05-02.
  */
 import { z } from 'zod';
+import { buildCampaignDossier, type CampaignDossier } from './campaign-dossier.js';
 import { ConflictError, ServiceUnavailableError, ValidationError } from './errors.js';
 import {
   MIN_COMPARABLE_RUNS,
@@ -56,6 +60,11 @@ export interface CampaignRunsSource {
   list(): Promise<unknown>;
 }
 
+/** Jobs de entrenamiento con el contrato `training_job_list` (D02-05). */
+export interface CampaignJobsSource {
+  list(): Promise<unknown>;
+}
+
 /** Manifest oficial con el contrato `manifest_summary` (D03-01/D03-03). */
 export interface FrozenManifestSource {
   manifest(): Promise<unknown>;
@@ -75,6 +84,14 @@ export interface SelectionState {
   closed_at: string | null;
 }
 
+/** Expediente de campaña (D05-02) y si coincide con la propuesta guardada. */
+export interface CampaignState extends CampaignDossier {
+  selection_status: SelectionStatus;
+  proposed_outcome_hash: string | null;
+  /** `null` sin propuesta guardada; `false` si la campaña cambió desde la propuesta. */
+  matches_proposal: boolean | null;
+}
+
 export interface ClosedSelection {
   candidate_run_id: string;
   closed_at: string;
@@ -85,6 +102,8 @@ export interface ModelSelectionService {
   state(): Promise<SelectionState>;
   propose(): Promise<SelectionState>;
   close(candidateRunId: unknown): Promise<SelectionState>;
+  /** Expediente de campaña de solo lectura (D05-02): nunca escribe. */
+  campaign(): Promise<CampaignState>;
   /** Guarda de todo acceso a resultados de test: ConflictError mientras no esté cerrada. */
   requireClosed(): Promise<ClosedSelection>;
   /** `evaluation_response` bloqueado mientras la selección no esté cerrada; `null` si lo está. */
@@ -101,6 +120,13 @@ export const runsAdapterPendingSource: CampaignRunsSource = {
   },
 };
 
+/** Fuente por defecto de jobs: sin ella no hay expediente ni cierre (503 con el motivo). */
+export const jobsSourcePendingSource: CampaignJobsSource = {
+  async list() {
+    throw new Error('la fuente de jobs de training no está conectada a la selección');
+  },
+};
+
 const runIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 
 // El sobre de la respuesta se valida aquí; cada run se valida (y excluye) por separado
@@ -108,7 +134,16 @@ const runIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 const runsEnvelopeSchema = z.object({
   experiment_name: z.literal(P3_EXPERIMENT),
   runs: z.array(z.unknown()),
+  excluded: z.array(z.unknown()).optional(),
 });
+
+// Igual con los jobs: cada uno se valida en el expediente, donde uno roto bloquea el cierre.
+const jobsEnvelopeSchema = z.object({ jobs: z.array(z.unknown()) });
+
+interface CampaignSnapshot {
+  reference: SelectionReference;
+  runs: z.infer<typeof runsEnvelopeSchema>;
+}
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -134,6 +169,7 @@ export function createModelSelectionService(
   runs: CampaignRunsSource,
   manifest: FrozenManifestSource,
   clock: () => Date = () => new Date(),
+  jobs: CampaignJobsSource = jobsSourcePendingSource,
 ): ModelSelectionService {
   async function loadReference(): Promise<SelectionReference> {
     let raw: unknown;
@@ -158,7 +194,7 @@ export function createModelSelectionService(
     };
   }
 
-  async function currentOutcome(): Promise<SelectionOutcome> {
+  async function snapshot(): Promise<CampaignSnapshot> {
     const reference = await loadReference();
     let raw: unknown;
     try {
@@ -170,7 +206,24 @@ export function createModelSelectionService(
     if (!envelope.success) {
       throw new ServiceUnavailableError('La lista de runs no cumple experiment_runs_response.');
     }
-    return selectCandidate(envelope.data.runs, reference);
+    return { reference, runs: envelope.data };
+  }
+
+  const outcomeOf = (snap: CampaignSnapshot): SelectionOutcome =>
+    selectCandidate(snap.runs.runs, snap.reference);
+
+  async function dossierOf(snap: CampaignSnapshot): Promise<CampaignDossier> {
+    let raw: unknown;
+    try {
+      raw = await jobs.list();
+    } catch (error) {
+      throw new ServiceUnavailableError(`Jobs de training no disponibles: ${errorText(error)}`);
+    }
+    const envelope = jobsEnvelopeSchema.safeParse(raw);
+    if (!envelope.success) {
+      throw new ServiceUnavailableError('La lista de jobs no cumple training_job_list.');
+    }
+    return buildCampaignDossier(snap.reference, snap.runs, envelope.data.jobs);
   }
 
   return {
@@ -182,7 +235,7 @@ export function createModelSelectionService(
       if ((await repo.read()).status === 'closed') {
         throw new ConflictError('La selección ya está cerrada: no se vuelve a seleccionar.');
       }
-      const outcome = await currentOutcome();
+      const outcome = outcomeOf(await snapshot());
       if (outcome.candidate === null) {
         throw new ConflictError(
           `Ningún run elegible para la selección (${outcome.excluded.length} excluidos).`,
@@ -218,14 +271,32 @@ export function createModelSelectionService(
             `(hay ${proposed.campaign_rows.length}).`,
         );
       }
-      const current = await currentOutcome();
-      if (current.outcome_hash !== proposed.outcome_hash) {
+      const snap = await snapshot();
+      if (outcomeOf(snap).outcome_hash !== proposed.outcome_hash) {
         throw new ConflictError('La campaña cambió desde la propuesta: vuelve a proponer.');
+      }
+      const dossier = await dossierOf(snap);
+      if (!dossier.ready_to_close) {
+        throw new ConflictError(
+          `El expediente de campaña no permite cerrar: ${dossier.close_blockers.join(' ')}`,
+        );
       }
       if (!(await repo.close(proposed.outcome_hash, clock()))) {
         throw new ConflictError('El estado de la selección cambió durante el cierre.');
       }
       return toState(await repo.read());
+    },
+
+    async campaign() {
+      const record = await repo.read();
+      const dossier = await dossierOf(await snapshot());
+      const proposedHash = record.outcome?.outcome_hash ?? null;
+      return {
+        ...dossier,
+        selection_status: record.status,
+        proposed_outcome_hash: proposedHash,
+        matches_proposal: proposedHash === null ? null : proposedHash === dossier.outcome_hash,
+      };
     },
 
     async requireClosed() {

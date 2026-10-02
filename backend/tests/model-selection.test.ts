@@ -6,10 +6,7 @@
  * preparatorio; MODEL SELECTION CLOSED de la campaña es D05-02. El repositorio en memoria
  * sustituye a MariaDB solo en estos tests de componente.
  */
-import { createHash } from 'node:crypto';
-import fs from 'node:fs';
 import type { AddressInfo } from 'node:net';
-import path from 'node:path';
 import express from 'express';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ConflictError, ServiceUnavailableError, ValidationError } from '../src/logic/errors.js';
@@ -19,7 +16,6 @@ import {
   campaignRowOf,
   MIN_COMPARABLE_RUNS,
   type SelectionOutcome,
-  type SelectionReference,
   selectCandidate,
 } from '../src/logic/model-selection.js';
 import {
@@ -38,112 +34,18 @@ import {
 } from '../src/logic/p3.contracts.js';
 import { createEvaluationRouter } from '../src/ui/evaluation.routes.js';
 import { createModelSelectionRouter } from '../src/ui/model-selection.routes.js';
-
-const FIXTURES = path.resolve('../contracts/p3/fixtures');
-const fixture = (contract: string, name: string): unknown =>
-  JSON.parse(fs.readFileSync(path.join(FIXTURES, contract, `${name}.json`), 'utf8')).payload;
-
-// --- Runs sintéticos -------------------------------------------------------------------
-
-const IMAGES_MD5 = '22222222222222222222222222222222.dir';
-const ANNOTATIONS_MD5 = '11111111111111111111111111111111.dir';
-const RELEASE_HASH = createHash('sha256').update(`${IMAGES_MD5}:${ANNOTATIONS_MD5}`).digest('hex');
-const MANIFEST_HASH = 'd'.repeat(64);
-const REFERENCE: SelectionReference = {
-  dataset_version: 'v0.1.1',
-  manifest_hash: MANIFEST_HASH,
-  dvc_release_hash: RELEASE_HASH,
-};
-
-interface RunOptions {
-  id: string; // un carácter hex: run_id = 32 veces ese carácter (o un run_id completo)
-  row?: number;
-  acc?: number;
-  f1?: number;
-  loss?: number;
-  status?: 'RUNNING' | 'FINISHED' | 'FAILED' | 'KILLED';
-  start?: string;
-  config?: Partial<TrainingConfig>;
-  tags?: Record<string, unknown>;
-}
-
-const runId = (id: string) => (id.length === 32 ? id : id.repeat(32));
-
-function matrixConfig(row: number): TrainingConfig {
-  const entry = CAMPAIGN_MATRIX[row - 1];
-  if (!entry) throw new Error(`La matriz no tiene fila ${row}`);
-  return entry.config;
-}
-
-/** Run con 3 épocas; el mejor checkpoint es la época 2 (NO la última), como en la campaña. */
-function makeRun(options: RunOptions): Record<string, unknown> {
-  const {
-    id,
-    row = 1,
-    acc = 0.86,
-    f1 = 0.85,
-    loss = 0.38,
-    status = 'FINISHED',
-    start = '2026-10-01T10:00:00Z',
-  } = options;
-  const base = matrixConfig(row);
-  const params = { ...base, ...options.config };
-  const finished = status !== 'RUNNING';
-  return {
-    run_id: runId(id),
-    experiment_name: 'p3-cnn-classifier',
-    status,
-    start_time: start,
-    end_time: finished ? '2026-10-01T11:00:00Z' : null,
-    params,
-    tags: {
-      git_commit: 'c'.repeat(40),
-      dvc_release: 'v0.1.1',
-      dvc_images_md5: IMAGES_MD5,
-      dvc_annotations_md5: ANNOTATIONS_MD5,
-      dvc_release_hash: RELEASE_HASH,
-      manifest_version: 'p3-v0.1.1-s42',
-      manifest_hash: MANIFEST_HASH,
-      classes: ['cat', 'dog'],
-      seed: params.seed,
-      job_id: 1,
-      ...options.tags,
-    },
-    // Un run FAILED/KILLED puede traer resumen parcial (el contrato lo permite): que
-    // tenga métricas no lo vuelve elegible.
-    summary: finished
-      ? { best_epoch: 2, best_val_accuracy: acc, best_val_macro_f1: f1, best_val_loss: loss }
-      : null,
-    history: [
-      epoch(1, acc - 0.1, f1 - 0.1, loss + 0.2),
-      epoch(2, acc, f1, loss),
-      epoch(3, acc - 0.02, f1 - 0.02, loss + 0.05),
-    ],
-    // D04-01: campos que agrega el adaptador MLflow al contrato de cada run.
-    checkpoint_sha256: status === 'FINISHED' ? 'e'.repeat(64) : null,
-    campaign_eligible: status === 'FINISHED',
-    ineligible_reasons: status === 'FINISHED' ? [] : [`estado ${status}: el run no terminó`],
-  };
-}
-
-function epoch(n: number, acc: number, f1: number, loss: number) {
-  return {
-    epoch: n,
-    train_loss: 0.4,
-    train_accuracy: 0.8,
-    val_loss: loss,
-    val_accuracy: acc,
-    val_macro_f1: f1,
-    learning_rate: 0.001,
-  };
-}
-
-/** Una corrida por cada fila 1..n de la matriz, todas válidas, con métricas distintas. */
-function campaign(n = 12): Record<string, unknown>[] {
-  return CAMPAIGN_MATRIX.slice(0, n).map((entry, i) =>
-    makeRun({ id: (i + 1).toString(16), row: entry.row, acc: 0.8 + i * 0.001 }),
-  );
-}
+import {
+  campaign,
+  fixture,
+  jobsFor,
+  MANIFEST_HASH,
+  makeRun,
+  matrixConfig,
+  queuedJob,
+  REFERENCE,
+  RELEASE_HASH,
+  runId,
+} from './selection-runs.js';
 
 const ids = (outcome: SelectionOutcome) => outcome.ranking.map((run) => run.run_id[0]);
 const reasonOf = (outcome: SelectionOutcome, id: string) =>
@@ -311,6 +213,12 @@ describe('solo runs válidos y comparables', () => {
     ['en curso', () => makeRun({ id: '1', row: 2, status: 'RUNNING' }), 'not_finished'],
     ['fallido', () => makeRun({ id: '1', row: 2, status: 'FAILED' }), 'not_finished'],
     ['cancelado', () => makeRun({ id: '1', row: 2, status: 'KILLED' }), 'not_finished'],
+    ['programado', () => makeRun({ id: '1', row: 2, status: 'SCHEDULED' }), 'not_finished'],
+    [
+      'FINISHED sin checkpoint verificado (D04-01 no lo da por elegible)',
+      () => makeRun({ id: '1', row: 2, checkpoint: null }),
+      'not_campaign_eligible',
+    ],
     [
       'smoke (max_epochs=10, fuera de la matriz)',
       () => makeRun({ id: '1', row: 1, config: { max_epochs: 10 } }),
@@ -395,6 +303,26 @@ describe('solo runs válidos y comparables', () => {
     expect(reasonOf(outcome, 'a')).toBe('not_finished');
   });
 
+  it.each(['RUNNING', 'SCHEDULED'] as const)(
+    'un intento %s de la matriz impide cerrar el conteo, aunque haya 12 filas',
+    (status) => {
+      // D05-02: con intentos pendientes no se cierra el conteo ni se propone ganador final.
+      const running = makeRun({ id: '0', row: 1, status, start: '2026-10-01T08:00:00Z' });
+      const outcome = selectCandidate([...campaign(), running], REFERENCE);
+      expect(outcome.campaign_rows).toHaveLength(12);
+      expect(outcome.candidate?.run_id).toBe(runId('c'));
+      expect(outcome.ready_to_close).toBe(false);
+      expect(reasonOf(outcome, '0')).toBe('not_finished');
+    },
+  );
+
+  it('un run en curso fuera de la matriz (p. ej. un smoke) no bloquea el cierre', () => {
+    const smoke = makeRun({ id: '0', row: 1, status: 'RUNNING', config: { max_epochs: 10 } });
+    const outcome = selectCandidate([...campaign(), smoke], REFERENCE);
+    expect(reasonOf(outcome, '0')).toBe('outside_campaign_matrix');
+    expect(outcome.ready_to_close).toBe(true);
+  });
+
   it('los runs sintéticos de este archivo cumplen el contrato real de runs', () => {
     for (const run of campaign()) expect(experimentRunSchema.safeParse(run).success).toBe(true);
   });
@@ -440,6 +368,7 @@ describe('servicio de selección', () => {
   let manifest: Record<string, unknown>;
   let now: Date;
   let listCalls: number;
+  let jobs: Record<string, unknown>[] | null;
 
   const service = () =>
     createModelSelectionService(
@@ -447,11 +376,13 @@ describe('servicio de selección', () => {
       {
         list: async () => {
           listCalls += 1;
-          return { experiment_name: 'p3-cnn-classifier', runs };
+          return { experiment_name: 'p3-cnn-classifier', runs, excluded: [] };
         },
       },
       { manifest: async () => manifest },
       () => now,
+      // Por defecto, un job de training conciliado por run (D05-02).
+      { list: async () => ({ jobs: jobs ?? jobsFor(runs) }) },
     );
 
   beforeEach(() => {
@@ -466,6 +397,7 @@ describe('servicio de selección', () => {
     expect(manifestSummarySchema.safeParse(manifest).success).toBe(true);
     now = new Date('2026-10-01T12:00:00Z');
     listCalls = 0;
+    jobs = null;
   });
 
   it('empieza abierta, sin candidato, y Evaluation responde bloqueado por contrato', async () => {
@@ -576,6 +508,10 @@ describe('servicio de selección', () => {
     const proposed = await service().propose();
     expect(proposed.ready_to_close).toBe(false);
     await expect(service().close(proposed.candidate?.run_id)).rejects.toThrow(ConflictError);
+    // Lo rechaza la guarda de la propuesta, antes de recalcular la campaña.
+    await expect(service().close(proposed.candidate?.run_id)).rejects.toThrow(
+      /al menos 10 configuraciones comparables/,
+    );
     expect((await repo.read()).status).toBe('candidate');
   });
 
@@ -590,6 +526,54 @@ describe('servicio de selección', () => {
     await service().propose();
     repo.close = async () => false;
     await expect(service().close(runId('c'))).rejects.toThrow(ConflictError);
+  });
+
+  it('no cierra con un job de la matriz todavía en cola (intento pendiente)', async () => {
+    const proposed = await service().propose();
+    expect(proposed.ready_to_close).toBe(true);
+    jobs = [...jobsFor(runs), queuedJob(99, 4)];
+    await expect(service().close(runId('c'))).rejects.toThrow(/pendiente/);
+    expect((await repo.read()).status).toBe('candidate');
+  });
+
+  it('no cierra si un job no concilia con su run (request ≠ config del run)', async () => {
+    await service().propose();
+    jobs = jobsFor(runs).map((job) =>
+      job.mlflow_run_id === runId('5') ? { ...job, config: matrixConfig(6) } : job,
+    );
+    await expect(service().close(runId('c'))).rejects.toThrow(/concilia/);
+    expect((await repo.read()).status).toBe('candidate');
+  });
+
+  it('expediente de campaña: solo lectura, en cualquier estado, mismo outcome que la selección', async () => {
+    const before = await service().campaign();
+    expect(before.selection_status).toBe('open');
+    expect(before.matches_proposal).toBeNull();
+    expect(before.rows.map((row) => row.status)).toEqual(Array(12).fill('accepted'));
+    expect(repo.writes).toBe(0);
+
+    const proposed = await service().propose();
+    const after = await service().campaign();
+    expect(after.outcome_hash).toBe(proposed.outcome_hash);
+    expect(after.matches_proposal).toBe(true);
+    expect(after.candidate?.run_id).toBe(proposed.candidate?.run_id);
+
+    runs = [...runs, makeRun({ id: '0', row: 2, status: 'RUNNING', job: 50 })];
+    expect((await service().campaign()).matches_proposal).toBe(false);
+    expect(repo.writes).toBe(1);
+  });
+
+  it('sin la fuente de jobs el expediente y el cierre responden 503, sin escribir', async () => {
+    const svc = createModelSelectionService(
+      repo,
+      { list: async () => ({ experiment_name: 'p3-cnn-classifier', runs, excluded: [] }) },
+      { manifest: async () => manifest },
+      () => now,
+    );
+    await expect(svc.campaign()).rejects.toThrow(ServiceUnavailableError);
+    await svc.propose();
+    await expect(svc.close(runId('c'))).rejects.toThrow(ServiceUnavailableError);
+    expect((await repo.read()).status).toBe('candidate');
   });
 
   it('sin manifest congelado no propone', async () => {
@@ -665,6 +649,7 @@ describe('API de selección y bloqueo de Evaluation', () => {
         }),
       },
       () => new Date('2026-10-01T12:00:00Z'),
+      { list: async () => ({ jobs: jobsFor(campaign()) }) },
     );
     const app = express();
     app.use(express.json());
@@ -714,6 +699,17 @@ describe('API de selección y bloqueo de Evaluation', () => {
     expect(evaluation.status).toBe(200);
     // D05-05: cerrada y sin evaluación oficial = `pending` (resultado ausente), sin resultados.
     expect(evaluationResponseSchema.parse(await evaluation.json()).state).toBe('pending');
+  });
+
+  it('GET /selection/campaign: expediente por fila sin escribir ni cambiar el estado', async () => {
+    const res = await call('GET', '/selection/campaign');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.rows).toHaveLength(12);
+    expect(body.ready_to_close).toBe(true);
+    expect(body.candidate).toMatchObject({ run_id: runId('c'), job_id: 12 });
+    expect(await (await call('GET', '/selection')).json()).toMatchObject({ status: 'open' });
+    expect(repo.writes).toBe(0);
   });
 
   it('sin el adaptador de runs (D04-01) proponer responde 503 con el motivo, sin escribir', async () => {

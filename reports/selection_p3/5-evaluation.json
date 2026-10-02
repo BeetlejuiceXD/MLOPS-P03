@@ -1,0 +1,1 @@
+{"state":"blocked","reason":"model_selection_open","detail":"MODEL SELECTION CLOSED no existe todavía: el frozen test solo se evalúa después del cierre de la selección por validation."}
