@@ -13,6 +13,12 @@ tamaño de cada archivo) y exactamente estos archivos:
 
 `format_version` es la versión del FORMATO; no es el semver del modelo, que asigna D06-02
 al package final.
+
+D06-02 reutiliza este mismo formato para el paquete final (`kind="official"`, ver
+`model_package.official`): mismo layout de archivos, mismo loader — solo cambia el
+contenido de `smoke_card.json` (nombre de archivo sin cambios, por compatibilidad con el
+loader ya probado; lo que distingue smoke de official es `kind` y el contenido de la
+tarjeta, no la ruta).
 """
 
 from __future__ import annotations
@@ -94,7 +100,7 @@ class PackageManifest(BaseModel):
 
     format: Literal["p3-model-package"]
     format_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
-    kind: Literal["smoke"]
+    kind: Literal["smoke", "official"]
     package_id: str = Field(min_length=1)
     created_at: str = Field(min_length=1)
     source: Source
