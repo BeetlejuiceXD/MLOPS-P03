@@ -32,12 +32,14 @@ def _ok(
     config: dict | None = None,
 ) -> dict:
     config = config if config is not None else _frozen_config(row)
+    resolved_job_id = job_id if job_id is not None else row
     return {
         "row": row,
         "change": "x",
         "request": {"task": "training", "config": config},
         "job": {
-            "id": job_id if job_id is not None else row,
+            "id": resolved_job_id,
+            "task": "training",
             "status": "succeeded",
             "config": config,
             "mlflow_run_id": run_id,
@@ -50,7 +52,7 @@ def _ok(
             "best_val_macro_f1": 0.90,
             "checkpoint_sha256": "a" * 64,
             "manifest_hash": "b" * 64,
-            "tags": {"p3.run_kind": "training"},
+            "tags": {"p3.run_kind": "training", "job_id": str(resolved_job_id)},
             "problems": [],
         },
         "details": {
@@ -157,10 +159,12 @@ def test_resources_and_commit_are_surfaced_per_row():
         "peak_memory_mb": 512.0,
         "device": "cpu",
         "git_commit": "abc123",
+        "run_kind": "training",
     }
 
 
-# --- Reintentos (#33): se elige por start_time, NUNCA por metrica -----------------
+# --- Reintentos (#33): se elige por start_time, NUNCA por metrica, NUNCA ----------
+# --- usando run_id como sustituto de un start_time faltante ----------------------
 
 
 def test_retry_selection_picks_earlier_start_time_not_better_metric():
@@ -186,6 +190,36 @@ def test_retry_selection_breaks_start_time_tie_with_lower_run_id():
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
     assert row_1["run_id"] == "run-aaa"
+
+
+def test_single_valid_attempt_does_not_need_start_time():
+    # Caso real de la campana: un solo intento por fila, sin reintentos. No
+    # hay nada que elegir, asi que falta de start_time no debe invalidarla.
+    only_attempt = _ok(1, run_id="run-1", start_time=None)
+    results = [only_attempt] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is True
+    assert row_1["run_id"] == "run-1"
+
+
+def test_multiple_valid_attempts_with_missing_start_time_are_not_resolved_by_run_id():
+    # Dos intentos validos, a uno le falta start_time: NO se debe caer en
+    # comparar run_id como si fuera el tiempo. Debe quedar documentado como
+    # problema, no resuelto en silencio.
+    with_time = _ok(1, run_id="run-aaa", start_time=1_000_000)
+    without_time = _ok(1, run_id="run-zzz", start_time=None)
+    results = [with_time, without_time] + [
+        _ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]
+    ]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("start_time" in p for p in row_1["problems"])
 
 
 def test_retry_selection_skips_invalid_attempts_and_picks_the_only_valid_one():
@@ -266,6 +300,38 @@ def test_request_task_other_than_training_invalidates_the_row():
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
     assert row_1["valid"] is False
     assert any("request.task" in p for p in row_1["problems"])
+
+
+def test_job_task_other_than_training_invalidates_the_row():
+    # Independiente de request.task: aqui es job.task (lo que el backend
+    # guardo), que podria diferir del request si hay un bug de la API.
+    wrong_job_task = _ok(1, run_id="run-1")
+    wrong_job_task["job"]["task"] = "controlled_task"
+
+    results = [wrong_job_task] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("job.task" in p for p in row_1["problems"])
+
+
+def test_job_id_mismatch_versus_run_tag_invalidates_the_row():
+    # El tag job_id que el run guarda en MLflow debe coincidir con job.id;
+    # si no, algo esta mal enlazado entre el job y el run.
+    wrong_job_id_tag = _ok(1, run_id="run-1", job_id=1)
+    wrong_job_id_tag["report"]["tags"]["job_id"] = "999"  # no coincide con job.id=1
+
+    results = [wrong_job_id_tag] + [
+        _ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]
+    ]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("tag job_id" in p for p in row_1["problems"])
 
 
 def test_run_kind_tag_other_than_training_invalidates_the_row():

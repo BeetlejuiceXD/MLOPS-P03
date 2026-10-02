@@ -140,7 +140,8 @@ def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
     - fila (matriz OFAT congelada) -> request.config
     - request.config -> job.config
     - job.mlflow_run_id -> report.run_id
-    - task=training y tag MLflow p3.run_kind=training
+    - request.task y job.task son "training"
+    - tag MLflow p3.run_kind=training y tag job_id == job.id
     - el reporte de verify_smoke está completo (no a medias)
     La unicidad de `run_id` es entre filas, no por intento — se audita
     aparte en `summarize`."""
@@ -162,8 +163,13 @@ def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
         problems.append(f"job.mlflow_run_id != report.run_id: {mismatch}")
     if request.get("task") != "training":
         problems.append(f"request.task={request.get('task')!r}, se esperaba 'training'")
+    if job.get("task") != "training":
+        problems.append(f"job.task={job.get('task')!r}, se esperaba 'training'")
     if succeeded and report.get("tags", {}).get("p3.run_kind") != "training":
         problems.append("tag p3.run_kind del run no es 'training'")
+    if succeeded and report.get("tags", {}).get("job_id") != str(job.get("id")):
+        tag_job_id = report.get("tags", {}).get("job_id")
+        problems.append(f"tag job_id del run ({tag_job_id!r}) != job.id ({job.get('id')!r})")
 
     if succeeded and report.get("run_status") != "FINISHED":
         problems.append(f"run_status={report.get('run_status')!r}, se esperaba FINISHED")
@@ -195,15 +201,13 @@ def _retry_key(attempt: dict) -> dict:
 
 def _earlier_retry(candidate: dict, current: dict) -> bool:
     """¿`candidate` desplaza a `current` como el intento que cuenta para la
-    fila? Entre varios intentos válidos y FINISHED de la misma fila, #33 dice
-    que se queda el de menor `start_time` (el que corrió primero) — nunca el
-    de mejor accuracy/F1/loss: eso sería elegir entre corridas reales por
-    resultado, lo que #33 prohíbe explícitamente. Empate exacto de
-    `start_time` (no debería pasar; MLflow lo asigna al crear el run):
-    `run_id` menor, determinista."""
-    candidate_time, current_time = candidate.get("start_time"), current.get("start_time")
-    if candidate_time is not None and current_time is not None and candidate_time != current_time:
-        return candidate_time < current_time
+    fila? Solo se llama cuando AMBOS ya tienen `start_time` no nulo —
+    `summarize` lo garantiza antes de comparar; `run_id` nunca sustituye un
+    tiempo faltante, solo desempata un tiempo exactamente igual (#33: nunca
+    por accuracy/F1/loss — eso sería elegir entre corridas reales por
+    resultado)."""
+    if candidate["start_time"] != current["start_time"]:
+        return candidate["start_time"] < current["start_time"]
     return candidate["run_id"] < current["run_id"]
 
 
@@ -239,14 +243,39 @@ def summarize(results: list[dict]) -> dict:
             a for a in enriched if a["job"]["status"] == "succeeded" and not a["problems"]
         ]
 
-        if candidates:
+        if len(candidates) == 1:
+            # Un solo intento valido: no hay nada que elegir, start_time no
+            # hace falta para esto (es el caso real de la campana sin
+            # reintentos).
             chosen = candidates[0]
-            chosen_key = _retry_key(chosen)
-            for candidate in candidates[1:]:
-                candidate_key = _retry_key(candidate)
-                if _earlier_retry(candidate_key, chosen_key):
-                    chosen, chosen_key = candidate, candidate_key
             valid = True
+        elif candidates:
+            # Varios intentos validos de verdad: #33 exige elegir por menor
+            # start_time. Si a CUALQUIERA le falta, no se puede garantizar
+            # el criterio sin inventarlo -> se documenta el problema, nunca
+            # se usa run_id como sustituto del tiempo.
+            missing_time = [
+                c for c in candidates if (c.get("details") or {}).get("start_time") is None
+            ]
+            if missing_time:
+                chosen = candidates[-1]
+                chosen = {
+                    **chosen,
+                    "problems": [
+                        *chosen["problems"],
+                        "varios intentos validos pero falta start_time en al menos uno: "
+                        "no se puede elegir representante sin inventar un criterio (#33)",
+                    ],
+                }
+                valid = False
+            else:
+                chosen = candidates[0]
+                chosen_key = _retry_key(chosen)
+                for candidate in candidates[1:]:
+                    candidate_key = _retry_key(candidate)
+                    if _earlier_retry(candidate_key, chosen_key):
+                        chosen, chosen_key = candidate, candidate_key
+                valid = True
         else:
             chosen = enriched[-1]  # ninguno valido: se documenta el mas reciente, no se oculta
             valid = False
@@ -284,6 +313,7 @@ def summarize(results: list[dict]) -> dict:
                     "peak_memory_mb": details.get("peak_memory_mb"),
                     "device": details.get("device"),
                     "git_commit": details.get("git_commit"),
+                    "run_kind": (chosen.get("report") or {}).get("tags", {}).get("p3.run_kind"),
                 },
             }
         )
