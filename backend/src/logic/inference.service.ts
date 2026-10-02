@@ -66,6 +66,14 @@ export interface InferenceRepository {
   findQueueItem(inferenceId: number): Promise<QueueRecord | null>;
   /** Lanza `DuplicateQueueItemError` si la inferencia ya tiene elemento. */
   insertQueueItem(item: Omit<QueueRecord, 'id'>): Promise<QueueRecord>;
+  /**
+   * Archivo nuevo: crea la imagen `pending` del portal y el elemento de la cola en UNA
+   * transacción (o ninguno de los dos). Lanza `DuplicateQueueItemError` igual que arriba.
+   */
+  insertQueueItemWithNewImage(
+    image: NewPortalImage,
+    item: Omit<QueueRecord, 'id' | 'image_id'>,
+  ): Promise<QueueRecord>;
   listQueue(): Promise<QueueRecord[]>;
 }
 
@@ -80,15 +88,16 @@ export interface PortalImages {
   } | null>;
   readImage(imageId: number): Promise<{ bytes: Buffer; mimeType: string } | null>;
   imageExists(imageId: number): Promise<boolean>;
-  createPendingImage(image: {
-    filename: string;
-    storageKey: string;
-    mimeType: string;
-    width: number;
-    height: number;
-    sizeBytes: number;
-  }): Promise<number>;
-  deleteImageRow(imageId: number): Promise<void>;
+}
+
+/** Fila nueva de `images` (portal) para un archivo enviado a la cola. */
+export interface NewPortalImage {
+  filename: string;
+  storageKey: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
 }
 
 export interface UploadedFile {
@@ -100,6 +109,30 @@ export interface UploadedFile {
 
 const HISTORY_LIMIT = 50;
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+
+/**
+ * MariaDB o MinIO caídos: 503 con un mensaje fijo. La causa (consulta, parámetros, host)
+ * va solo al log del servidor. Los errores de dominio (404, 400, 409, duplicado) pasan.
+ */
+async function infra<T>(what: string, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (
+      error instanceof NotFoundError ||
+      error instanceof ValidationError ||
+      error instanceof ConflictError ||
+      error instanceof ServiceUnavailableError ||
+      error instanceof DuplicateQueueItemError
+    ) {
+      throw error;
+    }
+    console.error(`[inference] ${what} falló:`, error);
+    throw new ServiceUnavailableError(
+      `No se pudo ${what}: la base de datos o el almacenamiento no están disponibles.`,
+    );
+  }
+}
 
 function engineError(error: unknown): Error {
   if (error instanceof EngineRejectedInputError) {
@@ -188,7 +221,7 @@ export function createInferenceService(deps: {
   }
 
   async function requireInference(id: number): Promise<StoredInference> {
-    const stored = await repo.find(id);
+    const stored = await infra('leer la inferencia', () => repo.find(id));
     if (!stored) throw new NotFoundError(`La inferencia ${id} no existe`);
     return stored;
   }
@@ -233,7 +266,9 @@ export function createInferenceService(deps: {
         throw new ValidationError('No se pudieron obtener las dimensiones de la imagen.');
       }
       const prediction = await predict(file.buffer, file.mimeType);
-      const storageKey = await images.storeInput(file.buffer, file.mimeType);
+      const storageKey = await infra('guardar la imagen de entrada', () =>
+        images.storeInput(file.buffer, file.mimeType),
+      );
       return save({
         created_at: now(),
         input: {
@@ -254,9 +289,13 @@ export function createInferenceService(deps: {
 
     /** Crop: la caja de una anotación existente, recortada de la imagen original. */
     async predictCrop(annotationId: number): Promise<InferenceResult> {
-      const annotation = await images.findAnnotation(annotationId);
+      const annotation = await infra('leer la anotación del portal', () =>
+        images.findAnnotation(annotationId),
+      );
       if (!annotation) throw new NotFoundError(`La anotación ${annotationId} no existe`);
-      const image = await images.readImage(annotation.image_id);
+      const image = await infra('leer la imagen del portal', () =>
+        images.readImage(annotation.image_id),
+      );
       if (!image) throw new NotFoundError(`La imagen ${annotation.image_id} no existe`);
       const meta = await sharp(image.bytes).metadata();
       const [x, y, w, h] = annotation.bbox;
@@ -299,56 +338,61 @@ export function createInferenceService(deps: {
 
     async get(id: number): Promise<InferenceResult> {
       const stored = await requireInference(id);
-      return toResult(stored, (await repo.findQueueItem(id))?.id ?? null);
+      const item = await infra('leer la cola de anotación', () => repo.findQueueItem(id));
+      return toResult(stored, item?.id ?? null);
     },
 
     async list() {
-      const rows = await repo.list(HISTORY_LIMIT);
-      const inferences = await Promise.all(
-        rows.map(async (row) => toResult(row, (await repo.findQueueItem(row.id))?.id ?? null)),
-      );
+      const inferences = await infra('leer las inferencias', async () => {
+        const rows = await repo.list(HISTORY_LIMIT);
+        return Promise.all(
+          rows.map(async (row) => toResult(row, (await repo.findQueueItem(row.id))?.id ?? null)),
+        );
+      });
       return { inferences };
     },
 
     /** Idempotente: el segundo envío devuelve el mismo elemento (`created: false`). */
     async sendToQueue(id: number): Promise<{ item: AnnotationQueueItem; created: boolean }> {
       const stored = await requireInference(id);
-      const existing = await repo.findQueueItem(id);
+      const existing = await infra('leer la cola de anotación', () => repo.findQueueItem(id));
       if (existing) return { item: toQueueItem(existing, stored), created: false };
 
-      let imageId: number;
-      let createdImage = false;
-      if (stored.input.kind === 'crop') {
-        imageId = stored.input.image_id;
-        if (!(await images.imageExists(imageId))) {
-          throw new ConflictError(`La imagen ${imageId} del crop ya no existe en el portal`);
-        }
-      } else {
-        imageId = await images.createPendingImage({
-          filename: stored.input.filename,
-          storageKey: stored.storage_key as string,
-          mimeType: stored.input.mime_type,
-          width: stored.input.width,
-          height: stored.input.height,
-          sizeBytes: stored.input.size_bytes,
-        });
-        createdImage = true;
-      }
       try {
-        const record = await repo.insertQueueItem({
-          inference_id: id,
-          image_id: imageId,
-          annotation_id: stored.input.kind === 'crop' ? stored.input.annotation_id : null,
-          created_at: now(),
-        });
+        let record: QueueRecord;
+        if (stored.input.kind === 'crop') {
+          const { image_id: imageId, annotation_id: annotationId } = stored.input;
+          if (!(await infra('leer la imagen del portal', () => images.imageExists(imageId)))) {
+            throw new ConflictError(`La imagen ${imageId} del crop ya no existe en el portal`);
+          }
+          record = await repo.insertQueueItem({
+            inference_id: id,
+            image_id: imageId,
+            annotation_id: annotationId,
+            created_at: now(),
+          });
+        } else {
+          // Imagen pending y elemento en una sola transacción: no hay limpieza que pueda fallar.
+          record = await repo.insertQueueItemWithNewImage(
+            {
+              filename: stored.input.filename,
+              storageKey: stored.storage_key as string,
+              mimeType: stored.input.mime_type,
+              width: stored.input.width,
+              height: stored.input.height,
+              sizeBytes: stored.input.size_bytes,
+            },
+            { inference_id: id, annotation_id: null, created_at: now() },
+          );
+        }
         return { item: toQueueItem(record, stored), created: true };
       } catch (error) {
-        if (createdImage) await images.deleteImageRow(imageId).catch(() => undefined);
         if (error instanceof DuplicateQueueItemError) {
           // Otro envío simultáneo ganó: se devuelve el suyo, sin duplicar.
-          const winner = await repo.findQueueItem(id);
+          const winner = await infra('leer la cola de anotación', () => repo.findQueueItem(id));
           if (winner) return { item: toQueueItem(winner, stored), created: false };
         }
+        if (error instanceof ConflictError || error instanceof ServiceUnavailableError) throw error;
         console.error('[inference] insert de p3_annotation_queue falló:', error);
         throw new ServiceUnavailableError(
           'No se pudo guardar el elemento de la cola de anotación: la base de datos no está disponible. No se guardó nada.',
@@ -357,7 +401,7 @@ export function createInferenceService(deps: {
     },
 
     async queue() {
-      const records = await repo.listQueue();
+      const records = await infra('leer la cola de anotación', () => repo.listQueue());
       const items = await Promise.all(
         records.map(async (record) =>
           toQueueItem(record, await requireInference(record.inference_id)),

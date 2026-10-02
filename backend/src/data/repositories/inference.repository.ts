@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { p3AnnotationQueue, p3Inference } from '../db/schema.js';
+import { images, type NewImage, p3AnnotationQueue, p3Inference } from '../db/schema.js';
 
 /**
  * D05-07 — `p3_inference` y `p3_annotation_queue` (MariaDB, migración 0009). El índice
@@ -34,6 +34,11 @@ export async function findAnnotationQueueRow(inferenceId: number) {
   return found ?? null;
 }
 
+function isDuplicate(error: unknown): boolean {
+  const code = (error as { cause?: { code?: string }; code?: string }).cause?.code;
+  return code === 'ER_DUP_ENTRY' || (error as { code?: string }).code === 'ER_DUP_ENTRY';
+}
+
 /** `null` si la inferencia ya tiene elemento en la cola (índice único). */
 export async function insertAnnotationQueueRow(row: AnnotationQueueInsert): Promise<number | null> {
   try {
@@ -41,10 +46,33 @@ export async function insertAnnotationQueueRow(row: AnnotationQueueInsert): Prom
     if (!inserted) throw new Error('MariaDB no devolvió el id del elemento de la cola');
     return inserted.id;
   } catch (error) {
-    const code = (error as { cause?: { code?: string }; code?: string }).cause?.code;
-    if (code === 'ER_DUP_ENTRY' || (error as { code?: string }).code === 'ER_DUP_ENTRY') {
-      return null;
-    }
+    if (isDuplicate(error)) return null;
+    throw error;
+  }
+}
+
+/**
+ * Archivo nuevo a la cola: la imagen `pending` del portal y el elemento de la cola en UNA
+ * transacción. Si el segundo insert falla (índice único, MariaDB caída), la imagen se
+ * revierte con él: nunca queda una imagen pending sin elemento. `null` = ya tenía elemento.
+ */
+export async function insertAnnotationQueueWithNewImage(
+  image: NewImage,
+  row: Omit<AnnotationQueueInsert, 'imageId'>,
+): Promise<{ id: number; imageId: number } | null> {
+  try {
+    return await db.transaction(async (tx) => {
+      const [createdImage] = await tx.insert(images).values(image).$returningId();
+      if (!createdImage) throw new Error('MariaDB no devolvió el id de la imagen');
+      const [inserted] = await tx
+        .insert(p3AnnotationQueue)
+        .values({ ...row, imageId: createdImage.id })
+        .$returningId();
+      if (!inserted) throw new Error('MariaDB no devolvió el id del elemento de la cola');
+      return { id: inserted.id, imageId: createdImage.id };
+    });
+  } catch (error) {
+    if (isDuplicate(error)) return null;
     throw error;
   }
 }

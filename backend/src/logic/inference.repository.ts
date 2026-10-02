@@ -4,6 +4,7 @@ import {
   findAnnotationQueueRow,
   findInferenceRow,
   insertAnnotationQueueRow,
+  insertAnnotationQueueWithNewImage,
   insertInferenceRow,
   listAnnotationQueueRows,
   listInferenceRows,
@@ -88,6 +89,19 @@ export const mariaDbInferenceRepository: InferenceRepository = {
     });
     if (id === null) throw new DuplicateQueueItemError(item.inference_id);
     return { ...item, id };
+  },
+  async insertQueueItemWithNewImage(image, item) {
+    const created = await insertAnnotationQueueWithNewImage(
+      { ...image, status: 'pending' },
+      {
+        inferenceId: item.inference_id,
+        annotationId: item.annotation_id,
+        status: 'pending',
+        createdAt: item.created_at,
+      },
+    );
+    if (created === null) throw new DuplicateQueueItemError(item.inference_id);
+    return { ...item, id: created.id, image_id: created.imageId };
   },
   async listQueue() {
     return (await listAnnotationQueueRows()).map(toQueue);

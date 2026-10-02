@@ -1,9 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env.js';
 import {
-  createImageMetadata,
   deleteImageObject,
-  deleteImageRow,
   findAnnotationById,
   findImageById,
   getImageObjectStream,
@@ -44,16 +42,6 @@ export const portalImages: PortalImages = {
     return { bytes: Buffer.concat(chunks), mimeType: image.mimeType };
   },
   imageExists: async (imageId) => (await findImageById(imageId)) !== null,
-  createPendingImage: (image) =>
-    createImageMetadata({
-      filename: image.filename,
-      storageKey: image.storageKey,
-      mimeType: image.mimeType,
-      width: image.width,
-      height: image.height,
-      sizeBytes: image.sizeBytes,
-    }),
-  deleteImageRow: (imageId) => deleteImageRow(imageId),
 };
 
 export function createPortalInferenceService() {

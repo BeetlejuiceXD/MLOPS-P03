@@ -116,6 +116,18 @@ class MemoryRepo implements InferenceRepository {
     this.queue.push(record);
     return record;
   }
+  /** Transacción: la imagen pending y el elemento se crean juntos o ninguno. */
+  portal?: MemoryImages;
+  async insertQueueItemWithNewImage(
+    image: { storageKey: string; mimeType: string },
+    item: Omit<QueueRecord, 'id' | 'image_id'>,
+  ) {
+    if (this.failQueueInsert) throw new Error('connect ECONNREFUSED mariadb:3306');
+    const imageId = (this.portal as MemoryImages).commitPendingImage(image);
+    const record = { ...item, image_id: imageId, id: this.queue.length + 1 };
+    this.queue.push(record);
+    return record;
+  }
   async listQueue() {
     this.readFails();
     return [...this.queue].reverse();
@@ -127,9 +139,8 @@ class MemoryImages implements PortalImages {
   images = new Map<number, { storageKey: string; mimeType: string; status: string }>();
   annotations = new Map<number, { image_id: number; bbox: [number, number, number, number] }>();
   createdImages: number[] = [];
-  deletedImages: number[] = [];
   createdAnnotations = 0;
-  /** La limpieza compensatoria también falla (MariaDB caída a la mitad). */
+  /** Si hubiera limpieza compensatoria, también fallaría (MariaDB caída a la mitad). */
   failDelete = false;
   /** MariaDB/MinIO caídos para las lecturas del portal. */
   failReads = false;
@@ -157,16 +168,12 @@ class MemoryImages implements PortalImages {
     if (this.failReads) throw new Error('Failed query: select * from `images`');
     return this.images.has(imageId);
   }
-  async createPendingImage(image: { storageKey: string; mimeType: string }) {
+  /** Lo que confirma la transacción del repositorio (fila `images` en pending). */
+  commitPendingImage(image: { storageKey: string; mimeType: string }) {
     const id = ++this.seq;
     this.images.set(id, { ...image, status: 'pending' });
     this.createdImages.push(id);
     return id;
-  }
-  async deleteImageRow(id: number) {
-    if (this.failDelete) throw new Error('connect ECONNREFUSED mariadb:3306');
-    this.images.delete(id);
-    this.deletedImages.push(id);
   }
 }
 
@@ -180,6 +187,7 @@ beforeEach(async () => {
   engine = new FakeEngine();
   repo = new MemoryRepo();
   images = new MemoryImages();
+  repo.portal = images;
   const service = createInferenceService({
     engine,
     repo,
@@ -478,7 +486,7 @@ describe('POST /inference/:id/annotation-queue', () => {
     const { error } = await failed.json();
     expect(error).toMatch(/no se pudo guardar el elemento de la cola/i);
     expect(error).not.toMatch(/ECONNREFUSED|mariadb:3306/);
-    expect(images.deletedImages).toEqual(images.createdImages);
+    expect(images.createdImages).toEqual([]); // la transacción no confirmó la imagen
     expect(repo.queue).toHaveLength(0);
     repo.failQueueInsert = false;
     expect((await enqueue(1)).status).toBe(201);
