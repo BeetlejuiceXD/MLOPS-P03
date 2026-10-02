@@ -4,9 +4,12 @@
  * Las respuestas vienen de los fixtures compartidos `contracts/p3/fixtures/evaluation_response`
  * (datos de ejemplo etiquetados): prueban el render y los estados, no son resultados del
  * frozen test ni evidencia de la evaluación oficial (D06-01/D06-05).
+ *
+ * Las comprobaciones usan `expect` de vitest (dentro de `waitFor` cuando hay que esperar al
+ * fetch) en vez de `findBy*`/matchers de jest-dom, para que un estado equivocado falle por
+ * aserción y no por una excepción de Testing Library.
  */
-import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
@@ -46,6 +49,17 @@ const renderEvaluation = () =>
 const requestedPaths = (fetchMock: ReturnType<typeof mockEvaluation>) =>
   fetchMock.mock.calls.map(([input]) => String(input).replace(/^https?:\/\/[^/]+/, ""));
 
+/** Espera a que aparezca el elemento y lo devuelve. */
+async function appears(testId: string): Promise<HTMLElement> {
+  await waitFor(() => expect(screen.queryByTestId(testId)).not.toBeNull());
+  return screen.getByTestId(testId);
+}
+
+const text = (element: HTMLElement | null) => element?.textContent ?? "";
+const absent = (testId: string) => expect(screen.queryByTestId(testId)).toBeNull();
+const namespaceIn = (element: HTMLElement) =>
+  text(element.querySelector('[data-testid="evaluation-namespace"]'));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -55,45 +69,43 @@ describe("Evaluation: bloqueada, pendiente, resultado y fallo son estados distin
   it("blocked: no muestra nada del test ni pide la exportación por muestra", async () => {
     const fetchMock = mockEvaluation(fixture("valid-blocked"));
     renderEvaluation();
-    expect(await screen.findByTestId("p3-state-blocked")).toHaveTextContent(
-      "MODEL SELECTION CLOSED"
-    );
-    expect(screen.queryByTestId("p3-content")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("evaluation-pending")).not.toBeInTheDocument();
-    expect(screen.queryByText(/accuracy/i)).not.toBeInTheDocument();
+    expect(text(await appears("p3-state-blocked"))).toContain("MODEL SELECTION CLOSED");
+    absent("p3-content");
+    absent("evaluation-pending");
+    expect(document.body.textContent).not.toMatch(/accuracy/i);
     expect(requestedPaths(fetchMock)).toEqual(["/api/evaluation"]);
   });
 
   it("pending: selección cerrada sin evaluación oficial, sin métricas ni matriz", async () => {
     mockEvaluation(fixture("valid-pending"));
     renderEvaluation();
-    const pending = await screen.findByTestId("evaluation-pending");
-    expect(pending).toHaveTextContent("La selección está cerrada");
-    expect(pending).toHaveTextContent("la evaluación oficial aún no existe");
+    const pending = await appears("evaluation-pending");
+    expect(text(pending)).toContain("La selección está cerrada");
+    expect(text(pending)).toContain("la evaluación oficial aún no existe");
     // Identidad de la selección cerrada, para saber qué se evaluará en D06-01.
-    expect(pending).toHaveTextContent("aaaaaaaa");
-    expect(within(pending).getByTestId("evaluation-namespace")).toHaveTextContent("official");
-    expect(screen.queryByTestId("confusion-matrix")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("p3-state-blocked")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(text(pending)).toContain("aaaaaaaa");
+    expect(namespaceIn(pending)).toBe("official");
+    absent("confusion-matrix");
+    absent("p3-state-blocked");
+    expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
   });
 
   it("ready official: namespace visible y procedencia, sin aviso de prueba", async () => {
     mockEvaluation(fixture("valid-ready"));
     renderEvaluation();
-    const content = await screen.findByTestId("p3-content");
-    expect(within(content).getByTestId("evaluation-namespace")).toHaveTextContent("official");
-    expect(within(content).getByTestId("evaluation-provenance")).toHaveTextContent("dddddddd");
-    expect(within(content).getByText("59 / 66")).toBeInTheDocument();
-    expect(screen.queryByTestId("evaluation-synthetic-warning")).not.toBeInTheDocument();
+    const content = await appears("p3-content");
+    expect(namespaceIn(content)).toBe("official");
+    expect(text(screen.getByTestId("evaluation-provenance"))).toContain("dddddddd");
+    expect(text(content)).toContain("59 / 66");
+    absent("evaluation-synthetic-warning");
   });
 
   it("ready synthetic: se rotula como recorrido de prueba, nunca como evaluación oficial", async () => {
     mockEvaluation(fixture("valid-ready-synthetic"));
     renderEvaluation();
-    const content = await screen.findByTestId("p3-content");
-    expect(within(content).getByTestId("evaluation-namespace")).toHaveTextContent("synthetic");
-    expect(screen.getByTestId("evaluation-synthetic-warning")).toHaveTextContent(
+    const content = await appears("p3-content");
+    expect(namespaceIn(content)).toBe("synthetic");
+    expect(text(screen.queryByTestId("evaluation-synthetic-warning"))).toContain(
       "no es la evaluación oficial"
     );
   });
@@ -104,14 +116,14 @@ describe("Evaluation: bloqueada, pendiente, resultado y fallo son estados distin
       body: { error: "Evaluación guardada incoherente: el manifest no es el de la selección cerrada." },
     });
     renderEvaluation();
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(document.body.textContent).toContain(
         "El servidor respondió con estado 503: Evaluación guardada incoherente: el manifest no es el de la selección cerrada."
       )
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
-    expect(screen.queryByTestId("evaluation-pending")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("p3-state-blocked")).not.toBeInTheDocument();
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeNull();
+    absent("evaluation-pending");
+    absent("p3-state-blocked");
   });
 
   it.each([
@@ -121,11 +133,13 @@ describe("Evaluation: bloqueada, pendiente, resultado y fallo son estados distin
   ])("%s: fuera de contrato, no se muestra", async (name) => {
     mockEvaluation(fixture(name));
     renderEvaluation();
-    expect(
-      await screen.findByText("La respuesta del servidor no tiene el formato esperado.")
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId("p3-content")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("evaluation-pending")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.body.textContent).toContain(
+        "La respuesta del servidor no tiene el formato esperado."
+      )
+    );
+    absent("p3-content");
+    absent("evaluation-pending");
   });
 
   it("el estado sale siempre del backend: al recargar se vuelve a consultar", async () => {
@@ -134,12 +148,15 @@ describe("Evaluation: bloqueada, pendiente, resultado y fallo son estados distin
       fixture("valid-pending")
     );
     renderEvaluation();
-    fireEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
-    expect(await screen.findByTestId("evaluation-pending")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeNull()
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    await appears("evaluation-pending");
     cleanup();
 
     renderEvaluation();
-    expect(await screen.findByTestId("evaluation-pending")).toBeInTheDocument();
+    await appears("evaluation-pending");
     expect(requestedPaths(fetchMock)).toEqual([
       "/api/evaluation",
       "/api/evaluation",
