@@ -89,6 +89,35 @@ function campaignRuns(selection: Selection = CANDIDATE) {
   };
 }
 
+
+const RETRY_ID = "7576d02bb5564dbf94429373e9587a3a";
+
+/** Forma de `GET /api/selection/campaign` (D05-02): solo lo que Experiments lee. */
+function dossierFor(selection: Selection) {
+  return {
+    rows: selection.ranking.map((ranked) => ({
+      row: ranked.campaign_row,
+      status: "accepted",
+      representative: ranked.run_id,
+      attempts: [
+        { job_id: 1, run_id: ranked.run_id, role: "representative", reason: null, detail: null },
+        ...(ranked.campaign_row === selection.ranking[0]?.campaign_row
+          ? [
+              {
+                job_id: 5,
+                run_id: RETRY_ID,
+                role: "retry",
+                reason: "duplicate_campaign_row",
+                detail: `La fila ya cuenta con ${ranked.run_id} (corrida más temprana).`,
+              },
+            ]
+          : []),
+      ],
+    })),
+    unattributed: [],
+  };
+}
+
 describe("cotejo selección ↔ Experiments (sin segundo ranking)", () => {
   it("candidato y filas aceptadas coinciden con los runs de MLflow → sin problemas", () => {
     const check = selectionCrossCheck(campaignRuns().runs, CANDIDATE);
@@ -267,6 +296,58 @@ describe("Experiments con la selección", () => {
     expect(
       await screen.findByText(/Propuesta pendiente de cierre \(D05-08\)/)
     ).toBeInTheDocument();
+  });
+
+  it("reintentos del expediente de D05-02: visibles con su estado y fuera del conteo", async () => {
+    const runs = campaignRuns();
+    const representative = CANDIDATE.ranking[0] as RankedRun;
+    const retry = runFor({ ...representative, run_id: RETRY_ID });
+    runs.runs.push(retry);
+    mockApi({
+      "/api/experiments/runs": { body: runs },
+      "/api/selection": { body: CANDIDATE },
+      "/api/selection/campaign": { body: dossierFor(CANDIDATE) },
+    });
+    renderExperiments();
+    await screen.findByTestId("experiments-selection");
+    const counts = await screen.findByTestId("experiments-counts");
+    expect(counts).toHaveTextContent("Runs de training: 13");
+    expect(counts).toHaveTextContent("Cuentan para la campaña (filas aceptadas por D05-02): 11");
+    expect(counts).toHaveTextContent("Reintentos y no aceptados: 2 (no cuentan)");
+    expect(counts).not.toHaveTextContent("Elegibles para campaña");
+    const retryRow = await screen.findByTestId(`run-row-${RETRY_ID}`);
+    expect(await within(retryRow).findByText("Reintento · fila 1")).toBeInTheDocument();
+    expect(retryRow).not.toHaveTextContent(/^Fila \d+$/);
+    expect(screen.getByTestId("run-row-c46e4c3ab2bb4ee18c37571adbb65d92")).toHaveTextContent(
+      "No aceptado por D05-02"
+    );
+    expect(screen.getAllByText(/^Fila \d+$/)).toHaveLength(11);
+  });
+
+  it("sin expediente (falla /selection/campaign) los no aceptados igual no cuentan", async () => {
+    const runs = campaignRuns();
+    runs.runs.push(runFor({ ...(CANDIDATE.ranking[0] as RankedRun), run_id: RETRY_ID }));
+    mockApi({
+      "/api/experiments/runs": { body: runs },
+      "/api/selection": { body: CANDIDATE },
+    });
+    renderExperiments();
+    await screen.findByTestId("experiments-selection");
+    const counts = screen.getByTestId("experiments-counts");
+    expect(counts).toHaveTextContent("Cuentan para la campaña (filas aceptadas por D05-02): 11");
+    expect(counts).toHaveTextContent("Reintentos y no aceptados: 2 (no cuentan)");
+    expect(screen.getByTestId(`run-row-${RETRY_ID}`)).toHaveTextContent("No aceptado por D05-02");
+  });
+
+  it("selección abierta: el conteo sigue siendo el de elegibles del adaptador", async () => {
+    mockApi({
+      "/api/experiments/runs": { body: campaignRuns() },
+      "/api/selection": { body: OPEN },
+    });
+    renderExperiments();
+    await screen.findByTestId("experiments-selection");
+    expect(screen.getByTestId("experiments-counts")).toHaveTextContent("Elegibles para campaña: 12");
+    expect(screen.queryByText("No aceptado por D05-02")).not.toBeInTheDocument();
   });
 
   it("si /api/selection falla, el motivo sale en su panel y los runs siguen visibles", async () => {
