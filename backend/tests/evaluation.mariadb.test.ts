@@ -60,8 +60,11 @@ describe.skipIf(!enabled)('p3_evaluation en MariaDB', () => {
       expect(exported.namespace).toBe('synthetic');
       expect(predictionsToCsv(exported).trimEnd().split('\n')).toHaveLength(1 + exported.n_test);
 
+      // D05-05: la API oficial responde `pending` (sin resultados) y nunca la sintética.
       const official = createEvaluationService(repo, guard, 'official');
-      await expect(official.evaluation()).rejects.toBeInstanceOf(NotFoundError);
+      const pending = await official.evaluation();
+      expect(pending).toMatchObject({ state: 'pending', namespace: 'official' });
+      expect(JSON.stringify(pending)).not.toMatch(/confusion_matrix|metrics|n_test/);
       await expect(official.predictions()).rejects.toBeInstanceOf(NotFoundError);
     } finally {
       await pool.query("DELETE FROM p3_evaluation WHERE namespace = 'synthetic'");

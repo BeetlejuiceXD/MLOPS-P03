@@ -7,7 +7,27 @@ import { dateTime, percent, shortHash } from "../format";
 /**
  * D01-05 — Evaluation: frozen test. La API responde `blocked` hasta MODEL
  * SELECTION CLOSED y la página no muestra nada del test en ese estado.
+ *
+ * D05-05 — Cuatro estados distintos, todos decididos por la API (la página no guarda
+ * nada): `blocked` (selección abierta), `pending` (cerrada, sin evaluación todavía),
+ * `ready` con su namespace visible (`synthetic` se rotula como recorrido de prueba) y el
+ * error de la API con su motivo (fallo del servicio o datos incoherentes, 503).
  */
+function NamespaceBadge({ namespace }: Readonly<{ namespace: "official" | "synthetic" }>) {
+  return (
+    <span
+      data-testid="evaluation-namespace"
+      className={`rounded-full px-2 py-0.5 font-mono text-xs ${
+        namespace === "official"
+          ? "bg-status-done-soft text-status-done"
+          : "bg-status-pending-soft text-status-pending"
+      }`}
+    >
+      {namespace}
+    </span>
+  );
+}
+
 export function EvaluationPage() {
   const evaluation = useEvaluation();
 
@@ -26,10 +46,50 @@ export function EvaluationPage() {
               </StatePanel>
             );
           }
+          if (data.state === "pending") {
+            return (
+              <div
+                data-testid="evaluation-pending"
+                className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center"
+              >
+                <NamespaceBadge namespace={data.namespace} />
+                <p className="text-sm font-medium text-ink">
+                  La selección está cerrada; la evaluación oficial aún no existe.
+                </p>
+                <p className="max-w-md text-sm text-ink-muted">{data.detail}</p>
+                <p className="text-xs text-ink-muted">
+                  Candidato{" "}
+                  <span className="font-mono">{shortHash(data.selection.candidate_run_id)}</span>
+                  {" · "}cerrada {dateTime(data.selection.closed_at)}
+                  {" · "}manifest <span className="font-mono">{shortHash(data.manifest_hash)}</span>
+                </p>
+              </div>
+            );
+          }
           const { labels, rows } = data.confusion_matrix;
           const hits = labels.reduce((sum, _label, i) => sum + (rows[i]?.[i] ?? 0), 0);
           return (
             <div data-testid="p3-content" className="flex flex-col gap-6">
+              {data.namespace === "synthetic" && (
+                <div
+                  data-testid="evaluation-synthetic-warning"
+                  role="note"
+                  className="rounded-2xl border border-status-pending/40 bg-status-pending-soft px-5 py-3 text-sm text-ink"
+                >
+                  Recorrido de prueba con predicciones sintéticas: no es la evaluación oficial del
+                  frozen test.
+                </div>
+              )}
+              <p
+                data-testid="evaluation-provenance"
+                className="flex flex-wrap items-center gap-2 text-xs text-ink-muted"
+              >
+                <NamespaceBadge namespace={data.namespace} />
+                <span>
+                  Manifest <span className="font-mono">{shortHash(data.manifest_hash)}</span>
+                </span>
+                <span>· Evaluada {dateTime(data.evaluated_at)}</span>
+              </p>
               <section className="grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-3">
                 <div>
                   <h2 className="text-xs text-ink-muted">Candidato</h2>

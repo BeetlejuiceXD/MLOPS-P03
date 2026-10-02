@@ -4,6 +4,7 @@
   "why": "El test se evalúa solo después de cerrar la selección",
   "payload": {
     "state": "ready",
+    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",

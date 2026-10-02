@@ -70,6 +70,10 @@ export {
   createModelSelectionService,
   runsAdapterPendingSource,
 } from './model-selection.service.js';
+// D05-06: Models conectado al registro de D04-06 (official vs local_test).
+export type { ModelsPortalService } from './models-portal.service.js';
+export { createModelsPortalService } from './models-portal.service.js';
+export { createRegistryModelsPortal } from './models-portal.wiring.js';
 export { mariaDbP3SourcesRepository } from './p3-sources.repository.js';
 // Fuentes oficiales de Training publicadas por trainer-worker (D03-03)
 export type { P3SourcesService } from './p3-sources.service.js';

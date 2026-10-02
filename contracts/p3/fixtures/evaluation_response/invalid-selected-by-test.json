@@ -4,6 +4,7 @@
   "why": "La selección solo puede usar val_accuracy",
   "payload": {
     "state": "ready",
+    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "test_accuracy",

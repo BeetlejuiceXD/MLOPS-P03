@@ -4,6 +4,7 @@
   "why": "support por clase = suma de su fila real",
   "payload": {
     "state": "ready",
+    "namespace": "official",
     "selection": {
       "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "metric": "val_accuracy",

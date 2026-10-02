@@ -107,12 +107,27 @@ class EvaluationRepo implements EvaluationRepository {
 }
 
 const synthetic = (): StoredEvaluation => structuredClone(SYNTHETIC);
-/** La misma exportación declarada como oficial (para probar la ruta oficial). */
+/** La misma evaluación y exportación declaradas como oficiales (para probar la ruta oficial). */
 const official = (): StoredEvaluation => {
   const row = synthetic();
+  (row.evaluation as { namespace: string }).namespace = 'official';
   (row.predictions as EvaluationPredictions).namespace = 'official';
   return row;
 };
+
+/** D05-05: cerrada sin resultado = `pending` con la selección cerrada; nunca métricas. */
+const pendingFor = (namespace: EvaluationNamespace) => ({
+  state: 'pending',
+  namespace,
+  reason: 'evaluation_missing',
+  selection: {
+    candidate_run_id: CANDIDATE,
+    metric: 'val_accuracy',
+    closed_at: CLOSED_AT.toISOString(),
+  },
+  manifest_hash: MANIFEST_HASH,
+  detail: expect.stringContaining(namespace === 'official' ? 'oficial' : namespace),
+});
 
 function first<T>(items: T[]): T {
   const item = items[0];
@@ -213,16 +228,31 @@ describe('guardas: nada del test antes de MODEL SELECTION CLOSED', () => {
     },
   );
 
-  it('cerrada sin evaluación guardada: 404 en ambas', async () => {
+  it('cerrada sin evaluación guardada: pending (resultado ausente) y la exportación 404', async () => {
     selectionRepo.setClosed();
-    await expect(service().evaluation()).rejects.toBeInstanceOf(NotFoundError);
+    const evaluation = await service().evaluation();
+    expect(evaluationResponseSchema.parse(evaluation).state).toBe('pending');
+    expect(evaluation).toEqual(pendingFor('official'));
+    expect(JSON.stringify(evaluation)).not.toMatch(/confusion_matrix|metrics|n_test/);
     await expect(service().predictions()).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('pending refleja el cierre persistido (otro candidato y manifest)', async () => {
+    selectionRepo.setClosed('b'.repeat(32), 'c'.repeat(64));
+    expect(await service().evaluation()).toMatchObject({
+      state: 'pending',
+      selection: { candidate_run_id: 'b'.repeat(32) },
+      manifest_hash: 'c'.repeat(64),
+    });
   });
 
   it('cerrada con evaluación oficial coherente: ready y exportación idénticas a lo guardado', async () => {
     selectionRepo.setClosed();
     evaluationRepo.rows.set('official', official());
-    expect(await service().evaluation()).toEqual(SYNTHETIC.evaluation);
+    expect(await service().evaluation()).toEqual(official().evaluation);
+    expect((await service().evaluation()) as { namespace: string }).toMatchObject({
+      namespace: 'official',
+    });
     expect(await service().predictions()).toEqual(official().predictions);
   });
 });
@@ -231,10 +261,13 @@ describe('aislamiento del namespace sintético', () => {
   it('una evaluación sintética nunca se sirve como oficial', async () => {
     selectionRepo.setClosed();
     evaluationRepo.rows.set('synthetic', synthetic());
-    await expect(service('official').evaluation()).rejects.toBeInstanceOf(NotFoundError);
+    expect(await service('official').evaluation()).toEqual(pendingFor('official'));
     await expect(service('official').predictions()).rejects.toBeInstanceOf(NotFoundError);
-    // El servicio del namespace sintético sí la ve (recorrido de prueba).
+    // El servicio del namespace sintético sí la ve (recorrido de prueba), marcada synthetic.
     expect(await service('synthetic').evaluation()).toEqual(SYNTHETIC.evaluation);
+    expect((await service('synthetic').evaluation()) as { namespace: string }).toMatchObject({
+      namespace: 'synthetic',
+    });
     expect((await service('synthetic').predictions()).namespace).toBe('synthetic');
   });
 
@@ -242,6 +275,23 @@ describe('aislamiento del namespace sintético', () => {
     selectionRepo.setClosed();
     evaluationRepo.rows.set('official', synthetic());
     await expect(service().evaluation()).rejects.toThrow(/namespace/);
+  });
+
+  it('evaluación sintética disfrazada de oficial (solo la exportación dice official) → 503', async () => {
+    selectionRepo.setClosed();
+    const row = synthetic();
+    (row.predictions as EvaluationPredictions).namespace = 'official';
+    evaluationRepo.rows.set('official', row);
+    for (const call of [() => service().evaluation(), () => service().predictions()]) {
+      const error = await call().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ServiceUnavailableError);
+      expect((error as Error).message).toMatch(/la evaluación declara namespace synthetic/);
+    }
+  });
+
+  it('el namespace sintético sin resultado también es pending, marcado synthetic', async () => {
+    selectionRepo.setClosed();
+    expect(await service('synthetic').evaluation()).toEqual(pendingFor('synthetic'));
   });
 
   it('el namespace sintético también exige la selección cerrada', async () => {
@@ -351,6 +401,13 @@ describe('datos guardados incompatibles → 503 con el motivo', () => {
       },
     ],
     [
+      'evaluación guardada en estado pending',
+      /evaluation_response/,
+      (row) => {
+        row.evaluation = { ...pendingFor('official'), detail: 'x' };
+      },
+    ],
+    [
       'exportación que no cumple el contrato',
       /evaluation_predictions/,
       (row) => {
@@ -401,10 +458,21 @@ describe('API de evaluación', () => {
     expect(evaluationRepo.reads).toBe(0);
   });
 
-  it('cerrada sin evaluación oficial: 404', async () => {
+  it('cerrada sin evaluación oficial: GET /evaluation 200 pending y la exportación 404', async () => {
     selectionRepo.setClosed();
-    expect((await get('/evaluation')).status).toBe(404);
+    const evaluation = await get('/evaluation');
+    expect(evaluation.status).toBe(200);
+    expect(evaluationResponseSchema.parse(await evaluation.json())).toEqual(pendingFor('official'));
     expect((await get('/evaluation/predictions')).status).toBe(404);
+  });
+
+  it('una sintética guardada no aparece por la API oficial: pending, nunca ready', async () => {
+    selectionRepo.setClosed();
+    evaluationRepo.rows.set('synthetic', synthetic());
+    const body = await (await get('/evaluation')).json();
+    expect(body.state).toBe('pending');
+    expect(body.namespace).toBe('official');
+    expect((await get('/evaluation/predictions?format=csv')).status).toBe(404);
   });
 
   it('recorrido cerrado: ready, exportación JSON y CSV descargable', async () => {
@@ -413,7 +481,7 @@ describe('API de evaluación', () => {
 
     const evaluation = await get('/evaluation');
     expect(evaluation.status).toBe(200);
-    expect(await evaluation.json()).toEqual(SYNTHETIC.evaluation);
+    expect(await evaluation.json()).toEqual(official().evaluation);
 
     const json = await get('/evaluation/predictions');
     expect(json.status).toBe(200);

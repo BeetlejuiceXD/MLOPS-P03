@@ -31,7 +31,7 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/selection` | `selection_state` (D05-03): estado persistido de la selección (`open` \| `candidate` \| `closed`), candidato, ranking solo validation y runs excluidos con su motivo | Ale (D04-04); lectura en Experiments: Hannah (D05-03) |
 | `POST /api/selection/candidate` | Recalcula y guarda el candidato **preparatorio** (409 si ya está cerrada; 503 sin runs/manifest) | Ale (D04-04) |
 | `POST /api/selection/close` | body `{ "candidate_run_id" }` → MODEL SELECTION CLOSED, definitivo (409 si no es el candidato, hay < 10 filas comparables o la campaña cambió) | Ale (D04-04); cierre oficial en D05-02 |
-| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED; cerrada y sin evaluación oficial → 404; guardada pero incoherente → 503) | Ale (D04-05) |
+| `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED; cerrada y sin evaluación oficial → `pending` (200, D05-05); `ready` con su `namespace`; guardada pero incoherente → 503 con el motivo) | Ale (D04-05, D05-05) |
 | `GET /api/evaluation/predictions[?format=json\|csv]` | `evaluation_predictions` por muestra (409 antes del cierre, sin leer nada; 404 sin evaluación oficial; `csv` = mismo contenido como descarga) | Ale (D04-05) |
 | `GET /api/models` | `models_response` | Hannah (D06) |
 | `POST /api/models/:semver/publish` | `model_version` | Hannah (D06) |
@@ -54,7 +54,7 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | `experiment_run_detail` | El mismo run del listado más `artifacts`: rutas relativas al run (sin `/` inicial ni `..`), directorios sin tamaño. |
 | `selection_state` (D05-03) | `open` sin candidato ni ranking; `candidate`/`closed` exigen candidato y `proposed_at`; `closed` ⇔ `closed_at`; candidato = `ranking[0]` (no se reordena en la UI); `ready_to_close` exige `campaign_rows` ≥ `min_comparable_runs`; ranking solo con métricas de validation (`test_*` rechazado). |
 | `evaluation_predictions` | `namespace` `official` o `synthetic` (la API solo sirve `official`); una fila por crop en orden estrictamente creciente de `crop_id`, `n_test` filas; probabilidad para cada clase declarada y ninguna otra, suma ≈ 1 (±1e-3), `predicted_class` = argmax. El backend exige además `test_split_hash` = sha256 del JSON de los `crop_id` ordenados, la matriz reconstruida igual a la de `evaluation_response` y mismo candidato/`closed_at`/manifest que el cierre persistido. |
-| `evaluation_response` | `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
+| `evaluation_response` | Tres estados: `blocked` (selección abierta), `pending` (cerrada, sin evaluación: solo la identidad de la selección, sin resultados) y `ready`. `ready` y `pending` declaran `namespace` `official` o `synthetic` (`local_test` es del registro de modelos, no de Evaluation); la API oficial rechaza (503) una evaluación que no declare `official`. `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
 | `models_response` | `semver` propio del modelo (no del dataset); `s3_key` bajo `models/p3-cnn-classifier/<semver>/`; `sha256` hex de 64; `published` exige `version_id` y `published_at`. |
 | `models_response` (D04-06) | El registro `p3_model_registry` solo marca `published` si el objeto existe en el bucket con el VersionId registrado y su tamaño, metadato `sha256` y SHA-256 del contenido coinciden; objeto ausente o hash incorrecto → `failed` con motivo. Las pruebas locales (MinIO) van en el namespace `local_test`, separado de `official`. Detalle en `backend/src/logic/model-registry.README.md`. |
 | `inference_result` | Probabilidad para cada clase declarada y ninguna otra; suma ≈ 1 (±1e-3); `predicted_class` = argmax. |
@@ -65,7 +65,7 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 |---|---|---|---|---|
 | Training | `/ml/training` | Sin jobs | Sin release aprobado o manifest no congelado | Error HTTP o respuesta fuera de contrato |
 | Experiments | `/ml/experiments` | Sin corridas | — | ídem |
-| Evaluation | `/ml/evaluation` | — | MODEL SELECTION CLOSED no existe | ídem |
+| Evaluation | `/ml/evaluation` | `pending`: selección cerrada, evaluación oficial aún no existe | MODEL SELECTION CLOSED no existe | ídem; el 503 muestra su motivo. Un `ready` `synthetic` se rotula como recorrido de prueba |
 | Models | `/ml/models` | Sin versiones | — | ídem |
 | Inference | `/ml/inference` | — | No hay ninguna versión publicada | ídem |
 

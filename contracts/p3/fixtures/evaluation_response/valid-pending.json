@@ -1,0 +1,17 @@
+{
+  "contract": "evaluation_response",
+  "valid": true,
+  "why": "Selección cerrada sin evaluación guardada: resultado ausente, distinto de blocked y de un fallo",
+  "payload": {
+    "state": "pending",
+    "namespace": "official",
+    "reason": "evaluation_missing",
+    "selection": {
+      "candidate_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "metric": "val_accuracy",
+      "closed_at": "2026-09-28T20:00:00Z"
+    },
+    "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "detail": "La selección está cerrada, pero la evaluación oficial del frozen test aún no existe."
+  }
+}
