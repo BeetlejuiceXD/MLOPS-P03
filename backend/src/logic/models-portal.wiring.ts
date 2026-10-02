@@ -4,6 +4,7 @@
  */
 import { minioClient } from '../data/storage/minio.client.js';
 import { createMinioModelStore } from '../data/storage/model-object.storage.js';
+import { mariaDbModelCardRepository } from './model-card.repository.js';
 import { mariaDbModelRegistryRepository } from './model-registry.repository.js';
 import { createModelsPortalService } from './models-portal.service.js';
 
@@ -11,5 +12,7 @@ export function createRegistryModelsPortal(modelBucket: string) {
   return createModelsPortalService({
     repo: mariaDbModelRegistryRepository,
     store: createMinioModelStore(minioClient, modelBucket),
+    // D06-03: official muestra cada versión con su tarjeta (`p3_model_card`).
+    cardRepo: mariaDbModelCardRepository,
   });
 }

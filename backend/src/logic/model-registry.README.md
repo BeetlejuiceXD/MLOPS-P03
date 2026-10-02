@@ -71,14 +71,14 @@ Son dos cosas distintas y una no implica la otra:
 | Tipo | Quién | Alcance |
 |---|---|---|
 | Infraestructura (Terraform) | `MLOPS-P3-Terraform` (asignado a Hanna) | Crear y configurar el bucket. **No** sirve para publicar ni leer modelos. |
-| Acceso operativo mínimo | `MLOPS-S3-MODELS` (todavía no existe) | Para publicar y recargar: `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion` y `s3:ListBucket` (con condición de prefijo), solo sobre `arn:aws:s3:::<MODEL_S3_BUCKET>/models/p3-cnn-classifier/*`, y `s3:GetBucketVersioning` sobre el bucket. Sin `DeleteObject`/`DeleteObjectVersion`. |
+| Acceso operativo mínimo | `MLOPS-S3-MODELS` (todavía no existe) | Para publicar y recargar: `s3:PutObject`, `s3:GetObject` y `s3:GetObjectVersion` solo sobre `arn:aws:s3:::<MODEL_S3_BUCKET>/models/p3-cnn-classifier/*`; `s3:ListBucket`/`s3:ListBucketVersions` con condición de prefijo; y, para comprobar el bucket antes de publicar, lectura de su configuración (`GetBucketVersioning`, `GetEncryptionConfiguration`, `GetBucketPublicAccessBlock`, `GetBucketPolicy`, `GetLifecycleConfiguration`). Sin `DeleteObject`/`DeleteObjectVersion`. El JSON exacto es el output `operational_policy_json` de `terraform/p3-models` (D06-03). |
 
 `MLOPS-S3-DVC` es el acceso al remoto de DVC, no al bucket de modelos. Tener
 `MLOPS-S3-DVC` o `MLOPS-P3-Terraform` **no** demuestra que se pueda publicar.
 
 ### Estado administrativo de AWS (según Heri, sin verificar en AWS)
 
-- [ ] Bucket exclusivo de modelos P3: no existe. Lo crea Hanna con Terraform en su ticket.
+- [ ] Bucket exclusivo de modelos P3: no existe. El Terraform ya está en `terraform/p3-models` (D06-03); falta el `apply` con `MLOPS-P3-Terraform`.
 - [ ] `MLOPS-S3-MODELS`: no existe. Lo coordina Heri y Hanna verifica después el acceso operativo.
 - [ ] Publicación y recarga oficial: pendientes (D06-03/D06-04).
 
@@ -103,3 +103,28 @@ P3_MODEL_REGISTRY_PHASE=check npx vitest run tests/model-registry.minio.test.ts
 ```
 
 - `.github/scripts/run_model_registry_mutations.py`: mutation testing en una copia aislada.
+
+## D06-03 — Publicación official en AWS
+
+- **Bucket:** `terraform/p3-models` (ver `terraform/README.md`). El nombre real lo asigna
+  AWS (`bucket_prefix = "mlops-p3-models-"`) y se lee de `terraform output bucket_name`;
+  ese valor va en `MODEL_S3_BUCKET`.
+- **Tarjeta del modelo:** segundo objeto de la versión,
+  `models/p3-cnn-classifier/<semver>/model_card.json`, con su propia fila en
+  `p3_model_card` (migración 0009) y la misma máquina de estados (`objectName` del
+  servicio). `GET /api/models` devuelve cada versión official con su `model_card`.
+- **`official-publication.service.ts`:**
+  1. Lee la seguridad del bucket (`inspectModelBucket`): versioning `Enabled`, SSE
+     `AES256`, los 4 bloqueos públicos, `DenyInsecureTransport` y ninguna regla de
+     lifecycle habilitada que expire versiones. Si algo no cumple o no se puede leer
+     (permiso insuficiente), responde 409 y no registra nada.
+  2. Contrasta la tarjeta: JSON, no `smoke`, mismo `mlflow_run_id` y `semver` si los declara.
+  3. Registra modelo y tarjeta, sube y verifica **la tarjeta** por VersionId, y solo si
+     quedó `published` sube y verifica el modelo. Si la tarjeta falla, el modelo queda
+     `failed` con `model_card_failed`: nunca hay un modelo publicado sin tarjeta.
+- **`../data/storage/s3-model.storage.ts`:** store con `@aws-sdk/client-s3`. `head`/`get`
+  siempre con `VersionId`; `NotFound`/`NoSuchKey`/`NoSuchVersion` = ausente y cualquier
+  otro error (p. ej. `AccessDenied`) se propaga como 503.
+- **`../cli/publish-official-model.ts`:** lo corre el principal operacional con su perfil
+  SSO (cadena estándar del SDK, nada en el repo). Rechaza `MODEL_S3_BUCKET=p3-models-local`
+  y sale con 0 solo si los dos objetos quedan `published` y su relectura coincide.

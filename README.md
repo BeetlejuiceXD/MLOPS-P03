@@ -1642,3 +1642,33 @@ fuera del entrenamiento, sin memoria ni estado del trainer. El detalle está en
 python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 --out /tmp/smoke-package
 python -m model_package predict --package /tmp/smoke-package   # proceso limpio
 ```
+
+## D06-03 — Bucket de modelos en AWS y publicación official (preparación)
+
+Tres trabajos separados:
+
+1. **Bucket exclusivo y seguro:** `terraform/p3-models`. Tiene versioning, SSE AES256,
+   bloqueo público completo, `DenyInsecureTransport`, versiones conservadas (sin lifecycle
+   y con `DeleteObjectVersion` negado) y `force_destroy = false`. El nombre real lo asigna
+   AWS y sale de `terraform output bucket_name`. Se prueba con `terraform test` y un
+   provider simulado, sin AWS. Detalle en `terraform/README.md`.
+2. **Permiso operacional de mínimo privilegio (`MLOPS-S3-MODELS`):** el output
+   `operational_policy_json` permite subir y leer por VersionId solo bajo
+   `models/p3-cnn-classifier/` y leer la configuración de seguridad del bucket. No puede
+   borrar nada. Es distinto de `MLOPS-P3-Terraform` y de `MLOPS-S3-DVC`.
+3. **Publicación y verificación:** `backend/src/cli/publish-official-model.ts` publica el
+   paquete final de D06-02 y su tarjeta (`<semver>/model.pt` y `<semver>/model_card.json`)
+   en el namespace `official`, con el registro de D04-06:
+   - Antes de registrar nada comprueba la seguridad del bucket en AWS.
+   - Verifica la tarjeta y después el modelo, cada uno por HEAD y GET de su VersionId
+     exacto con SHA-256 y tamaño.
+   - Ningún fallo termina `published`.
+   - Models (`GET /api/models`) muestra cada versión official con bucket/key, VersionId,
+     SHA-256 y su tarjeta.
+
+Para **cerrar #94** falta:
+- el `apply` del bucket;
+- el permiso `MLOPS-S3-MODELS` asignado y comprobado;
+- el paquete y la tarjeta finales de D06-02.
+
+Los tests usan bytes de fixture y un cliente S3 simulado: no son evidencia de AWS (5.2).

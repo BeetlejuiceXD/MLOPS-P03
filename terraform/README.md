@@ -325,3 +325,50 @@ El workflow incluye los cuatro roots, sin activar los backends. Estas pruebas
 pueden descargar providers, pero no demuestran existencia del bucket, permisos,
 migración ni locking concurrente real. Esas comprobaciones quedan para una
 operación AWS autorizada posterior.
+
+## D06-03 — Bucket exclusivo de modelos P3 (`terraform/p3-models`)
+
+Raíz propia, con su propio estado (`p3-models/terraform.tfstate` en el bucket de estado
+remoto de P2-25). Se aplica con el permiso de infraestructura `MLOPS-P3-Terraform`. No
+toca la infraestructura de P2 ni los buckets de DVC o de artefactos.
+
+| Recurso | Configuración |
+|---|---|
+| `aws_s3_bucket.models` | `bucket_prefix = "mlops-p3-models-"`: AWS asigna el nombre real (output `bucket_name`), así que no se inventa. `force_destroy = false`. |
+| `aws_s3_bucket_versioning.models` | `Enabled`: el registro lee cada versión por su VersionId exacto. |
+| `aws_s3_bucket_server_side_encryption_configuration.models` | SSE `AES256`. |
+| `aws_s3_bucket_public_access_block.models` | Los 4 bloqueos activos. |
+| `aws_s3_bucket_ownership_controls.models` | `BucketOwnerEnforced` (sin ACL). |
+| `aws_s3_bucket_policy.models` | `DenyInsecureTransport`, y `DenyDeleteModelVersions` (niega `DeleteObjectVersion` y `DeleteBucket` a cualquiera). |
+| (sin lifecycle) | Las versiones anteriores se conservan (P3-14). |
+
+**Permiso operacional (`MLOPS-S3-MODELS`)**, distinto de la identidad de Terraform y de
+`MLOPS-S3-DVC`:
+- El output `operational_policy_json` es la política de mínimo privilegio:
+  - `PutObject`, `GetObject` y `GetObjectVersion` solo en `models/p3-cnn-classifier/*`;
+  - `ListBucket`/`ListBucketVersions` con condición de prefijo;
+  - lectura de la configuración de seguridad del bucket;
+  - nada de `Delete*` ni `s3:*`.
+- Por defecto Terraform **no** crea IAM: el JSON se entrega a quien administra el
+  permission set en IAM Identity Center.
+- Con `create_operational_policy = true` crea la política
+  `mlops-p3-s3-models-operational`.
+
+```bash
+cd terraform/p3-models
+terraform fmt -check -recursive
+terraform init -backend=false -input=false -lockfile=readonly
+terraform validate
+terraform test          # provider simulado: no necesita AWS
+```
+
+Para aplicar, con el perfil SSO de `MLOPS-P3-Terraform`. Nunca se versionan credenciales,
+`terraform.tfvars` ni el estado:
+
+```bash
+terraform init -backend-config="bucket=<bucket de estado>" -backend-config="region=us-east-1"
+terraform plan -out=p3-models.tfplan
+terraform apply p3-models.tfplan
+terraform output bucket_name              # → MODEL_S3_BUCKET
+terraform output -raw operational_policy_json
+```

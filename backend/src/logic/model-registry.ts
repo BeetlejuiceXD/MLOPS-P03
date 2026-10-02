@@ -12,6 +12,8 @@ import { createHash } from 'node:crypto';
 import { type ModelVersion, P3_EXPERIMENT } from './p3.contracts.js';
 
 export const MODEL_OBJECT_NAME = 'model.pt';
+/** D06-03: tarjeta del modelo, junto al modelo en el mismo prefijo de su semver. */
+export const MODEL_CARD_OBJECT_NAME = 'model_card.json';
 
 export type RegistryNamespace = 'official' | 'local_test';
 
@@ -21,7 +23,9 @@ export type RegistryFailureReason =
   | 'size_mismatch'
   | 'object_missing'
   | 'version_id_missing'
-  | 'version_mismatch';
+  | 'version_mismatch'
+  /** D06-03: la tarjeta no quedó verificada, así que el modelo no se publica. */
+  | 'model_card_failed';
 
 /** Fila del registro: el contrato `model_version` más tamaño, motivo de fallo y namespace. */
 export interface RegistryEntry {
@@ -42,9 +46,9 @@ export interface RegistryEntry {
   published_at: Date | null;
 }
 
-/** Clave del objeto de una versión: `models/p3-cnn-classifier/<semver>/model.pt`. */
-export function modelObjectKey(semver: string): string {
-  return `models/${P3_EXPERIMENT}/${semver}/${MODEL_OBJECT_NAME}`;
+/** Clave de un objeto de la versión: `models/p3-cnn-classifier/<semver>/<model.pt|model_card.json>`. */
+export function modelObjectKey(semver: string, objectName: string = MODEL_OBJECT_NAME): string {
+  return `models/${P3_EXPERIMENT}/${semver}/${objectName}`;
 }
 
 export function sha256Hex(body: Buffer): string {
@@ -62,9 +66,12 @@ export function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-/** La fila del registro con la forma exacta del contrato (sin namespace ni extras). */
-export function toModelVersion(entry: RegistryEntry): ModelVersion {
-  return {
+/**
+ * La fila del registro con la forma exacta del contrato (sin namespace ni extras). Con la
+ * fila de su tarjeta (D06-03), incluye `model_card`.
+ */
+export function toModelVersion(entry: RegistryEntry, card?: RegistryEntry | null): ModelVersion {
+  const model: ModelVersion = {
     semver: entry.semver,
     mlflow_run_id: entry.mlflow_run_id,
     manifest_hash: entry.manifest_hash,
@@ -77,4 +84,14 @@ export function toModelVersion(entry: RegistryEntry): ModelVersion {
     status: entry.status,
     published_at: entry.published_at === null ? null : entry.published_at.toISOString(),
   };
+  if (card) {
+    model.model_card = {
+      s3_key: card.s3_key,
+      version_id: card.version_id,
+      sha256: card.sha256,
+      size_bytes: card.size_bytes,
+      status: card.status,
+    };
+  }
+  return model;
 }

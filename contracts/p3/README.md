@@ -34,7 +34,7 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/evaluation` | `evaluation_response` (`blocked` hasta MODEL SELECTION CLOSED; cerrada y sin evaluación oficial → `pending` (200, D05-05); `ready` con su `namespace`; guardada pero incoherente → 503 con el motivo) | Ale (D04-05, D05-05) |
 | `GET /api/evaluation/predictions[?format=json\|csv]` | `evaluation_predictions` por muestra (409 antes del cierre, sin leer nada; 404 sin evaluación oficial; `csv` = mismo contenido como descarga) | Ale (D04-05) |
 | `GET /api/models` | `models_response` | Hannah (D06) |
-| `POST /api/models/:semver/publish` | `model_version` | Hannah (D06) |
+| `POST /api/models/:semver/publish` | `model_version` — **no se expone**: la publicación official la hace el principal operacional con `publish-official-model` (D06-03); el backend no guarda credenciales de AWS | Hannah (D06-03) |
 | `POST /api/inference` | multipart (`image`, `model_version`) → `inference_result` | Hannah + motor de Esteban (D06) |
 | `POST /api/inference/:id/annotation-queue` | `annotation_queue_item` | Hannah (D06) |
 
@@ -56,6 +56,7 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | `evaluation_response` | Tres estados: `blocked` (selección abierta), `pending` (cerrada, sin evaluación: solo la identidad de la selección, sin resultados) y `ready`. `ready` y `pending` declaran `namespace` `official` o `synthetic` (`local_test` es del registro de modelos, no de Evaluation); la API oficial rechaza (503) una evaluación que no declare `official`. `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
 | `models_response` | `semver` propio del modelo (no del dataset); `s3_key` bajo `models/p3-cnn-classifier/<semver>/`; `sha256` hex de 64; `published` exige `version_id` y `published_at`. |
 | `models_response` (D04-06) | El registro `p3_model_registry` solo marca `published` si el objeto existe en el bucket con el VersionId registrado y su tamaño, metadato `sha256` y SHA-256 del contenido coinciden; objeto ausente o hash incorrecto → `failed` con motivo. Las pruebas locales (MinIO) van en el namespace `local_test`, separado de `official`. Detalle en `backend/src/logic/model-registry.README.md`. |
+| `models_response` (D06-03) | Cada versión puede llevar `model_card` (`models/p3-cnn-classifier/<semver>/model_card.json`, VersionId, SHA-256, tamaño, estado). Si está: la clave es la de su semver, una tarjeta `published` tiene VersionId y un modelo `published` tiene la tarjeta `published`. La publicación official (`backend/src/cli/publish-official-model.ts`) exige la tarjeta y la verifica por VersionId antes de subir el modelo. |
 | `inference_result` | Probabilidad para cada clase declarada y ninguna otra; suma ≈ 1 (±1e-3); `predicted_class` = argmax. |
 
 ## Estados de las cinco páginas
