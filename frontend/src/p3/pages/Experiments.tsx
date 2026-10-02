@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PageHeader } from "@/pipeline/components/PageHeader";
-import { useCampaignDossier, useExperimentRuns, useSelection } from "../api";
+import { useExperimentRuns, useSelection } from "../api";
 import { FetchBoundary } from "../components/FetchBoundary";
 import { StatePanel } from "../components/StatePanel";
 import type { ExcludedRun, ExperimentRun, SelectionState } from "../contracts";
@@ -19,10 +19,10 @@ import { RunDetail } from "../experiments/RunDetail";
 import { SelectionPanel } from "../experiments/SelectionPanel";
 import { dateTime, percent, shortHash } from "../format";
 import {
-  type AttemptMark,
-  attemptLabel,
-  attemptMarks,
   campaignRows,
+  type ExclusionMark,
+  exclusionLabel,
+  exclusionMarks,
   selectionCrossCheck,
 } from "../selection";
 
@@ -38,7 +38,6 @@ const selectClass =
 export function ExperimentsPage() {
   const runs = useExperimentRuns();
   const selection = useSelection();
-  const dossier = useCampaignDossier();
   const [filters, setFilters] = useState<RunFilters>(EMPTY_FILTERS);
   const [compared, setCompared] = useState<string[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -62,7 +61,6 @@ export function ExperimentsPage() {
           onClick={() => {
             runs.reload();
             selection.reload();
-            dossier.reload();
             setRefreshKey((key) => key + 1);
           }}
         >
@@ -73,8 +71,7 @@ export function ExperimentsPage() {
         {(data) => {
           const marks = selectionMarks(
             data.runs,
-            selection.status === "success" ? selection.data : null,
-            dossier.status === "success" ? dossier.data : null
+            selection.status === "success" ? selection.data : null
           );
           const counts = campaignCounts(data);
           const accepted = acceptedCounts(data.runs, marks.accepted);
@@ -369,7 +366,7 @@ function ExcludedRuns({ excluded }: Readonly<{ excluded: readonly ExcludedRun[] 
 
 type SelectionMarks = {
   accepted: ReadonlySet<string>;
-  attempts: ReadonlyMap<string, AttemptMark>;
+  exclusions: ReadonlyMap<string, ExclusionMark>;
   rows: ReadonlyMap<string, number>;
   candidateId: string | null;
   candidateLabel: string;
@@ -377,7 +374,7 @@ type SelectionMarks = {
 
 const NO_MARKS: SelectionMarks = {
   accepted: new Set(),
-  attempts: new Map(),
+  exclusions: new Map(),
   rows: new Map(),
   candidateId: null,
   candidateLabel: "",
@@ -389,15 +386,14 @@ const NO_MARKS: SelectionMarks = {
  */
 function selectionMarks(
   runs: readonly ExperimentRun[],
-  selection: SelectionState | null,
-  dossier: Parameters<typeof attemptMarks>[0]
+  selection: SelectionState | null
 ): SelectionMarks {
   if (selection === null || selection.candidate === null) return NO_MARKS;
   if (selectionCrossCheck(runs, selection).problems.length > 0) return NO_MARKS;
   const rows = campaignRows(selection);
   return {
     accepted: new Set(rows.keys()),
-    attempts: attemptMarks(dossier),
+    exclusions: exclusionMarks(selection),
     rows,
     candidateId: selection.candidate.run_id,
     candidateLabel:
@@ -409,11 +405,13 @@ function SelectionBadges({ runId, marks }: Readonly<{ runId: string; marks: Sele
   const row = marks.rows.get(runId);
   if (row === undefined) {
     if (marks.accepted.size === 0) return null;
+    const exclusion = marks.exclusions.get(runId);
     return (
-      <span className="mt-1 flex flex-wrap gap-1">
-        <span className="rounded-full bg-status-pending-soft px-2 py-0.5 text-status-pending">
-          {attemptLabel(marks.attempts.get(runId))}
+      <span className="mt-1 flex flex-col gap-1">
+        <span className="w-fit rounded-full bg-status-pending-soft px-2 py-0.5 text-status-pending">
+          {exclusionLabel(exclusion)}
         </span>
+        {exclusion && <span className="text-ink-muted">{exclusion.detail}</span>}
       </span>
     );
   }

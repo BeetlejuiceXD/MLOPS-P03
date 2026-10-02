@@ -13,11 +13,11 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
-import type { ExperimentRun } from "../src/p3/contracts";
+import type { ExperimentRun, SelectionState } from "../src/p3/contracts";
 import {
-  attemptLabel,
-  attemptMarks,
   campaignRows,
+  exclusionLabel,
+  exclusionMarks,
   selectionCrossCheck,
 } from "../src/p3/selection";
 import { fixturePayload } from "./p3-fixtures";
@@ -97,30 +97,13 @@ function campaignRuns(selection: Selection = CANDIDATE) {
 
 const RETRY_ID = "7576d02bb5564dbf94429373e9587a3a";
 
-/** Forma de `GET /api/selection/campaign` (D05-02): solo lo que Experiments lee. */
-function dossierFor(selection: Selection) {
-  return {
-    rows: selection.ranking.map((ranked) => ({
-      row: ranked.campaign_row,
-      status: "accepted",
-      representative: ranked.run_id,
-      attempts: [
-        { job_id: 1, run_id: ranked.run_id, role: "representative", reason: null, detail: null },
-        ...(ranked.campaign_row === selection.ranking[0]?.campaign_row
-          ? [
-              {
-                job_id: 5,
-                run_id: RETRY_ID,
-                role: "retry",
-                reason: "duplicate_campaign_row",
-                detail: `La fila ya cuenta con ${ranked.run_id} (corrida más temprana).`,
-              },
-            ]
-          : []),
-      ],
-    })),
-    unattributed: [],
-  };
+const RETRY_DETAIL = "La fila 1 ya cuenta con 684c6a694c34408fb07c780045656da8 (corrida más temprana).";
+
+/** Selección con un reintento en `excluded`, como la entrega D05-02 (`GET /api/selection`). */
+function withRetry(selection: Selection): Selection {
+  const copy = clone(selection);
+  copy.excluded.push({ run_id: RETRY_ID, reason: "duplicate_campaign_row", detail: RETRY_DETAIL });
+  return copy;
 }
 
 describe("cotejo selección ↔ Experiments (sin segundo ranking)", () => {
@@ -171,25 +154,17 @@ describe("cotejo selección ↔ Experiments (sin segundo ranking)", () => {
     expect(rows.size).toBe(CANDIDATE.ranking.length);
   });
 
-  it("el expediente solo rotula intentos no representantes, con su fila", () => {
-    const marks = attemptMarks({
-      rows: [
-        {
-          row: 1,
-          attempts: [
-            { run_id: "a".repeat(32), role: "representative", reason: null },
-            { run_id: RETRY_ID, role: "retry", reason: "duplicate_campaign_row" },
-            { run_id: null, role: "excluded", reason: "job_failed" },
-          ],
-        },
-      ],
-      unattributed: [{ run_id: "b".repeat(32), role: "excluded", reason: "adapter_excluded" }],
-    });
-    expect([...marks.keys()]).toEqual([RETRY_ID, "b".repeat(32)]);
-    expect(attemptLabel(marks.get(RETRY_ID))).toBe("Reintento · fila 1");
-    expect(attemptLabel(marks.get("b".repeat(32)))).toBe("Excluido");
-    expect(attemptLabel(undefined)).toBe("No aceptado por D05-02");
-    expect(attemptMarks(null).size).toBe(0);
+  it("los rótulos salen de excluded de la selección, sin recalcular nada", () => {
+    const marks = exclusionMarks(withRetry(CANDIDATE) as unknown as SelectionState);
+    expect(marks.get(RETRY_ID)).toEqual({ reason: "duplicate_campaign_row", detail: RETRY_DETAIL });
+    expect(marks.has("c46e4c3ab2bb4ee18c37571adbb65d92")).toBe(true);
+    expect([...marks.keys()]).not.toContain(null);
+    expect(marks.size).toBe(2);
+    expect(exclusionLabel(marks.get(RETRY_ID))).toBe("Reintento de una fila ya aceptada");
+    expect(exclusionLabel(marks.get("c46e4c3ab2bb4ee18c37571adbb65d92"))).toBe(
+      "Fuera de la matriz OFAT"
+    );
+    expect(exclusionLabel(undefined)).toBe("No aceptado por D05-02");
   });
 
   it("selección abierta: no hay candidato que cotejar", () => {
@@ -324,33 +299,31 @@ describe("Experiments con la selección", () => {
     ).toBeInTheDocument();
   });
 
-  it("reintentos del expediente de D05-02: visibles con su estado y fuera del conteo", async () => {
+  it("reintentos de D05-02: visibles con su motivo y fuera del conteo", async () => {
     const runs = campaignRuns();
     const representative = CANDIDATE.ranking[0] as RankedRun;
-    const retry = runFor({ ...representative, run_id: RETRY_ID });
-    runs.runs.push(retry);
+    runs.runs.push(runFor({ ...representative, run_id: RETRY_ID }));
     mockApi({
       "/api/experiments/runs": { body: runs },
-      "/api/selection": { body: CANDIDATE },
-      "/api/selection/campaign": { body: dossierFor(CANDIDATE) },
+      "/api/selection": { body: withRetry(CANDIDATE) },
     });
     renderExperiments();
     await screen.findByTestId("experiments-selection");
-    const counts = await screen.findByTestId("experiments-counts");
+    const counts = screen.getByTestId("experiments-counts");
     expect(counts).toHaveTextContent("Runs de training: 13");
     expect(counts).toHaveTextContent("Cuentan para la campaña (filas aceptadas por D05-02): 11");
     expect(counts).toHaveTextContent("Reintentos y no aceptados: 2 (no cuentan)");
     expect(counts).not.toHaveTextContent("Elegibles para campaña");
-    const retryRow = await screen.findByTestId(`run-row-${RETRY_ID}`);
-    expect(await within(retryRow).findByText("Reintento · fila 1")).toBeInTheDocument();
-    expect(retryRow).not.toHaveTextContent(/^Fila \d+$/);
+    const retryRow = screen.getByTestId(`run-row-${RETRY_ID}`);
+    expect(retryRow).toHaveTextContent("Reintento de una fila ya aceptada");
+    expect(retryRow).toHaveTextContent(RETRY_DETAIL);
     expect(screen.getByTestId("run-row-c46e4c3ab2bb4ee18c37571adbb65d92")).toHaveTextContent(
-      "No aceptado por D05-02"
+      "Fuera de la matriz OFAT"
     );
     expect(screen.getAllByText(/^Fila \d+$/)).toHaveLength(11);
   });
 
-  it("sin expediente (falla /selection/campaign) los no aceptados igual no cuentan", async () => {
+  it("un run fuera del ranking que la selección no explica igual no cuenta", async () => {
     const runs = campaignRuns();
     runs.runs.push(runFor({ ...(CANDIDATE.ranking[0] as RankedRun), run_id: RETRY_ID }));
     mockApi({

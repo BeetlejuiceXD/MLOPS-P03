@@ -4,7 +4,6 @@
  * son los de la API. Solo comprueba que lo que dice la selección existe en Experiments con
  * los mismos valores.
  */
-import { z } from "zod";
 import type { ExperimentRun, RankedRun, SelectionState } from "./contracts";
 
 const METRICS: readonly [keyof RankedRun, (run: ExperimentRun) => number | undefined][] = [
@@ -64,46 +63,32 @@ export function selectionCrossCheck(
   return { candidate: candidateRun, problems };
 }
 
+type Exclusion = SelectionState["excluded"][number];
+export type ExclusionMark = Pick<Exclusion, "reason" | "detail">;
+
+const EXCLUSION_LABEL: Record<Exclusion["reason"], string> = {
+  duplicate_campaign_row: "Reintento de una fila ya aceptada",
+  outside_campaign_matrix: "Fuera de la matriz OFAT",
+  not_finished: "No terminado",
+  invalid_contract: "Contrato inválido",
+  manifest_mismatch: "Manifest distinto",
+  release_mismatch: "Release distinto",
+  provenance_inconsistent: "Procedencia inconsistente",
+};
+
 /**
- * Lo que Experiments lee del expediente de campaña de D05-02 (`GET /api/selection/campaign`):
- * el rol de cada intento. No es otra fuente de verdad: solo rotula los runs que la selección
- * no acepta (reintentos, pendientes, excluidos). El resto de campos se ignora.
+ * run_id → motivo por el que la selección (D05-02) NO lo cuenta, tal cual viene en
+ * `excluded` de `GET /api/selection`. Experiments solo lo rotula; no lo decide.
  */
-const dossierAttemptSchema = z.object({
-  run_id: z.string().nullable(),
-  role: z.enum(["representative", "retry", "pending", "excluded"]),
-  reason: z.string().nullable(),
-});
-export const campaignDossierAttemptsSchema = z.object({
-  rows: z.array(z.object({ row: z.number().int(), attempts: z.array(dossierAttemptSchema) })),
-  unattributed: z.array(dossierAttemptSchema),
-});
-export type CampaignDossierAttempts = z.infer<typeof campaignDossierAttemptsSchema>;
-
-export type AttemptMark = { role: "retry" | "pending" | "excluded"; row: number | null };
-
-/** run_id → rol de los intentos que NO son representantes, tal como los clasificó D05-02. */
-export function attemptMarks(dossier: CampaignDossierAttempts | null) {
-  const marks = new Map<string, AttemptMark>();
-  if (dossier === null) return marks;
-  const add = (attempt: z.infer<typeof dossierAttemptSchema>, row: number | null) => {
-    if (attempt.run_id !== null && attempt.role !== "representative") {
-      marks.set(attempt.run_id, { role: attempt.role, row });
-    }
-  };
-  for (const row of dossier.rows) for (const attempt of row.attempts) add(attempt, row.row);
-  for (const attempt of dossier.unattributed) add(attempt, null);
+export function exclusionMarks(selection: Pick<SelectionState, "excluded">) {
+  const marks = new Map<string, ExclusionMark>();
+  for (const { run_id, reason, detail } of selection.excluded) {
+    if (run_id !== null) marks.set(run_id, { reason, detail });
+  }
   return marks;
 }
 
-const ROLE_LABEL: Record<AttemptMark["role"], string> = {
-  retry: "Reintento",
-  pending: "Pendiente",
-  excluded: "Excluido",
-};
-
-/** Rótulo de un run que no cuenta para la campaña aceptada. */
-export function attemptLabel(mark: AttemptMark | undefined) {
-  if (mark === undefined) return "No aceptado por D05-02";
-  return mark.row === null ? ROLE_LABEL[mark.role] : `${ROLE_LABEL[mark.role]} · fila ${mark.row}`;
+/** Rótulo de un run de training que no cuenta para la campaña aceptada. */
+export function exclusionLabel(mark: ExclusionMark | undefined) {
+  return mark === undefined ? "No aceptado por D05-02" : EXCLUSION_LABEL[mark.reason];
 }

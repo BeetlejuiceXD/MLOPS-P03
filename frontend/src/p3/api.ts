@@ -14,7 +14,6 @@ import {
   selectionStateSchema,
   trainingJobListSchema,
 } from "./contracts";
-import { campaignDossierAttemptsSchema } from "./selection";
 
 // D03-03: el 503 de las fuentes trae el motivo que publicó trainer-worker; se muestra.
 const WITH_REASON = { showServerReason: true } as const;
@@ -34,9 +33,6 @@ export const useModels = () => useValidatedFetch("/models", modelsResponseSchema
 // D05-03: estado de la selección (D04-04/D05-02); el 503 trae el motivo.
 export const useSelection = () =>
   useValidatedFetch("/selection", selectionStateSchema, WITH_REASON);
-// D05-03: expediente de D05-02, solo para rotular reintentos y excluidos de la campaña.
-export const useCampaignDossier = () =>
-  useValidatedFetch("/selection/campaign", campaignDossierAttemptsSchema, WITH_REASON);
 // D05-06: registro local_test (MinIO) de D04-06, aparte de la lista official.
 export const useLocalTestModels = () =>
   useValidatedFetch("/models/local-test", localTestModelsResponseSchema, WITH_REASON);
