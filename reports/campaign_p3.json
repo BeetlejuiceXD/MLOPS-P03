@@ -1329,6 +1329,303 @@
         "run_kind": "training",
         "best_val_loss": 0.158954248110305
       }
+    },
+    {
+      "row": 1,
+      "change": "Baseline",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        }
+      },
+      "job": {
+        "id": 1,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "684c6a694c34408fb07c780045656da8",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-02T03:08:26.000Z",
+        "started_at": "2026-10-02T03:08:28.000Z",
+        "finished_at": "2026-10-02T03:11:17.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "684c6a694c34408fb07c780045656da8",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9177959957615303,
+        "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "1",
+          "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0000001192092896
+      },
+      "details": {
+        "duration_seconds": 157.668757073,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790910515019,
+        "run_kind": "training",
+        "best_val_loss": 0.158954248110305
+      }
+    },
+    {
+      "row": 1,
+      "change": "Baseline",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        }
+      },
+      "job": {
+        "id": 2,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "800fa919f5bb4b30a3ffdd1f5e2dcbec",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-02T03:13:48.000Z",
+        "started_at": "2026-10-02T03:13:49.000Z",
+        "finished_at": "2026-10-02T03:16:30.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "800fa919f5bb4b30a3ffdd1f5e2dcbec",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9177959957615303,
+        "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "2",
+          "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0000001192092896
+      },
+      "details": {
+        "duration_seconds": 155.97274198799994,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790910833003,
+        "run_kind": "training",
+        "best_val_loss": 0.158954248110305
+      }
+    },
+    {
+      "row": 1,
+      "change": "Baseline",
+      "request": {
+        "task": "training",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        }
+      },
+      "job": {
+        "id": 4,
+        "task": "training",
+        "status": "succeeded",
+        "dataset_version": "v0.1.1",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "config": {
+          "architecture": "resnet18",
+          "pretrained": true,
+          "trainable_layers": "last_block",
+          "image_size": 224,
+          "batch_size": 16,
+          "learning_rate": 0.001,
+          "weight_decay": 0.0001,
+          "optimizer": "adam",
+          "max_epochs": 30,
+          "patience": 5,
+          "augmentation": true,
+          "seed": 7,
+          "hidden_layers": 0,
+          "hidden_dim": 128,
+          "dropout": 0
+        },
+        "progress": {
+          "epoch": 9,
+          "total_epochs": 30
+        },
+        "mlflow_run_id": "bafb68badcda4b8f963b51372f8c50f8",
+        "error": null,
+        "cancel_requested": false,
+        "created_at": "2026-10-02T04:09:26.000Z",
+        "started_at": "2026-10-02T04:09:28.000Z",
+        "finished_at": "2026-10-02T04:12:16.000Z"
+      },
+      "report": {
+        "problems": [],
+        "run_id": "bafb68badcda4b8f963b51372f8c50f8",
+        "run_status": "FINISHED",
+        "experiment": "p3-cnn-classifier",
+        "epochs_logged": 9,
+        "best_epoch": 7,
+        "best_val_accuracy": 0.917910447761194,
+        "best_val_macro_f1": 0.9177959957615303,
+        "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e",
+        "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+        "tags": {
+          "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+          "dvc_release": "v0.1.1",
+          "dvc_images_md5": "951150dd4fb053f4665089fcb37a1c87.dir",
+          "dvc_annotations_md5": "c7cb86ae7ece94ef7b853620e464a4d7.dir",
+          "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+          "manifest_version": "p3-v0.1.1-s42",
+          "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+          "classes": "cat,dog",
+          "seed": "7",
+          "job_id": "4",
+          "checkpoint_sha256": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+        },
+        "loaded_classes": [
+          "cat",
+          "dog"
+        ],
+        "probabilities_sum": 1.0000001192092896
+      },
+      "details": {
+        "duration_seconds": 162.30676711599972,
+        "peak_memory_mb": 1302.97265625,
+        "device": "cpu",
+        "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
+        "start_time": 1790914171862,
+        "run_kind": "training",
+        "best_val_loss": 0.158954248110305
+      }
     }
   ],
   "summary": {
@@ -1353,14 +1650,14 @@
       {
         "row": 1,
         "change": "Baseline",
-        "job_id": 3,
+        "job_id": 1,
         "job_status": "succeeded",
-        "run_id": "d7965d2980a645f8b3ec74613ddd66a0",
+        "run_id": "684c6a694c34408fb07c780045656da8",
         "valid": true,
         "problems": [],
-        "retries": 1,
+        "retries": 4,
         "resources": {
-          "duration_seconds": 145.9896670669998,
+          "duration_seconds": 157.668757073,
           "peak_memory_mb": 1302.97265625,
           "device": "cpu",
           "git_commit": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168",
