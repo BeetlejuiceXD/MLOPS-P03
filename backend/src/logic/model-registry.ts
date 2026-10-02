@@ -8,7 +8,8 @@
  * - `namespace` separa las pruebas locales (`local_test`, MinIO) de la publicación oficial
  *   (`official`, AWS en D06-03); `GET /api/models` solo servirá `official`.
  */
-import type { ModelVersion } from './p3.contracts.js';
+import { createHash } from 'node:crypto';
+import { type ModelVersion, P3_EXPERIMENT } from './p3.contracts.js';
 
 export const MODEL_OBJECT_NAME = 'model.pt';
 
@@ -42,20 +43,38 @@ export interface RegistryEntry {
 }
 
 /** Clave del objeto de una versión: `models/p3-cnn-classifier/<semver>/model.pt`. */
-export function modelObjectKey(_semver: string): string {
-  throw new Error('D04-06: pendiente');
+export function modelObjectKey(semver: string): string {
+  return `models/${P3_EXPERIMENT}/${semver}/${MODEL_OBJECT_NAME}`;
 }
 
-export function sha256Hex(_body: Buffer): string {
-  throw new Error('D04-06: pendiente');
+export function sha256Hex(body: Buffer): string {
+  return createHash('sha256').update(body).digest('hex');
 }
 
 /** Orden ascendente por MAJOR.MINOR.PATCH numérico (no lexicográfico). */
-export function compareSemver(_a: string, _b: string): number {
-  throw new Error('D04-06: pendiente');
+export function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 /** La fila del registro con la forma exacta del contrato (sin namespace ni extras). */
-export function toModelVersion(_entry: RegistryEntry): ModelVersion {
-  throw new Error('D04-06: pendiente');
+export function toModelVersion(entry: RegistryEntry): ModelVersion {
+  return {
+    semver: entry.semver,
+    mlflow_run_id: entry.mlflow_run_id,
+    manifest_hash: entry.manifest_hash,
+    dvc_release: entry.dvc_release,
+    dvc_release_hash: entry.dvc_release_hash,
+    s3_bucket: entry.s3_bucket,
+    s3_key: entry.s3_key,
+    version_id: entry.version_id,
+    sha256: entry.sha256,
+    status: entry.status,
+    published_at: entry.published_at === null ? null : entry.published_at.toISOString(),
+  };
 }

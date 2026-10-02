@@ -115,6 +115,8 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
       MINIO_BUCKET: image-annotations
+      # D04-06: bucket de modelos con versioning (MinIO local; AWS en D06-03).
+      MODEL_S3_BUCKET: p3-models-local
       MAX_UPLOAD_SIZE_BYTES: 5242880
       PIPELINE_CONFIG_ROOT: /pipeline
       # D04-01: el portal lee runs, curvas y artefactos de MLflow por su API REST.

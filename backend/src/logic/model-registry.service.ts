@@ -19,10 +19,23 @@
  * Este ticket lo prueba en `local_test` contra MinIO; la publicación oficial en AWS y su
  * recarga son D06-03/D06-04.
  */
-
-import type { z } from 'zod';
-import type { RegistryEntry, RegistryFailureReason, RegistryNamespace } from './model-registry.js';
-import type { ModelVersion, modelsResponseSchema } from './p3.contracts.js';
+import { z } from 'zod';
+import {
+  ConflictError,
+  NotFoundError,
+  ServiceUnavailableError,
+  ValidationError,
+} from './errors.js';
+import {
+  compareSemver,
+  modelObjectKey,
+  type RegistryEntry,
+  type RegistryFailureReason,
+  type RegistryNamespace,
+  sha256Hex,
+  toModelVersion,
+} from './model-registry.js';
+import { type ModelVersion, modelsResponseSchema, modelVersionSchema } from './p3.contracts.js';
 
 type ModelsResponse = z.infer<typeof modelsResponseSchema>;
 
@@ -97,11 +110,181 @@ export interface ModelRegistryService {
   list(): Promise<ModelsResponse>;
 }
 
-export function createModelRegistryService(_deps: {
+type Failure = { reason: RegistryFailureReason; detail: string };
+
+const sizeSchema = z.number().int().positive();
+
+export function createModelRegistryService(deps: {
   repo: ModelRegistryRepository;
   store: ModelObjectStore;
   namespace: RegistryNamespace;
   now?: () => Date;
 }): ModelRegistryService {
-  throw new Error('D04-06: pendiente');
+  const { repo, store, namespace } = deps;
+  const now = deps.now ?? (() => new Date());
+
+  /** Un fallo del storage no es evidencia de nada: 503 y el registro no cambia. */
+  async function storage<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ServiceUnavailableError(`Storage de modelos no disponible: ${detail}`);
+    }
+  }
+
+  async function load(semver: string): Promise<RegistryEntry> {
+    const entry = await repo.find(namespace, semver);
+    if (!entry) throw new NotFoundError(`La versión ${semver} no está registrada`);
+    return entry;
+  }
+
+  async function outcome(semver: string, failure: Failure | null): Promise<RegistryOutcome> {
+    return { model: toModelVersion(await load(semver)), failure };
+  }
+
+  async function fail(entry: RegistryEntry, failure: Failure): Promise<RegistryOutcome> {
+    if (!(await repo.markFailed(namespace, entry.semver, failure.reason, failure.detail))) {
+      throw new ConflictError(`La versión ${entry.semver} cambió de estado; no se marcó failed`);
+    }
+    return outcome(entry.semver, failure);
+  }
+
+  function requireDraft(entry: RegistryEntry) {
+    if (entry.status !== 'draft') {
+      throw new ConflictError(`La versión ${entry.semver} ya está ${entry.status}`);
+    }
+  }
+
+  /** head + get por VersionId: el objeto guardado debe ser exactamente el registrado. */
+  async function inspect(entry: RegistryEntry, versionId: string): Promise<Failure | null> {
+    const where = `${entry.s3_bucket}/${entry.s3_key}@${versionId}`;
+    const head = await storage(() => store.head(entry.s3_key, versionId));
+    if (head === null) return { reason: 'object_missing', detail: `No existe ${where}` };
+    if (head.versionId !== versionId) {
+      return {
+        reason: 'version_mismatch',
+        detail: `HEAD de ${where} devolvió VersionId ${head.versionId}`,
+      };
+    }
+    if (head.size !== entry.size_bytes) {
+      return {
+        reason: 'size_mismatch',
+        detail: `${where} mide ${head.size} B; registrado ${entry.size_bytes} B`,
+      };
+    }
+    if (head.sha256 !== entry.sha256) {
+      return {
+        reason: 'sha256_mismatch',
+        detail: `Metadato sha256 de ${where} = ${head.sha256}; registrado ${entry.sha256}`,
+      };
+    }
+    const body = await storage(() => store.get(entry.s3_key, versionId));
+    if (body === null) return { reason: 'object_missing', detail: `GET de ${where} sin objeto` };
+    const actual = sha256Hex(body);
+    if (actual !== entry.sha256) {
+      return {
+        reason: 'sha256_mismatch',
+        detail: `SHA-256 del contenido de ${where} = ${actual}; registrado ${entry.sha256}`,
+      };
+    }
+    return null;
+  }
+
+  return {
+    async register(input) {
+      const entry: RegistryEntry = {
+        namespace,
+        semver: input.semver,
+        mlflow_run_id: input.mlflow_run_id,
+        manifest_hash: input.manifest_hash,
+        dvc_release: input.dvc_release,
+        dvc_release_hash: input.dvc_release_hash,
+        s3_bucket: store.bucket,
+        s3_key: modelObjectKey(input.semver),
+        version_id: null,
+        sha256: input.sha256,
+        size_bytes: input.size_bytes,
+        status: 'draft',
+        failure_reason: null,
+        failure_detail: null,
+        published_at: null,
+      };
+      const contract = modelVersionSchema.safeParse(toModelVersion(entry));
+      if (!contract.success) {
+        throw new ValidationError(`Versión inválida: ${z.prettifyError(contract.error)}`);
+      }
+      if (!sizeSchema.safeParse(input.size_bytes).success) {
+        throw new ValidationError('size_bytes debe ser un entero positivo');
+      }
+      if (!(await repo.insertDraft(entry))) {
+        throw new ConflictError(`La versión ${input.semver} ya existe: el semver es inmutable`);
+      }
+      return toModelVersion(entry);
+    },
+
+    async upload(semver, body) {
+      const entry = await load(semver);
+      requireDraft(entry);
+      if (entry.version_id !== null) {
+        throw new ConflictError(`La versión ${semver} ya se subió (VersionId ${entry.version_id})`);
+      }
+      if (body.length !== entry.size_bytes) {
+        return fail(entry, {
+          reason: 'size_mismatch',
+          detail: `El objeto mide ${body.length} B; registrado ${entry.size_bytes} B`,
+        });
+      }
+      const actual = sha256Hex(body);
+      if (actual !== entry.sha256) {
+        return fail(entry, {
+          reason: 'sha256_mismatch',
+          detail: `SHA-256 del objeto = ${actual}; registrado ${entry.sha256}`,
+        });
+      }
+      const { versionId } = await storage(() => store.put(entry.s3_key, body, entry.sha256));
+      if (versionId === null) {
+        return fail(entry, {
+          reason: 'version_id_missing',
+          detail: `${store.bucket} no devolvió VersionId (bucket sin versioning)`,
+        });
+      }
+      if (!(await repo.markUploaded(namespace, semver, versionId))) {
+        throw new ConflictError(`La versión ${semver} cambió de estado durante la subida`);
+      }
+      return outcome(semver, null);
+    },
+
+    async verify(semver) {
+      const entry = await load(semver);
+      requireDraft(entry);
+      const versionId = entry.version_id;
+      if (versionId === null) {
+        throw new ConflictError(`La versión ${semver} todavía no tiene objeto subido`);
+      }
+      const failure = await inspect(entry, versionId);
+      if (failure) return fail(entry, failure);
+      if (!(await repo.markPublished(namespace, semver, versionId, now()))) {
+        throw new ConflictError(`La versión ${semver} cambió de estado; no se publicó`);
+      }
+      return outcome(semver, null);
+    },
+
+    async audit(semver) {
+      const entry = await load(semver);
+      if (entry.status !== 'published' || entry.version_id === null) {
+        throw new ConflictError(
+          `Solo se audita una versión publicada (${semver}: ${entry.status})`,
+        );
+      }
+      const failure = await inspect(entry, entry.version_id);
+      return failure ? { ok: false, ...failure } : { ok: true };
+    },
+
+    async list() {
+      const rows = await repo.list(namespace);
+      rows.sort((a, b) => compareSemver(a.semver, b.semver));
+      return modelsResponseSchema.parse({ models: rows.map(toModelVersion) });
+    },
+  };
 }

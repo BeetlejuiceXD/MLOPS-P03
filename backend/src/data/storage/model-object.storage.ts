@@ -23,16 +23,64 @@ export interface MinioModelStore {
   get(key: string, versionId: string): Promise<Buffer | null>;
 }
 
-export function createMinioModelStore(_client: Minio.Client, _bucket: string): MinioModelStore {
-  throw new Error('D04-06: pendiente');
+/** Códigos con los que S3/MinIO dicen que el objeto o la versión no existen. */
+const MISSING = new Set(['NotFound', 'NoSuchKey', 'NoSuchVersion']);
+
+function isMissing(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && MISSING.has(code);
+}
+
+async function orNull<T>(operation: () => Promise<T>): Promise<T | null> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (isMissing(error)) return null;
+    throw error;
+  }
+}
+
+export function createMinioModelStore(client: Minio.Client, bucket: string): MinioModelStore {
+  return {
+    bucket,
+    async put(key, body, sha256) {
+      const info = await client.putObject(bucket, key, body, body.length, {
+        'Content-Type': 'application/octet-stream',
+        'X-Amz-Meta-Sha256': sha256,
+      });
+      return { versionId: info.versionId ?? null };
+    },
+    head: (key, versionId) =>
+      orNull(async () => {
+        const stat = await client.statObject(bucket, key, { versionId });
+        const sha256 = stat.metaData?.[SHA256_METADATA_KEY];
+        return {
+          size: stat.size,
+          versionId: stat.versionId ?? null,
+          sha256: typeof sha256 === 'string' ? sha256 : null,
+        };
+      }),
+    get: (key, versionId) =>
+      orNull(async () => {
+        const stream = await client.getObject(bucket, key, { versionId });
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+        return Buffer.concat(chunks);
+      }),
+  };
 }
 
 /** Solo local/CI: crea el bucket si falta y activa versioning (en AWS lo hace Terraform). */
-export async function ensureLocalModelBucket(_client: Minio.Client, _bucket: string) {
-  throw new Error('D04-06: pendiente');
+export async function ensureLocalModelBucket(client: Minio.Client, bucket: string) {
+  if (!(await client.bucketExists(bucket))) await client.makeBucket(bucket);
+  await client.setBucketVersioning(bucket, { Status: 'Enabled' });
+  await assertModelBucketVersioned(client, bucket);
 }
 
 /** Sin versioning no hay VersionId y nada puede publicarse: se rechaza el bucket. */
-export async function assertModelBucketVersioned(_client: Minio.Client, _bucket: string) {
-  throw new Error('D04-06: pendiente');
+export async function assertModelBucketVersioned(client: Minio.Client, bucket: string) {
+  const config = await client.getBucketVersioning(bucket);
+  if (config?.Status !== 'Enabled') {
+    throw new Error(`El bucket de modelos ${bucket} no tiene versioning activo`);
+  }
 }

@@ -284,6 +284,27 @@ jobs:
           P3_EVALUATION_MARIADB_TEST: "1"
           DATABASE_URL: mysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3306/image_repo
         run: npx vitest run tests/evaluation.mariadb.test.ts
+      - name: Registro de modelos real en MinIO + MariaDB, con reinicio (D04-06)
+        # Migración 0008 aplicada por el backend. Bucket local con versioning, objetos de
+        # PRUEBA en el namespace `local_test` y credenciales de MinIO del runner (no AWS):
+        # escribe, reinicia MariaDB y MinIO sin borrar volúmenes y otro proceso relee.
+        working-directory: backend
+        env:
+          P3_MODEL_REGISTRY_TEST: "1"
+          DATABASE_URL: mysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3306/image_repo
+          MINIO_ENDPOINT: 127.0.0.1
+          MINIO_PORT: "9000"
+          MINIO_ACCESS_KEY: ${{ env.MINIO_ROOT_USER }}
+          MINIO_SECRET_KEY: ${{ env.MINIO_ROOT_PASSWORD }}
+          MODEL_S3_BUCKET: p3-models-local
+          P3_MODEL_REGISTRY_EVIDENCE: ${{ runner.temp }}/model-registry-evidence.json
+        run: |
+          P3_MODEL_REGISTRY_PHASE=write npx vitest run tests/model-registry.minio.test.ts
+          docker compose -f ../docker-compose.yml restart mariadb minio
+          docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 300 mariadb minio
+          P3_MODEL_REGISTRY_PHASE=check npx vitest run tests/model-registry.minio.test.ts
+          echo "Evidencia (objetos de prueba, sin credenciales):"
+          cat "$P3_MODEL_REGISTRY_EVIDENCE"
       - name: Logs de los servicios
         if: failure()
         run: docker compose logs --no-color backend trainer-worker mlflow
