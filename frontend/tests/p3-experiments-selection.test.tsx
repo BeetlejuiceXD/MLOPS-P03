@@ -112,6 +112,15 @@ describe("cotejo selección ↔ Experiments (sin segundo ranking)", () => {
     expect(check.problems.join(" ")).toMatch(/val_accuracy/);
   });
 
+  it("una fila aceptada (no candidata) que no aparece en Experiments → problema que la nombra", () => {
+    const missing = CANDIDATE.ranking[5] as RankedRun;
+    const runs = campaignRuns().runs.filter((r) => r.run_id !== missing.run_id);
+    const check = selectionCrossCheck(runs, CANDIDATE);
+    expect(check.problems).toContain(
+      `La fila ${missing.campaign_row} (${missing.run_id}) no aparece en Experiments.`
+    );
+  });
+
   it("una fila aceptada que en Experiments no es elegible → problema", () => {
     const runs = campaignRuns().runs;
     const row = runs.find((r) => r.run_id === CANDIDATE.ranking[3]?.run_id) as ExperimentRun;
@@ -176,6 +185,7 @@ describe("Experiments con la selección", () => {
     const row = screen.getByTestId(`run-row-${CANDIDATE.candidate?.run_id}`);
     expect(row).toHaveTextContent("Candidato propuesto");
     expect(row).toHaveTextContent("Fila 1");
+    expect(screen.getAllByText("Candidato propuesto")).toHaveLength(1);
   });
 
   it("los auxiliares y el training fuera de la campaña no suman a las filas aceptadas", async () => {
@@ -235,9 +245,28 @@ describe("Experiments con la selección", () => {
     renderExperiments();
     const alert = await screen.findByTestId("selection-mismatch");
     expect(alert).toHaveTextContent("no aparece");
+    expect(screen.queryAllByText(/^Fila \d+$/)).toHaveLength(0);
+    expect(screen.queryByText("Candidato propuesto")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("experiments-selection")).queryByText(
       "Propuesta pendiente de cierre (D05-08)"
     )).not.toBeInTheDocument();
+  });
+
+  it("Actualizar vuelve a pedir la selección (abierta → candidato propuesto)", async () => {
+    const routes: Record<string, Route> = {
+      "/api/experiments/runs": { body: campaignRuns() },
+      "/api/selection": { body: OPEN },
+    };
+    mockApi(routes);
+    renderExperiments();
+    expect(await screen.findByTestId("experiments-selection")).toHaveTextContent(
+      "Todavía no hay candidato propuesto"
+    );
+    routes["/api/selection"] = { body: CANDIDATE };
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
+    expect(
+      await screen.findByText(/Propuesta pendiente de cierre \(D05-08\)/)
+    ).toBeInTheDocument();
   });
 
   it("si /api/selection falla, el motivo sale en su panel y los runs siguen visibles", async () => {

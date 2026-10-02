@@ -45,7 +45,8 @@ function SelectionBody({
   state,
   runs,
 }: Readonly<{ state: SelectionState; runs: readonly ExperimentRun[] }>) {
-  if (state.status === "open" || state.candidate === null) {
+  // El contrato garantiza: `open` ⇔ sin candidato.
+  if (state.candidate === null) {
     return (
       <p className="text-ink-muted">
         Todavía no hay candidato propuesto: MODEL SELECTION sigue abierto.
