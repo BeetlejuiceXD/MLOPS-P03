@@ -369,9 +369,14 @@ describe('POST /inference con un crop del portal', () => {
     expect(engine.calls).toHaveLength(0);
   });
 
-  it('caja fuera de la imagen → 400 sin llamar al motor', async () => {
+  it.each([
+    ['se sale por la derecha y por abajo', [150, 50, 100, 80]],
+    ['se sale solo por la derecha', [150, 10, 100, 20]],
+    ['se sale solo por abajo', [10, 60, 20, 80]],
+    ['sin área', [10, 10, 0, 20]],
+  ])('caja que %s → 400 sin llamar al motor', async (_name, bbox) => {
     await portalImageWithBox();
-    images.annotations.set(8, { image_id: 42, bbox: [150, 50, 100, 80] });
+    images.annotations.set(8, { image_id: 42, bbox: bbox as [number, number, number, number] });
     const res = await postCrop(8);
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/fuera de la imagen/);

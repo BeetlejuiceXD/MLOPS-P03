@@ -96,6 +96,9 @@ describe("identidad del motor", () => {
     expect(
       await screen.findByText(/motor de inferencia \(D05-04\) no disponible/)
     ).toBeInTheDocument();
+    // Aunque la entrada sea válida: sin motor no hay predicción.
+    chooseFile(file("perro.png", "image/png"));
+    expect(screen.queryByTestId("inference-input-error")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Predecir" })).toBeDisabled();
   });
 });
