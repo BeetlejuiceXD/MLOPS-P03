@@ -62,6 +62,7 @@ def _ok(
             "device": "cpu",
             "git_commit": "abc123",
             "run_kind": "training",
+            "best_val_loss": 0.21,
         },
     }
 
@@ -161,6 +162,7 @@ def test_resources_and_commit_are_surfaced_per_row():
         "device": "cpu",
         "git_commit": "abc123",
         "run_kind": "training",
+        "best_val_loss": 0.21,
     }
 
 
@@ -193,23 +195,18 @@ def test_retry_selection_breaks_start_time_tie_with_lower_run_id():
     assert row_1["run_id"] == "run-aaa"
 
 
-def test_single_valid_attempt_does_not_need_start_time():
-    # Caso real de la campana: un solo intento por fila, sin reintentos. No
-    # hay nada que elegir, asi que falta de start_time no debe invalidarla.
+def test_single_attempt_without_start_time_is_invalid_even_without_competition():
     only_attempt = _ok(1, run_id="run-1", start_time=None)
     results = [only_attempt] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
 
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["valid"] is True
-    assert row_1["run_id"] == "run-1"
+    assert row_1["valid"] is False
+    assert any("start_time" in p for p in row_1["problems"])
 
 
-def test_multiple_valid_attempts_with_missing_start_time_are_not_resolved_by_run_id():
-    # Dos intentos validos, a uno le falta start_time: NO se debe caer en
-    # comparar run_id como si fuera el tiempo. Debe quedar documentado como
-    # problema, no resuelto en silencio.
+def test_attempt_without_start_time_is_excluded_but_the_other_valid_one_still_counts():
     with_time = _ok(1, run_id="run-aaa", start_time=1_000_000)
     without_time = _ok(1, run_id="run-zzz", start_time=None)
     results = [with_time, without_time] + [
@@ -219,13 +216,11 @@ def test_multiple_valid_attempts_with_missing_start_time_are_not_resolved_by_run
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["valid"] is False
-    assert any("start_time" in p for p in row_1["problems"])
+    assert row_1["valid"] is True
+    assert row_1["run_id"] == "run-aaa"
 
 
-def test_multiple_valid_attempts_with_empty_string_start_time_are_not_resolved_by_run_id():
-    # start_time="" (cadena vacia, no None) debe tratarse igual que ausente:
-    # no se puede elegir representante sin inventar el orden.
+def test_both_attempts_with_empty_string_start_time_invalidate_the_row():
     a = _ok(1, run_id="run-aaa", start_time="")
     b = _ok(1, run_id="run-bbb", start_time="")
     results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
@@ -237,7 +232,7 @@ def test_multiple_valid_attempts_with_empty_string_start_time_are_not_resolved_b
     assert any("start_time" in p for p in row_1["problems"])
 
 
-def test_multiple_valid_attempts_with_wrong_type_start_time_are_not_resolved_by_run_id():
+def test_attempt_with_wrong_type_start_time_is_excluded_but_the_other_valid_one_still_counts():
     a = _ok(1, run_id="run-aaa", start_time=[1, 2, 3])
     b = _ok(1, run_id="run-bbb", start_time=1_000_000)
     results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
@@ -245,11 +240,11 @@ def test_multiple_valid_attempts_with_wrong_type_start_time_are_not_resolved_by_
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["valid"] is False
-    assert any("start_time" in p for p in row_1["problems"])
+    assert row_1["valid"] is True
+    assert row_1["run_id"] == "run-bbb"
 
 
-def test_multiple_valid_attempts_with_non_numeric_string_start_time_are_not_resolved_by_run_id():
+def test_attempt_with_non_numeric_string_start_time_is_excluded_but_the_other_still_counts():
     a = _ok(1, run_id="run-aaa", start_time="no-es-un-numero")
     b = _ok(1, run_id="run-bbb", start_time=1_000_000)
     results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
@@ -257,8 +252,8 @@ def test_multiple_valid_attempts_with_non_numeric_string_start_time_are_not_reso
     summary = summarize(results)
 
     row_1 = next(r for r in summary["rows"] if r["row"] == 1)
-    assert row_1["valid"] is False
-    assert any("start_time" in p for p in row_1["problems"])
+    assert row_1["valid"] is True
+    assert row_1["run_id"] == "run-bbb"
 
 
 def test_a_numeric_string_start_time_is_accepted_as_valid():
@@ -499,3 +494,48 @@ def test_parse_rows_single_value():
 
 def test_parse_rows_multiple_values_with_spaces():
     assert _parse_rows("1, 3,5") == {1, 3, 5}
+
+
+# --- merge: concilia intentos de archivos de evidencia separados, sin ocultar ----
+
+
+def test_merge_combines_results_without_hiding_either_attempt(tmp_path):
+    verification = tmp_path / "verification.json"
+    verification.write_text(
+        json.dumps(
+            {
+                "manifest": {"dataset_version": "v0.1.1"},
+                "results": [_ok(1, run_id="run-verification", start_time=1_000_000)],
+            }
+        ),
+        encoding="utf-8",
+    )
+    campaign = tmp_path / "campaign.json"
+    campaign.write_text(
+        json.dumps(
+            {
+                "manifest": {"dataset_version": "v0.1.1"},
+                "results": [_ok(1, run_id="run-campaign", start_time=2_000_000)]
+                + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "merged.json"
+
+    main(["merge", str(campaign), str(verification), "--evidence", str(output)])
+
+    merged = json.loads(output.read_text(encoding="utf-8"))
+    row_1_attempts = [r for r in merged["results"] if r["row"] == 1]
+    assert len(row_1_attempts) == 2  # ningun intento se descarta al combinar
+    assert {a["job"]["mlflow_run_id"] for a in row_1_attempts} == {
+        "run-verification",
+        "run-campaign",
+    }
+
+    row_1_summary = next(r for r in merged["summary"]["rows"] if r["row"] == 1)
+    assert row_1_summary["valid"] is True
+    assert row_1_summary["run_id"] == "run-verification"  # menor start_time
+    assert row_1_summary["retries"] == 1
+    assert merged["summary"]["valid_count"] == 10
+    assert merged["summary"]["meets_minimum"] is True

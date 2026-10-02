@@ -66,6 +66,7 @@ def _run_details(tracking_uri: str, run_id: str) -> dict:
         "git_commit": run.data.tags.get("git_commit"),
         "start_time": run.info.start_time,
         "run_kind": run.data.tags.get("p3.run_kind"),
+        "best_val_loss": run.data.metrics.get("best_val_loss"),
     }
 
 
@@ -180,6 +181,14 @@ def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
     if not job.get("id"):
         problems.append("sin job_id")
 
+    details = attempt.get("details") or {}
+    if succeeded and _valid_start_time(details.get("start_time")) is None:
+        problems.append(
+            f"start_time ausente o inválido ({details.get('start_time')!r}): "
+            "un intento sin start_time real no puede ser candidato, ni siquiera "
+            "si es el único (#33)"
+        )
+
     if succeeded:
         required_report_fields = (
             "run_id",
@@ -270,41 +279,17 @@ def summarize(results: list[dict]) -> dict:
             a for a in enriched if a["job"]["status"] == "succeeded" and not a["problems"]
         ]
 
-        if len(candidates) == 1:
-            # Un solo intento valido: no hay nada que elegir, start_time no
-            # hace falta para esto (es el caso real de la campana sin
-            # reintentos).
+        if candidates:
+            # _attempt_problems ya exige start_time valido en TODO candidato
+            # (incluso si es el unico) - aqui ambos siempre lo tienen, nunca
+            # hace falta un caso especial ni sustituir por run_id.
             chosen = candidates[0]
+            chosen_key = _retry_key(chosen)
+            for candidate in candidates[1:]:
+                candidate_key = _retry_key(candidate)
+                if _earlier_retry(candidate_key, chosen_key):
+                    chosen, chosen_key = candidate, candidate_key
             valid = True
-        elif candidates:
-            # Varios intentos validos de verdad: #33 exige elegir por menor
-            # start_time. Si a CUALQUIERA le falta, no se puede garantizar
-            # el criterio sin inventarlo -> se documenta el problema, nunca
-            # se usa run_id como sustituto del tiempo.
-            missing_time = [
-                c
-                for c in candidates
-                if _valid_start_time((c.get("details") or {}).get("start_time")) is None
-            ]
-            if missing_time:
-                chosen = candidates[-1]
-                chosen = {
-                    **chosen,
-                    "problems": [
-                        *chosen["problems"],
-                        "varios intentos validos pero falta start_time en al menos uno: "
-                        "no se puede elegir representante sin inventar un criterio (#33)",
-                    ],
-                }
-                valid = False
-            else:
-                chosen = candidates[0]
-                chosen_key = _retry_key(chosen)
-                for candidate in candidates[1:]:
-                    candidate_key = _retry_key(candidate)
-                    if _earlier_retry(candidate_key, chosen_key):
-                        chosen, chosen_key = candidate, candidate_key
-                valid = True
         else:
             chosen = enriched[-1]  # ninguno valido: se documenta el mas reciente, no se oculta
             valid = False
@@ -343,6 +328,7 @@ def summarize(results: list[dict]) -> dict:
                     "device": details.get("device"),
                     "git_commit": details.get("git_commit"),
                     "run_kind": details.get("run_kind"),
+                    "best_val_loss": details.get("best_val_loss"),
                 },
             }
         )
@@ -422,6 +408,29 @@ def audit_campaign(args: argparse.Namespace) -> int:
     return _print_summary(summary)
 
 
+def merge_campaign(args: argparse.Namespace) -> int:
+    """Combina los `results` de varios archivos de evidencia (p. ej. una
+    corrida de verificación de una fila + la campaña completa) en un solo
+    inventario, SIN descartar ningún intento. `summarize` decide el
+    representante de cada fila por `start_time` (#33) — los intentos que no
+    quedan como representante se quedan igual en `results`, documentados,
+    nunca ocultos."""
+    combined_results: list[dict] = []
+    manifest = None
+    for path in args.inputs:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        combined_results.extend(evidence["results"])
+        if manifest is None:
+            manifest = evidence.get("manifest")
+
+    summary = summarize(combined_results)
+    merged = {"manifest": manifest, "results": combined_results, "summary": summary}
+    args.evidence.write_text(
+        json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return _print_summary(summary)
+
+
 def enrich_campaign(args: argparse.Namespace) -> int:
     """Rellena duration_seconds/peak_memory_mb/device/git_commit/start_time
     desde MLflow sobre una evidencia YA escrita — consulta de solo lectura
@@ -480,6 +489,12 @@ def main(argv: list[str] | None = None) -> int:
     audit = sub.add_parser("audit", help="re-audita una evidencia ya escrita, sin red")
     audit.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
 
+    merge = sub.add_parser(
+        "merge", help="combina varios archivos de evidencia sin ocultar ningun intento"
+    )
+    merge.add_argument("inputs", nargs="+", type=Path, help="archivos de evidencia a combinar")
+    merge.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+
     enrich = sub.add_parser(
         "enrich",
         help="rellena recursos/commit desde MLflow sobre runs YA existentes, sin reentrenar",
@@ -492,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_campaign(args)
     if args.command == "enrich":
         return enrich_campaign(args)
+    if args.command == "merge":
+        return merge_campaign(args)
     return audit_campaign(args)
 
 
