@@ -96,7 +96,7 @@ def decode_image(data: bytes, *, max_bytes: int = MAX_IMAGE_BYTES) -> tuple[Imag
                 raise InputRejected(
                     f"formato {image.format} no admitido (se aceptan {sorted(ACCEPTED_FORMATS)})"
                 )
-            image.load()
+            # convert() decodifica la imagen completa: un archivo truncado falla aquí.
             return image.convert("RGB"), image.format
     except InputRejected:
         raise
