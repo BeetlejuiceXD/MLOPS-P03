@@ -73,8 +73,10 @@ class MemoryStore implements ModelObjectStore {
     this.objects.set(`${key}#${versionId}`, { body: Buffer.from(body), sha256 });
     return { versionId };
   }
+  reads = 0;
   async head(key: string, versionId: string): Promise<StoredObjectHead | null> {
     this.check();
+    this.reads++;
     const o = this.objects.get(`${key}#${versionId}`);
     return o ? { size: o.body.length, versionId, sha256: o.sha256 } : null;
   }
@@ -410,8 +412,11 @@ describe('upload + verify', () => {
     await svc.register(input('1.0.0'));
     await svc.upload('1.0.0', BODY);
     await svc.verify('1.0.0');
+    // Ni siquiera se vuelve a leer el storage: el estado terminal decide antes.
+    const reads = store.reads;
     await expect(svc.verify('1.0.0')).rejects.toBeInstanceOf(ConflictError);
     await expect(svc.upload('1.0.0', BODY)).rejects.toBeInstanceOf(ConflictError);
+    expect(store.reads).toBe(reads);
 
     await svc.register(input('1.1.0'));
     await svc.upload('1.1.0', Buffer.from('otro contenido'));
@@ -458,9 +463,11 @@ describe('audit', () => {
     expect((await repo.find('local_test', '1.0.0'))?.status).toBe('published');
   });
 
-  it('solo audita versiones publicadas', async () => {
+  it('solo audita versiones publicadas (no un draft, ni ya subido sin verificar)', async () => {
     const svc = service();
     await svc.register(input('1.0.0'));
+    await expect(svc.audit('1.0.0')).rejects.toBeInstanceOf(ConflictError);
+    await svc.upload('1.0.0', BODY);
     await expect(svc.audit('1.0.0')).rejects.toBeInstanceOf(ConflictError);
   });
 });
@@ -596,8 +603,8 @@ describe('adaptador MinIO del bucket de modelos', () => {
         }),
         'b-1',
       );
-      expect(await store.head('k', 'v-1')).toBeNull();
-      expect(await store.get('k', 'v-1')).toBeNull();
+      await expect(store.head('k', 'v-1')).resolves.toBeNull();
+      await expect(store.get('k', 'v-1')).resolves.toBeNull();
     },
   );
 
