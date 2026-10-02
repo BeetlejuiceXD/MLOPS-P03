@@ -17,16 +17,27 @@
  *
  * `server.ts` monta SOLO el namespace `official`; `synthetic` (recorridos de prueba con
  * predicciones conocidas) existe para los tests y nunca se presenta como oficial.
+ *
+ * D06-05 — `details()`: lo que la página Evaluation necesita además de las métricas, sin
+ * otra fuente de cifras: la procedencia del run cerrado (checkpoint, commit, release, leídos
+ * de MLflow y cotejados con el cierre), `test_split_hash`, el umbral 0.85 contrastado con
+ * conteos enteros y ejemplos de aciertos y errores por `crop_id`, todo desde lo guardado.
+ * Este servicio solo LEE: nunca llama al productor ni vuelve a evaluar el test.
  */
 import { createHash } from 'node:crypto';
 import { NotFoundError, ServiceUnavailableError } from './errors.js';
+import type { ExperimentsService } from './experiments.service.js';
+import { campaignRowOf } from './model-selection.js';
 import type { ClosedSelection, ModelSelectionService } from './model-selection.service.js';
 import {
+  type EvaluationDetails,
   type EvaluationPredictions,
   type EvaluationResponse,
+  evaluationDetailsSchema,
   type evaluationNamespaces,
   evaluationPredictionsSchema,
   evaluationResponseSchema,
+  OFFICIAL_ACCURACY_TARGET,
 } from './p3.contracts.js';
 
 export type EvaluationNamespace = (typeof evaluationNamespaces)[number];
@@ -45,10 +56,17 @@ export interface EvaluationRepository {
 /** Las guardas reales de D04-04 (`createModelSelectionService`). */
 export type EvaluationGuard = Pick<ModelSelectionService, 'requireClosed' | 'blockedEvaluation'>;
 
+/** Lectura del run cerrado en MLflow (D04-01): checkpoint, commit y release. */
+export type EvaluationRunSource = Pick<ExperimentsService, 'getRun'>;
+
 export interface EvaluationService {
   evaluation(): Promise<EvaluationResponse>;
   predictions(): Promise<EvaluationPredictions>;
+  details(): Promise<EvaluationDetails>;
 }
+
+/** Ejemplos de cada tipo que muestra la página; el resto se consulta en la exportación. */
+export const EXAMPLES_PER_KIND = 6;
 
 type ReadyEvaluation = Extract<EvaluationResponse, { state: 'ready' }>;
 type PendingEvaluation = Extract<EvaluationResponse, { state: 'pending' }>;
@@ -176,10 +194,46 @@ function coherenceProblems(
   return problems;
 }
 
+type Example = EvaluationDetails['examples']['errors'][number];
+
+/** Aciertos y errores desde la exportación guardada: los de mayor confianza primero. */
+export function evaluationExamples(
+  predictions: EvaluationPredictions,
+  limit = EXAMPLES_PER_KIND,
+): EvaluationDetails['examples'] {
+  const all: Example[] = predictions.predictions.map((sample) => ({
+    crop_id: sample.crop_id,
+    true_class: sample.true_class,
+    predicted_class: sample.predicted_class,
+    confidence: sample.probabilities[sample.predicted_class] ?? 0,
+  }));
+  const ranked = (items: Example[]) =>
+    items.sort((a, b) => b.confidence - a.confidence || a.crop_id - b.crop_id).slice(0, limit);
+  const correct = all.filter((sample) => sample.true_class === sample.predicted_class);
+  const errors = all.filter((sample) => sample.true_class !== sample.predicted_class);
+  return {
+    n_correct: correct.length,
+    n_errors: errors.length,
+    correct: ranked(correct),
+    errors: ranked(errors),
+  };
+}
+
+/** Umbral de #33 con enteros: aciertos · 100 ≥ 85 · n_test, sin redondear la accuracy. */
+export function accuracyTarget(correct: number, nTest: number): EvaluationDetails['target'] {
+  return {
+    accuracy: OFFICIAL_ACCURACY_TARGET,
+    correct,
+    n_test: nTest,
+    met: correct * 100 >= nTest * 85,
+  };
+}
+
 export function createEvaluationService(
   repo: EvaluationRepository,
   guard: EvaluationGuard,
   namespace: EvaluationNamespace,
+  runs?: EvaluationRunSource,
 ): EvaluationService {
   async function load(): Promise<
     | { evaluation: ReadyEvaluation; predictions: EvaluationPredictions }
@@ -219,6 +273,56 @@ export function createEvaluationService(
       const { predictions } = await load();
       if (!predictions) throw new NotFoundError(missingDetail(namespace));
       return predictions;
+    },
+
+    async details() {
+      const { evaluation, predictions } = await load();
+      if (!predictions) throw new NotFoundError(missingDetail(namespace));
+      if (!runs) throw new ServiceUnavailableError('MLflow no está conectado a Evaluation.');
+      const runId = evaluation.selection.candidate_run_id;
+      let run: Awaited<ReturnType<EvaluationRunSource['getRun']>>['run'];
+      try {
+        ({ run } = await runs.getRun(runId));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new ServiceUnavailableError(`No se pudo leer el run cerrado ${runId}: ${reason}`);
+      }
+      // El run de MLflow tiene que ser el cerrado y del mismo manifest: si no, no se muestra
+      // una procedencia que no corresponde a lo evaluado.
+      const campaignRow = campaignRowOf(run.params);
+      const problems: string[] = [];
+      if (run.run_id !== runId) problems.push(`MLflow devolvió el run ${run.run_id}`);
+      if (run.tags.manifest_hash !== evaluation.manifest_hash) {
+        problems.push(`el run ${runId} se entrenó con otro manifest (${run.tags.manifest_hash})`);
+      }
+      if (!run.campaign_eligible || campaignRow === null) {
+        problems.push(`el run ${runId} no es un training elegible de la campaña`);
+      }
+      if (problems.length > 0 || !run.summary || !run.checkpoint_sha256 || campaignRow === null) {
+        throw new ServiceUnavailableError(`Run cerrado incoherente: ${problems.join('; ')}.`);
+      }
+      const { labels, rows } = evaluation.confusion_matrix;
+      const correct = labels.reduce((sum, _label, i) => sum + (rows[i]?.[i] ?? 0), 0);
+      return evaluationDetailsSchema.parse({
+        namespace,
+        final: namespace === 'official',
+        provenance: {
+          candidate_run_id: runId,
+          campaign_row: campaignRow,
+          best_epoch: run.summary.best_epoch,
+          checkpoint_sha256: run.checkpoint_sha256,
+          git_commit: run.tags.git_commit,
+          dataset_version: run.tags.dvc_release,
+          dvc_release_hash: run.tags.dvc_release_hash,
+          manifest_hash: evaluation.manifest_hash,
+          test_split_hash: predictions.test_split_hash,
+          closed_at: evaluation.selection.closed_at,
+          evaluated_at: evaluation.evaluated_at,
+          n_test: evaluation.n_test,
+        },
+        target: accuracyTarget(correct, evaluation.n_test),
+        examples: evaluationExamples(predictions),
+      });
     },
   };
 }

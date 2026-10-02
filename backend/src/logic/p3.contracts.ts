@@ -697,6 +697,91 @@ export const evaluationPredictionsSchema = z
 export type EvaluationPredictions = z.infer<typeof evaluationPredictionsSchema>;
 
 // ---------------------------------------------------------------------------
+// D06-05: detalle de la evaluación guardada para la página Evaluation
+// (`GET /api/evaluation/details`). Todo sale de lo que persistió el productor (D06-01) y del
+// run cerrado en MLflow; el portal lo muestra sin recalcular. `final` solo es verdadero en
+// `official`: un recorrido `synthetic` nunca se presenta como resultado final.
+// ---------------------------------------------------------------------------
+export const OFFICIAL_ACCURACY_TARGET = 0.85;
+
+const evaluationExampleSchema = z.strictObject({
+  crop_id: positiveInt,
+  true_class: classSchema,
+  predicted_class: classSchema,
+  // Probabilidad que el modelo dio a la clase predicha.
+  confidence: unitInterval,
+});
+
+export const evaluationDetailsSchema = z
+  .strictObject({
+    namespace: evaluationNamespaceSchema,
+    final: z.boolean(),
+    provenance: z.strictObject({
+      candidate_run_id: mlflowRunIdSchema,
+      campaign_row: z.number().int().min(1).max(12),
+      best_epoch: positiveInt,
+      checkpoint_sha256: sha256Schema,
+      git_commit: gitCommitSchema,
+      dataset_version: datasetVersionSchema,
+      dvc_release_hash: sha256Schema,
+      manifest_hash: sha256Schema,
+      test_split_hash: sha256Schema,
+      closed_at: timestampSchema,
+      evaluated_at: timestampSchema,
+      n_test: positiveInt,
+    }),
+    // Umbral de #33 contrastado con conteos enteros: correct / n_test >= 0.85, sin redondeo.
+    target: z.strictObject({
+      accuracy: z.literal(OFFICIAL_ACCURACY_TARGET),
+      correct: nonNegativeInt,
+      n_test: positiveInt,
+      met: z.boolean(),
+    }),
+    examples: z.strictObject({
+      n_correct: nonNegativeInt,
+      n_errors: nonNegativeInt,
+      correct: z.array(evaluationExampleSchema),
+      errors: z.array(evaluationExampleSchema),
+    }),
+  })
+  .superRefine((details, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: 'custom', path: [path], message });
+    const { provenance, target, examples } = details;
+    if (details.final !== (details.namespace === 'official')) {
+      issue('final', 'Solo la evaluación official es final');
+    }
+    if (Date.parse(provenance.evaluated_at) <= Date.parse(provenance.closed_at)) {
+      issue('provenance', 'El test se evalúa solo después de MODEL SELECTION CLOSED');
+    }
+    if (target.n_test !== provenance.n_test || target.correct > target.n_test) {
+      issue('target', 'correct ≤ n_test y el mismo n_test que la procedencia');
+    }
+    if (target.met !== target.correct * 100 >= target.n_test * 85) {
+      issue('target', 'met debe ser correct / n_test >= 0.85 con enteros, sin redondear');
+    }
+    if (
+      examples.n_correct !== target.correct ||
+      examples.n_errors !== target.n_test - target.correct
+    ) {
+      issue('examples', 'Los conteos de aciertos y errores deben cuadrar con target');
+    }
+    if (examples.correct.some((sample) => sample.true_class !== sample.predicted_class)) {
+      issue('examples', 'Un acierto tiene clase real = predicha');
+    }
+    if (examples.errors.some((sample) => sample.true_class === sample.predicted_class)) {
+      issue('examples', 'Un error tiene clase real ≠ predicha');
+    }
+    if (
+      examples.correct.length > examples.n_correct ||
+      examples.errors.length > examples.n_errors
+    ) {
+      issue('examples', 'No puede haber más ejemplos que muestras');
+    }
+  });
+export type EvaluationDetails = z.infer<typeof evaluationDetailsSchema>;
+
+// ---------------------------------------------------------------------------
 // Versiones del modelo publicadas en AWS S3 (#33: bucket propio de modelos).
 // ---------------------------------------------------------------------------
 export const modelVersionSchema = z
@@ -859,6 +944,7 @@ export const P3_CONTRACTS = {
   selection_state: selectionStateSchema,
   evaluation_response: evaluationResponseSchema,
   evaluation_predictions: evaluationPredictionsSchema,
+  evaluation_details: evaluationDetailsSchema,
   models_response: modelsResponseSchema,
   local_test_models_response: localTestModelsResponseSchema,
   local_test_model_detail: localTestModelDetailSchema,
@@ -882,6 +968,7 @@ export const P3_ENDPOINTS = {
   getSelection: 'GET /api/selection',
   getEvaluation: 'GET /api/evaluation',
   exportEvaluationPredictions: 'GET /api/evaluation/predictions',
+  getEvaluationDetails: 'GET /api/evaluation/details',
   listModels: 'GET /api/models',
   listLocalTestModels: 'GET /api/models/local-test',
   getLocalTestModel: 'GET /api/models/local-test/:semver',
