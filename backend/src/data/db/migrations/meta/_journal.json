@@ -64,6 +64,13 @@
       "when": 1790901255752,
       "tag": "0008_p3_model_registry",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1790954436570,
+      "tag": "0009_p3_inference",
+      "breakpoints": true
     }
   ]
 }

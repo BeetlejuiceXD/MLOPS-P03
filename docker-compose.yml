@@ -118,6 +118,9 @@ services:
       # D04-06: bucket de modelos con versioning (MinIO local; AWS en D06-03).
       MODEL_S3_BUCKET: p3-models-local
       MAX_UPLOAD_SIZE_BYTES: 5242880
+      # D05-07: URL del motor de inferencia de D05-04. Vacía = Inference responde 503 con el
+      # motivo (motor aún no integrado); D06-06 la apunta al modelo official recargado.
+      INFERENCE_ENGINE_URL: ${INFERENCE_ENGINE_URL:-}
       PIPELINE_CONFIG_ROOT: /pipeline
       # D04-01: el portal lee runs, curvas y artefactos de MLflow por su API REST.
       MLFLOW_TRACKING_URI: http://mlflow:5000

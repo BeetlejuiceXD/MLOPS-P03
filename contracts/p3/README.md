@@ -35,8 +35,11 @@ para que cada área avance en paralelo. Las reglas salen del **protocolo congela
 | `GET /api/evaluation/predictions[?format=json\|csv]` | `evaluation_predictions` por muestra (409 antes del cierre, sin leer nada; 404 sin evaluación oficial; `csv` = mismo contenido como descarga) | Ale (D04-05) |
 | `GET /api/models` | `models_response` | Hannah (D06) |
 | `POST /api/models/:semver/publish` | `model_version` | Hannah (D06) |
-| `POST /api/inference` | multipart (`image`, `model_version`) → `inference_result` | Hannah + motor de Esteban (D06) |
-| `POST /api/inference/:id/annotation-queue` | `annotation_queue_item` | Hannah (D06) |
+| `GET /api/inference/engine` | `inference_engine`: identidad del paquete que sirve el motor (503 con el motivo si no hay motor) | Hannah (D05-07) sobre el motor de Esteban (D05-04) |
+| `POST /api/inference` | multipart `image` (archivo nuevo) **o** JSON `{ "annotation_id" }` (crop del portal) → `inference_result` (201). 400 entrada inválida, 413 > 5 MiB, 404 anotación inexistente, 503 motor ausente o respuesta inválida | Hannah (D05-07) + motor de Esteban (D05-04) |
+| `GET /api/inference` · `GET /api/inference/:id` | `inference_list` · `inference_result` (persistidos en `p3_inference`) | Hannah (D05-07) |
+| `POST /api/inference/:id/annotation-queue` | `annotation_queue_item` (201 nuevo · 200 el mismo en un reintento) | Hannah (D05-07) |
+| `GET /api/inference/annotation-queue` | `annotation_queue_response` | Hannah (D05-07) |
 
 Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no existe) y 409
 (estado no permitido, p. ej. evaluar test antes del cierre de selección).
@@ -56,7 +59,9 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | `evaluation_response` | Tres estados: `blocked` (selección abierta), `pending` (cerrada, sin evaluación: solo la identidad de la selección, sin resultados) y `ready`. `ready` y `pending` declaran `namespace` `official` o `synthetic` (`local_test` es del registro de modelos, no de Evaluation); la API oficial rechaza (503) una evaluación que no declare `official`. `blocked` hasta MODEL SELECTION CLOSED; selección solo por `val_accuracy`; `evaluated_at > closed_at`; matriz filas=reales/columnas=predichas que suma `n_test`; `accuracy = traza / n_test` exacto; `support` = suma de la fila; precision/recall/F1 coherentes con la matriz; baseline de clase mayoritaria. |
 | `models_response` | `semver` propio del modelo (no del dataset); `s3_key` bajo `models/p3-cnn-classifier/<semver>/`; `sha256` hex de 64; `published` exige `version_id` y `published_at`. |
 | `models_response` (D04-06) | El registro `p3_model_registry` solo marca `published` si el objeto existe en el bucket con el VersionId registrado y su tamaño, metadato `sha256` y SHA-256 del contenido coinciden; objeto ausente o hash incorrecto → `failed` con motivo. Las pruebas locales (MinIO) van en el namespace `local_test`, separado de `official`. Detalle en `backend/src/logic/model-registry.README.md`. |
-| `inference_result` | Probabilidad para cada clase declarada y ninguna otra; suma ≈ 1 (±1e-3); `predicted_class` = argmax. |
+| `inference_result` (D05-07) | Probabilidad para cada clase declarada y ninguna otra; suma ≈ 1 (±1e-3); `predicted_class` = argmax. Siempre con `model` (identidad: `source` smoke/official, `package_id`, `format_version`, `model_version`, `mlflow_run_id`, `checkpoint_sha256`): `smoke` ⇔ sin `model_version` (el semver lo asigna D06-02). `input` = `upload` (JPEG/PNG/WebP, tamaño, dimensiones, sha256) o `crop` (`image_id`, `annotation_id`, bbox). Reemplaza la forma de D01-05 (`model_version` suelto). |
+| `inference_engine` / `inference_engine_prediction` (D05-07) | Lo que expone el motor de D05-04: `GET {INFERENCE_ENGINE_URL}/identity` (clases `cat`, `dog` en ese orden) y `POST {INFERENCE_ENGINE_URL}/predict` (bytes de la imagen → clase, probabilidades e identidad). La API valida la respuesta antes de guardarla. |
+| `annotation_queue_item` (D05-07) | `status` siempre `pending`, `human_label` siempre `null`; la predicción viaja como `suggestion` con `source: "model"` y la identidad del modelo. Referencia una imagen real del portal (y la anotación, si es un crop). |
 
 ## Estados de las cinco páginas
 
@@ -66,7 +71,7 @@ Errores: `api_error` (`{ "error": "..." }`) con 400 (validación), 404 (no exist
 | Experiments | `/ml/experiments` | Sin corridas | — | ídem |
 | Evaluation | `/ml/evaluation` | `pending`: selección cerrada, evaluación oficial aún no existe | MODEL SELECTION CLOSED no existe | ídem; el 503 muestra su motivo. Un `ready` `synthetic` se rotula como recorrido de prueba |
 | Models | `/ml/models` | Sin versiones | — | ídem |
-| Inference | `/ml/inference` | — | No hay ninguna versión publicada | ídem |
+| Inference | `/ml/inference` | Todavía no hay inferencias | Motor de inferencia no disponible (503 con el motivo) | ídem |
 
 Una respuesta que no cumple el contrato **nunca se muestra**: la página enseña el estado de
 error ("La respuesta del servidor no tiene el formato esperado.").

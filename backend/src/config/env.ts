@@ -42,6 +42,14 @@ const envSchema = z.object({
   // D04-01: servidor MLflow que lee el portal (Compose: http://mlflow:5000).
   MLFLOW_TRACKING_URI: z.string().url().default('http://localhost:5000'),
 
+  // D05-07: motor de inferencia de D05-04 (`GET /identity`, `POST /predict`). Vacío = aún
+  // no integrado: Inference responde 503 con el motivo. D06-06 lo apunta al modelo official.
+  INFERENCE_ENGINE_URL: z
+    .string()
+    .optional()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
+    .pipe(z.string().url().optional()),
+
   MAX_UPLOAD_SIZE_BYTES: z.coerce
     .number()
     .int()
