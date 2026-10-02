@@ -13,6 +13,8 @@
  *   decimales, con las métricas del mejor checkpoint (`summary`), no de la última época.
  * - Cada fila de la matriz cuenta una sola vez (su corrida terminada más temprana): volver
  *   a correr una configuración no da más oportunidades de ganar.
+ * - D05-02: un run FINISHED sin checkpoint verificado (D04-01 no lo da por elegible) no
+ *   cuenta, y mientras algún intento de la matriz siga en curso no se cierra el conteo.
  *
  * El candidato que sale de aquí es preparatorio: el cierre (MODEL SELECTION CLOSED) lo
  * persiste `model-selection.service.ts` y en la campaña oficial lo declara D05-02.
@@ -68,8 +70,9 @@ export interface SelectionReference {
 
 export const exclusionReasons = [
   'invalid_contract',
-  'not_finished',
   'outside_campaign_matrix',
+  'not_finished',
+  'not_campaign_eligible',
   'manifest_mismatch',
   'release_mismatch',
   'provenance_inconsistent',
@@ -147,7 +150,7 @@ function formatIssues(issues: { path: PropertyKey[]; message: string }[]): strin
 
 type Assessment =
   | { eligible: true; run: RankedRun }
-  | { eligible: false; reason: ExclusionReason; detail: string };
+  | { eligible: false; reason: ExclusionReason; detail: string; pending?: boolean };
 
 function assess(raw: unknown, reference: SelectionReference): Assessment {
   const parsed = experimentRunSchema.safeParse(raw);
@@ -159,15 +162,27 @@ function assess(raw: unknown, reference: SelectionReference): Assessment {
     };
   }
   const run: ExperimentRun = parsed.data;
-  if (run.status !== 'FINISHED' || run.summary === null) {
-    return { eligible: false, reason: 'not_finished', detail: `status=${run.status}` };
-  }
   const campaignRow = campaignRowOf(run.params);
   if (campaignRow === null) {
     return {
       eligible: false,
       reason: 'outside_campaign_matrix',
       detail: 'La config no coincide con ninguna de las 12 filas OFAT de #33 (seed incluida).',
+    };
+  }
+  if (run.status !== 'FINISHED' || run.summary === null) {
+    return {
+      eligible: false,
+      reason: 'not_finished',
+      detail: `status=${run.status}`,
+      pending: run.status === 'RUNNING' || run.status === 'SCHEDULED',
+    };
+  }
+  if (!run.campaign_eligible) {
+    return {
+      eligible: false,
+      reason: 'not_campaign_eligible',
+      detail: run.ineligible_reasons.join('; '),
     };
   }
   const { tags } = run;
@@ -224,9 +239,11 @@ export function selectCandidate(
 
   const excluded: ExcludedRun[] = [];
   const byRow = new Map<number, RankedRun[]>();
+  let pending = 0;
   for (const raw of runs) {
     const result = assess(raw, reference);
     if (!result.eligible) {
+      if (result.pending) pending += 1;
       excluded.push({ run_id: rawRunId(raw), reason: result.reason, detail: result.detail });
       continue;
     }
@@ -260,7 +277,8 @@ export function selectCandidate(
     excluded,
     candidate: ranking[0] ?? null,
     campaign_rows: campaignRows,
-    ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS,
+    // Con un intento de la matriz en curso, el conteo y el representante no son finales.
+    ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS && pending === 0,
     outcome_hash: sha256(JSON.stringify({ reference, ranking, excluded })),
   };
 }

@@ -1,0 +1,153 @@
+{
+  "contract": "selection_state",
+  "valid": true,
+  "why": "MODEL SELECTION CLOSED con su candidato",
+  "payload": {
+    "status": "closed",
+    "candidate": {
+      "run_id": "11111111111111111111111111111111",
+      "campaign_row": 1,
+      "start_time": "2026-10-02T11:00:00.000Z",
+      "best_epoch": 7,
+      "val_accuracy": 0.93,
+      "val_macro_f1": 0.929,
+      "val_loss": 0.16
+    },
+    "ranking": [
+      {
+        "run_id": "11111111111111111111111111111111",
+        "campaign_row": 1,
+        "start_time": "2026-10-02T11:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.93,
+        "val_macro_f1": 0.929,
+        "val_loss": 0.16
+      },
+      {
+        "run_id": "22222222222222222222222222222222",
+        "campaign_row": 2,
+        "start_time": "2026-10-02T12:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.925,
+        "val_macro_f1": 0.924,
+        "val_loss": 0.17
+      },
+      {
+        "run_id": "33333333333333333333333333333333",
+        "campaign_row": 3,
+        "start_time": "2026-10-02T13:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.92,
+        "val_macro_f1": 0.919,
+        "val_loss": 0.18
+      },
+      {
+        "run_id": "44444444444444444444444444444444",
+        "campaign_row": 4,
+        "start_time": "2026-10-02T14:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.915,
+        "val_macro_f1": 0.914,
+        "val_loss": 0.19
+      },
+      {
+        "run_id": "55555555555555555555555555555555",
+        "campaign_row": 5,
+        "start_time": "2026-10-02T15:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.91,
+        "val_macro_f1": 0.909,
+        "val_loss": 0.2
+      },
+      {
+        "run_id": "66666666666666666666666666666666",
+        "campaign_row": 6,
+        "start_time": "2026-10-02T16:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.905,
+        "val_macro_f1": 0.904,
+        "val_loss": 0.21
+      },
+      {
+        "run_id": "77777777777777777777777777777777",
+        "campaign_row": 7,
+        "start_time": "2026-10-02T17:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.9,
+        "val_macro_f1": 0.899,
+        "val_loss": 0.22
+      },
+      {
+        "run_id": "88888888888888888888888888888888",
+        "campaign_row": 8,
+        "start_time": "2026-10-02T18:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.895,
+        "val_macro_f1": 0.894,
+        "val_loss": 0.23
+      },
+      {
+        "run_id": "99999999999999999999999999999999",
+        "campaign_row": 9,
+        "start_time": "2026-10-02T19:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.89,
+        "val_macro_f1": 0.889,
+        "val_loss": 0.24
+      },
+      {
+        "run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "campaign_row": 10,
+        "start_time": "2026-10-02T20:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.885,
+        "val_macro_f1": 0.884,
+        "val_loss": 0.25
+      },
+      {
+        "run_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "campaign_row": 11,
+        "start_time": "2026-10-02T21:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.88,
+        "val_macro_f1": 0.879,
+        "val_loss": 0.26
+      }
+    ],
+    "excluded": [
+      {
+        "run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+        "reason": "outside_campaign_matrix",
+        "detail": "La config no coincide con ninguna de las 12 filas OFAT de #33 (seed incluida)."
+      },
+      {
+        "run_id": null,
+        "reason": "invalid_contract",
+        "detail": "tags.dvc_release_hash: Invalid input"
+      }
+    ],
+    "campaign_rows": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "min_comparable_runs": 10,
+    "ready_to_close": true,
+    "reference": {
+      "dataset_version": "v0.1.1",
+      "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+      "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+    },
+    "outcome_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proposed_at": "2026-10-03T18:00:00.000Z",
+    "closed_at": "2026-10-03T19:00:00.000Z"
+  }
+}

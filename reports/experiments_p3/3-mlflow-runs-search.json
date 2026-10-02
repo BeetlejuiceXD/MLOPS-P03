@@ -1,0 +1,3652 @@
+{
+  "runs": [
+    {
+      "info": {
+        "run_uuid": "bd4ee53765bc4a9c96ff3cb3b1f5330d",
+        "experiment_id": "1",
+        "run_name": "job-16-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790916515638,
+        "end_time": 1790916633897,
+        "artifact_uri": "mlflow-artifacts:/1/bd4ee53765bc4a9c96ff3cb3b1f5330d/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "bd4ee53765bc4a9c96ff3cb3b1f5330d"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 2.0,
+            "timestamp": 1790916632949,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790916632956,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.12353167238075342,
+            "timestamp": 1790916633047,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9402852049910874,
+            "timestamp": 1790916633001,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 116.47275309399993,
+            "timestamp": 1790916633095,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790916632860,
+            "step": 7
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790916633144,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9828693790149893,
+            "timestamp": 1790916632673,
+            "step": 7
+          },
+          {
+            "key": "train_loss",
+            "value": 0.05907262233933494,
+            "timestamp": 1790916632643,
+            "step": 7
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9104477611940298,
+            "timestamp": 1790916632764,
+            "step": 7
+          },
+          {
+            "key": "val_loss",
+            "value": 0.32349850748901937,
+            "timestamp": 1790916632719,
+            "step": 7
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9101274312541918,
+            "timestamp": 1790916632810,
+            "step": 7
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "77"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "55857f4fbe603634d864f3a55371054a49e2b177dc42d8ae4293e971f963f369"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "16"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-16-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "16"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "77"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "33715e5e663e4ace82265b3d05b48158",
+        "experiment_id": "1",
+        "run_name": "job-15-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790916388367,
+        "end_time": 1790916506880,
+        "artifact_uri": "mlflow-artifacts:/1/33715e5e663e4ace82265b3d05b48158/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "33715e5e663e4ace82265b3d05b48158"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 4.0,
+            "timestamp": 1790916505085,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790916505093,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.15969884045310875,
+            "timestamp": 1790916505186,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9179058758006127,
+            "timestamp": 1790916505137,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 115.91426009599945,
+            "timestamp": 1790916505236,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790916504993,
+            "step": 7
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790916505286,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9828693790149893,
+            "timestamp": 1790916504806,
+            "step": 7
+          },
+          {
+            "key": "train_loss",
+            "value": 0.05201658599349875,
+            "timestamp": 1790916504777,
+            "step": 7
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790916504898,
+            "step": 7
+          },
+          {
+            "key": "val_loss",
+            "value": 0.1759443796837508,
+            "timestamp": 1790916504852,
+            "step": 7
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9178692817741126,
+            "timestamp": 1790916504945,
+            "step": 7
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "21"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "b95de4b773d2748c313e876d99bada03f5cb8fed7e1ac434c1d5705e81cdf55b"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "15"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-15-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "15"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "21"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "438cc06bdf32461fa2982963e8be3727",
+        "experiment_id": "1",
+        "run_name": "job-14-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790916213135,
+        "end_time": 1790916382726,
+        "artifact_uri": "mlflow-artifacts:/1/438cc06bdf32461fa2982963e8be3727/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "438cc06bdf32461fa2982963e8be3727"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 5.0,
+            "timestamp": 1790916381657,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790916381704,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.21521837498606947,
+            "timestamp": 1790916381799,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9402852049910874,
+            "timestamp": 1790916381752,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 167.68463607600006,
+            "timestamp": 1790916381848,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790916381573,
+            "step": 10
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790916381899,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9850107066381156,
+            "timestamp": 1790916381384,
+            "step": 10
+          },
+          {
+            "key": "train_loss",
+            "value": 0.05756796449741919,
+            "timestamp": 1790916381363,
+            "step": 10
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9029850746268657,
+            "timestamp": 1790916381479,
+            "step": 10
+          },
+          {
+            "key": "val_loss",
+            "value": 0.25847989545940464,
+            "timestamp": 1790916381429,
+            "step": 10
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9027196068576534,
+            "timestamp": 1790916381526,
+            "step": 10
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.3"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "1"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "fa92d3915df21139ae5efa510805f3bf418f5200a5dfffab32cc7c1fc1be8471"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "14"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-14-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "14"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "02397ddadec047809ac0dd2421aeff7b",
+        "experiment_id": "1",
+        "run_name": "job-13-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790915955455,
+        "end_time": 1790916206425,
+        "artifact_uri": "mlflow-artifacts:/1/02397ddadec047809ac0dd2421aeff7b/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "02397ddadec047809ac0dd2421aeff7b"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 10.0,
+            "timestamp": 1790916205368,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9328358208955224,
+            "timestamp": 1790916205415,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.18807788551854554,
+            "timestamp": 1790916205511,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9325314685314685,
+            "timestamp": 1790916205462,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 249.1219747389996,
+            "timestamp": 1790916205559,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790916205290,
+            "step": 15
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790916205609,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9657387580299786,
+            "timestamp": 1790916205102,
+            "step": 15
+          },
+          {
+            "key": "train_loss",
+            "value": 0.09096615983879222,
+            "timestamp": 1790916205076,
+            "step": 15
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9104477611940298,
+            "timestamp": 1790916205196,
+            "step": 15
+          },
+          {
+            "key": "val_loss",
+            "value": 0.3181721362938632,
+            "timestamp": 1790916205149,
+            "step": 15
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9097237817201886,
+            "timestamp": 1790916205243,
+            "step": 15
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.3"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "a6534599c9eecb76ec51fed0fe3797cd34d29351bc819597ffc7cfef5bc40ee3"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "13"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-13-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "13"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "5fe9d9d9ca46440b9e591daff45acf35",
+        "experiment_id": "1",
+        "run_name": "job-12-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790915749017,
+        "end_time": 1790915950016,
+        "artifact_uri": "mlflow-artifacts:/1/5fe9d9d9ca46440b9e591daff45acf35/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "5fe9d9d9ca46440b9e591daff45acf35"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790915948935,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9253731343283582,
+            "timestamp": 1790915948981,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.160326715586568,
+            "timestamp": 1790915949079,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9252232142857143,
+            "timestamp": 1790915949027,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 199.07842188200038,
+            "timestamp": 1790915949127,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790915948851,
+            "step": 12
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790915949180,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9764453961456103,
+            "timestamp": 1790915948666,
+            "step": 12
+          },
+          {
+            "key": "train_loss",
+            "value": 0.09511790687030848,
+            "timestamp": 1790915948623,
+            "step": 12
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9104477611940298,
+            "timestamp": 1790915948758,
+            "step": 12
+          },
+          {
+            "key": "val_loss",
+            "value": 0.17393874743981147,
+            "timestamp": 1790915948712,
+            "step": 12
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9104477611940298,
+            "timestamp": 1790915948804,
+            "step": 12
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "1"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "69e7426935d4cc1121695a9a583a4caede467d026756d8c8e56a1311861407c0"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "12"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-12-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "12"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "a8b7545b465b465990fe7e7c594c1798",
+        "experiment_id": "1",
+        "run_name": "job-11-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790915593424,
+        "end_time": 1790915740530,
+        "artifact_uri": "mlflow-artifacts:/1/a8b7545b465b465990fe7e7c594c1798/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "a8b7545b465b465990fe7e7c594c1798"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 6.0,
+            "timestamp": 1790915739557,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790915739604,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.31269411542522374,
+            "timestamp": 1790915739701,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9176858211872452,
+            "timestamp": 1790915739656,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 145.31807069100023,
+            "timestamp": 1790915739747,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790915739481,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790915739793,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9957173447537473,
+            "timestamp": 1790915739296,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04632683845368519,
+            "timestamp": 1790915739244,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.8507462686567164,
+            "timestamp": 1790915739388,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.47380943885490073,
+            "timestamp": 1790915739342,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.8457997698504027,
+            "timestamp": 1790915739433,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "160"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "9ef31508c65d7bb085e8c7bb35e6c506b5c017aec66dfb1535362f6a76110571"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "11"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-11-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "11"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "6646544b73734ac1abdf413d1b63b3d9",
+        "experiment_id": "1",
+        "run_name": "job-10-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790915441488,
+        "end_time": 1790915585558,
+        "artifact_uri": "mlflow-artifacts:/1/6646544b73734ac1abdf413d1b63b3d9/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "6646544b73734ac1abdf413d1b63b3d9"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790915584549,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790915584556,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790915584648,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790915584601,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 142.28053252300015,
+            "timestamp": 1790915584694,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790915584460,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790915584742,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790915584275,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790915584240,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790915584367,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790915584321,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790915584413,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "60"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "10"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-10-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "10"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "c2adc19a9fb94b6999937289bf2a1f2c",
+        "experiment_id": "1",
+        "run_name": "job-9-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790915178189,
+        "end_time": 1790915430817,
+        "artifact_uri": "mlflow-artifacts:/1/c2adc19a9fb94b6999937289bf2a1f2c/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "c2adc19a9fb94b6999937289bf2a1f2c"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 11.0,
+            "timestamp": 1790915429694,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9552238805970149,
+            "timestamp": 1790915429702,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.13506626536541466,
+            "timestamp": 1790915429792,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9550637156270958,
+            "timestamp": 1790915429747,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 250.7034826549998,
+            "timestamp": 1790915429839,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790915429596,
+            "step": 16
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1312.86328125,
+            "timestamp": 1790915429886,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790915429398,
+            "step": 16
+          },
+          {
+            "key": "train_loss",
+            "value": 0.03314568288325147,
+            "timestamp": 1790915429370,
+            "step": 16
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790915429502,
+            "step": 16
+          },
+          {
+            "key": "val_loss",
+            "value": 0.1192231418203507,
+            "timestamp": 1790915429457,
+            "step": 16
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9402852049910874,
+            "timestamp": 1790915429549,
+            "step": 16
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "32"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "1e7ab9b07ac9e5d5c9cd4a0d342af16992729a50d8b0ec8dca27012a756cc1a5"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "9"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-9-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "9"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "379b553913254241a2efece3ed451d2d",
+        "experiment_id": "1",
+        "run_name": "job-8-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790914922026,
+        "end_time": 1790915170269,
+        "artifact_uri": "mlflow-artifacts:/1/379b553913254241a2efece3ed451d2d/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "379b553913254241a2efece3ed451d2d"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 16.0,
+            "timestamp": 1790915169347,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790915169353,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.17552780571268567,
+            "timestamp": 1790915169444,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9401785714285714,
+            "timestamp": 1790915169398,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 246.4538905700001,
+            "timestamp": 1790915169490,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790915169249,
+            "step": 16
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790915169538,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9528907922912205,
+            "timestamp": 1790915169065,
+            "step": 16
+          },
+          {
+            "key": "train_loss",
+            "value": 0.16162950259970393,
+            "timestamp": 1790915169036,
+            "step": 16
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790915169156,
+            "step": 16
+          },
+          {
+            "key": "val_loss",
+            "value": 0.17552780571268567,
+            "timestamp": 1790915169111,
+            "step": 16
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9401785714285714,
+            "timestamp": 1790915169202,
+            "step": 16
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "sgd"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "e9b36b93bbca243c9ef4a58af329e91a92cb2ff55df46a8903646fab52f3b4ef"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "8"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-8-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "8"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "2d56233c886142b7824e1551b90e8327",
+        "experiment_id": "1",
+        "run_name": "job-7-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790914754954,
+        "end_time": 1790914913657,
+        "artifact_uri": "mlflow-artifacts:/1/2d56233c886142b7824e1551b90e8327/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "2d56233c886142b7824e1551b90e8327"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 5.0,
+            "timestamp": 1790914912678,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9552238805970149,
+            "timestamp": 1790914912725,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.13173148013067557,
+            "timestamp": 1790914912818,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9551839464882943,
+            "timestamp": 1790914912771,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 156.90300598899967,
+            "timestamp": 1790914912864,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.0003,
+            "timestamp": 1790914912601,
+            "step": 10
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790914912909,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9807280513918629,
+            "timestamp": 1790914912417,
+            "step": 10
+          },
+          {
+            "key": "train_loss",
+            "value": 0.054800277397363616,
+            "timestamp": 1790914912408,
+            "step": 10
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9253731343283582,
+            "timestamp": 1790914912508,
+            "step": 10
+          },
+          {
+            "key": "val_loss",
+            "value": 0.14784623804821898,
+            "timestamp": 1790914912463,
+            "step": 10
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9253065774804905,
+            "timestamp": 1790914912555,
+            "step": 10
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.0003"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "7"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-7-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "7"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "a09c7b6e5102491f9dfc2391b88bb9b8",
+        "experiment_id": "1",
+        "run_name": "job-6-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790914514045,
+        "end_time": 1790914745669,
+        "artifact_uri": "mlflow-artifacts:/1/a09c7b6e5102491f9dfc2391b88bb9b8/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "a09c7b6e5102491f9dfc2391b88bb9b8"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 17.0,
+            "timestamp": 1790914744520,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.9552238805970149,
+            "timestamp": 1790914744526,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.1498487598415631,
+            "timestamp": 1790914744618,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9551839464882943,
+            "timestamp": 1790914744572,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 229.72683618799965,
+            "timestamp": 1790914744663,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790914744432,
+            "step": 22
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790914744709,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9571734475374732,
+            "timestamp": 1790914744246,
+            "step": 22
+          },
+          {
+            "key": "train_loss",
+            "value": 0.1140527441634994,
+            "timestamp": 1790914744220,
+            "step": 22
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.9402985074626866,
+            "timestamp": 1790914744338,
+            "step": 22
+          },
+          {
+            "key": "val_loss",
+            "value": 0.12600787651183,
+            "timestamp": 1790914744292,
+            "step": 22
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.9400849541694611,
+            "timestamp": 1790914744385,
+            "step": 22
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "head_only"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "2aa2549e125c20330815a8ee8acd8cbc082c7efbc96b258aec85b0a9ec1ef9b2"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "6"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-6-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "6"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "7576d02bb5564dbf94429373e9587a3a",
+        "experiment_id": "1",
+        "run_name": "job-5-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790914339768,
+        "end_time": 1790914503167,
+        "artifact_uri": "mlflow-artifacts:/1/7576d02bb5564dbf94429373e9587a3a/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "7576d02bb5564dbf94429373e9587a3a"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790914502113,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790914502160,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790914502254,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790914502207,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 161.5594136990003,
+            "timestamp": 1790914502303,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790914502029,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790914502354,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790914501845,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790914501817,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790914501935,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790914501890,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790914501982,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "5"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-5-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "5"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "bafb68badcda4b8f963b51372f8c50f8",
+        "experiment_id": "1",
+        "run_name": "job-4-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790914171862,
+        "end_time": 1790914336240,
+        "artifact_uri": "mlflow-artifacts:/1/bafb68badcda4b8f963b51372f8c50f8/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "bafb68badcda4b8f963b51372f8c50f8"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790914334953,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790914334965,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790914335060,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790914335013,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 162.30676711599972,
+            "timestamp": 1790914335106,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790914334849,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790914335154,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790914334666,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790914334632,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790914334756,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790914334710,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790914334801,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "4"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-4-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "4"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "d7965d2980a645f8b3ec74613ddd66a0",
+        "experiment_id": "1",
+        "run_name": "job-3-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790911506067,
+        "end_time": 1790911653987,
+        "artifact_uri": "mlflow-artifacts:/1/d7965d2980a645f8b3ec74613ddd66a0/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "d7965d2980a645f8b3ec74613ddd66a0"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790911652905,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790911652912,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790911653004,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790911652957,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 145.9896670669998,
+            "timestamp": 1790911653050,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790911652797,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790911653098,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790911652612,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790911652560,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790911652704,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790911652658,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790911652750,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "3"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-3-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "3"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "800fa919f5bb4b30a3ffdd1f5e2dcbec",
+        "experiment_id": "1",
+        "run_name": "job-2-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790910833003,
+        "end_time": 1790910990838,
+        "artifact_uri": "mlflow-artifacts:/1/800fa919f5bb4b30a3ffdd1f5e2dcbec/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "800fa919f5bb4b30a3ffdd1f5e2dcbec"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790910989791,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790910989798,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790910989889,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790910989843,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 155.97274198799994,
+            "timestamp": 1790910989936,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790910989705,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790910989986,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790910989519,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790910989505,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790910989612,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790910989566,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790910989658,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "2"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-2-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "2"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    },
+    {
+      "info": {
+        "run_uuid": "684c6a694c34408fb07c780045656da8",
+        "experiment_id": "1",
+        "run_name": "job-1-training",
+        "user_id": "unknown",
+        "status": "FINISHED",
+        "start_time": 1790910515019,
+        "end_time": 1790910677381,
+        "artifact_uri": "mlflow-artifacts:/1/684c6a694c34408fb07c780045656da8/artifacts",
+        "lifecycle_stage": "active",
+        "run_id": "684c6a694c34408fb07c780045656da8"
+      },
+      "data": {
+        "metrics": [
+          {
+            "key": "best_epoch",
+            "value": 7.0,
+            "timestamp": 1790910673540,
+            "step": 0
+          },
+          {
+            "key": "best_val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790910673585,
+            "step": 0
+          },
+          {
+            "key": "best_val_loss",
+            "value": 0.158954248110305,
+            "timestamp": 1790910673677,
+            "step": 0
+          },
+          {
+            "key": "best_val_macro_f1",
+            "value": 0.9177959957615303,
+            "timestamp": 1790910673631,
+            "step": 0
+          },
+          {
+            "key": "duration_seconds",
+            "value": 157.668757073,
+            "timestamp": 1790910673725,
+            "step": 0
+          },
+          {
+            "key": "learning_rate",
+            "value": 0.001,
+            "timestamp": 1790910673467,
+            "step": 9
+          },
+          {
+            "key": "peak_memory_mb",
+            "value": 1302.97265625,
+            "timestamp": 1790910673778,
+            "step": 0
+          },
+          {
+            "key": "train_accuracy",
+            "value": 0.9935760171306209,
+            "timestamp": 1790910673284,
+            "step": 9
+          },
+          {
+            "key": "train_loss",
+            "value": 0.04057141007931317,
+            "timestamp": 1790910673260,
+            "step": 9
+          },
+          {
+            "key": "val_accuracy",
+            "value": 0.917910447761194,
+            "timestamp": 1790910673376,
+            "step": 9
+          },
+          {
+            "key": "val_loss",
+            "value": 0.2305704455322294,
+            "timestamp": 1790910673330,
+            "step": 9
+          },
+          {
+            "key": "val_macro_f1",
+            "value": 0.91713048855906,
+            "timestamp": 1790910673421,
+            "step": 9
+          }
+        ],
+        "params": [
+          {
+            "key": "architecture",
+            "value": "resnet18"
+          },
+          {
+            "key": "augmentation",
+            "value": "True"
+          },
+          {
+            "key": "batch_size",
+            "value": "16"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "dropout",
+            "value": "0.0"
+          },
+          {
+            "key": "hidden_dim",
+            "value": "128"
+          },
+          {
+            "key": "hidden_layers",
+            "value": "0"
+          },
+          {
+            "key": "image_size",
+            "value": "224"
+          },
+          {
+            "key": "learning_rate",
+            "value": "0.001"
+          },
+          {
+            "key": "max_epochs",
+            "value": "30"
+          },
+          {
+            "key": "optimizer",
+            "value": "adam"
+          },
+          {
+            "key": "patience",
+            "value": "5"
+          },
+          {
+            "key": "pretrained",
+            "value": "True"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "trainable_layers",
+            "value": "last_block"
+          },
+          {
+            "key": "weight_decay",
+            "value": "0.0001"
+          }
+        ],
+        "tags": [
+          {
+            "key": "checkpoint_sha256",
+            "value": "6adebe3fd9f8172ccf1de251ba595068271438f9e8cf6aa340128d4a7196c06e"
+          },
+          {
+            "key": "classes",
+            "value": "cat,dog"
+          },
+          {
+            "key": "device",
+            "value": "cpu"
+          },
+          {
+            "key": "dvc_annotations_md5",
+            "value": "c7cb86ae7ece94ef7b853620e464a4d7.dir"
+          },
+          {
+            "key": "dvc_images_md5",
+            "value": "951150dd4fb053f4665089fcb37a1c87.dir"
+          },
+          {
+            "key": "dvc_release",
+            "value": "v0.1.1"
+          },
+          {
+            "key": "dvc_release_hash",
+            "value": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8"
+          },
+          {
+            "key": "git_commit",
+            "value": "bb7deb5da3c5d7f5b44edfdf36659c8945e34168"
+          },
+          {
+            "key": "job_id",
+            "value": "1"
+          },
+          {
+            "key": "manifest_hash",
+            "value": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43"
+          },
+          {
+            "key": "manifest_version",
+            "value": "p3-v0.1.1-s42"
+          },
+          {
+            "key": "mlflow.runName",
+            "value": "job-1-training"
+          },
+          {
+            "key": "p3.job_id",
+            "value": "1"
+          },
+          {
+            "key": "p3.run_kind",
+            "value": "training"
+          },
+          {
+            "key": "p3.task",
+            "value": "training"
+          },
+          {
+            "key": "seed",
+            "value": "7"
+          },
+          {
+            "key": "stopped_early",
+            "value": "true"
+          }
+        ]
+      },
+      "inputs": {},
+      "outputs": {}
+    }
+  ]
+}

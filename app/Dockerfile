@@ -30,6 +30,8 @@ COPY campaign/ ./campaign/
 # D03-05/D04-05: motor de métricas y productor de la evaluación (lo usa D06-01).
 COPY evaluation/ ./evaluation/
 COPY model_package/ ./model_package/
+# D05-04: motor de inferencia sobre el paquete (python -m inference_engine serve).
+COPY inference_engine/ ./inference_engine/
 
 # El volumen nombrado reports_data (docker-compose.yml) se inicializa la
 # primera vez con el contenido/dueño de este directorio si ya existe en la

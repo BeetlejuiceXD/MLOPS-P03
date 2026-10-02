@@ -1588,6 +1588,35 @@ la campaña y la selección por validation son de D04-03/D04-04.
 
 La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
 
+## D05-03 — Campaña aceptada y candidato en Experiments (preparación)
+
+Experiments lee la selección de D04-04/D05-02 (`GET /api/selection`, contrato
+`selection_state`) junto a los runs de MLflow. **No ordena ni elige nada.** El ranking, las
+filas de campaña y el candidato son los que entrega la API.
+
+- **Panel "Selección por validation":**
+  - `open`: "Todavía no hay candidato propuesto".
+  - `candidate`: muestra el run_id, la fila OFAT y las métricas de validation del mejor
+    checkpoint. Dice **"Propuesta pendiente de cierre (D05-08)"**: no es un cierre formal.
+  - `closed`: "MODEL SELECTION CLOSED" con la fecha.
+  - En los tres casos muestra "Filas de campaña comparables: N (mínimo 10)".
+- **Cotejo selección ↔ MLflow** (`frontend/src/p3/selection.ts`):
+  - El candidato y cada fila aceptada deben aparecer en Experiments y ser elegibles.
+  - `best_epoch`, `val_accuracy`, `val_macro_f1` y `val_loss` deben ser iguales a los de MLflow.
+  - Si algo no coincide, el panel lo dice con el motivo y no presenta la aceptación ni marca
+    filas.
+- **Tabla:** cada run aceptado lleva su badge "Fila N", y el candidato "Candidato propuesto"
+  o "Candidato seleccionado". El filtro **Campaña → Campaña aceptada** deja solo esas filas.
+  El training fuera de la matriz, los auxiliares y los excluidos no llevan badge ni cuentan.
+- **Fallos:**
+  - Si `/api/selection` falla (p. ej. 503 mientras D05-02 no integra el adaptador de runs),
+    el motivo sale en el panel y los runs siguen visibles.
+  - **Actualizar** recarga runs y selección.
+- Sin métricas de test: el contrato rechaza un ranking con `test_*`.
+
+Para **cerrar #86** falta la lista aceptada, el candidato y los hashes de D05-02 (Ale). Los
+fixtures solo prueban el render y el cotejo, no acreditan la campaña.
+
 ## D05-06 — Models con el registro de modelos (preparación)
 
 Models lee el registro de D04-06 (`p3_model_registry` + bucket `MODEL_S3_BUCKET` con
@@ -1695,3 +1724,28 @@ el resto del portal no cambia.
 
 Para **cerrar #90** falta el motor real de D05-04 (Esteban). Los tests usan un motor de
 **fixture**: prueban la API, la validación y la persistencia, no el motor.
+
+## D05-04 — Motor de inferencia con el paquete smoke
+
+`app/inference_engine/` carga un paquete de D05-01 y clasifica imágenes. El detalle está en
+`app/inference_engine/README.md`.
+
+- **Carga:** usa `load_package` de D05-01, así que la transformación, el `class_map` y la
+  config salen del paquete y no de los defaults del portal. Antes de aceptar imágenes,
+  coteja la salida de referencia del paquete y, si se le pasa, el `checkpoint_sha256`
+  esperado.
+- **Predicción:** devuelve la clase, las probabilidades en el orden del `class_map` y la
+  identidad del paquete (`package_id`, `mlflow_run_id`, `checkpoint_sha256`). La
+  identidad sale del mismo paquete que predijo. No guarda etiquetas humanas.
+- **Errores:** distingue imagen rechazada, paquete rechazado e inferencia incoherente.
+  Ninguno de los tres emite predicción.
+- **HTTP para D05-07:** `GET /identity` y `POST /predict`, con el contrato de
+  `INFERENCE_ENGINE_URL`.
+
+```bash
+# proceso limpio: carga, predice y escribe JSON
+python -m inference_engine predict --package ./smoke-package --image gato.jpg \
+  --expected-sha256 <checkpoint_sha256>
+# servicio para el portal (INFERENCE_ENGINE_URL=http://<host>:8090)
+python -m inference_engine serve --package ./smoke-package --port 8090
+```
