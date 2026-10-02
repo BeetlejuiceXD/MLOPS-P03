@@ -193,10 +193,33 @@ def _attempt_problems(attempt: dict, row: CampaignRow) -> list[str]:
     return problems
 
 
+def _valid_start_time(value: object) -> int | None:
+    """Normaliza `start_time` a un entero válido, o `None` si es ausente,
+    cadena vacía, tipo incorrecto o no interpretable. Nunca se inventa ni se
+    asume un valor por defecto — un `start_time` inválido se trata igual
+    que uno ausente."""
+    if isinstance(value, bool):  # bool es subclase de int; nunca es un timestamp real
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    return None
+
+
 def _retry_key(attempt: dict) -> dict:
     report = attempt.get("report") or {}
     details = attempt.get("details") or {}
-    return {"run_id": report.get("run_id") or "", "start_time": details.get("start_time")}
+    return {
+        "run_id": report.get("run_id") or "",
+        "start_time": _valid_start_time(details.get("start_time")),
+    }
 
 
 def _earlier_retry(candidate: dict, current: dict) -> bool:
@@ -255,7 +278,9 @@ def summarize(results: list[dict]) -> dict:
             # el criterio sin inventarlo -> se documenta el problema, nunca
             # se usa run_id como sustituto del tiempo.
             missing_time = [
-                c for c in candidates if (c.get("details") or {}).get("start_time") is None
+                c
+                for c in candidates
+                if _valid_start_time((c.get("details") or {}).get("start_time")) is None
             ]
             if missing_time:
                 chosen = candidates[-1]
@@ -348,6 +373,15 @@ def _print_summary(summary: dict) -> int:
     return VERIFIED if summary["meets_minimum"] else MISMATCH
 
 
+def _parse_rows(value: str | None) -> set[int] | None:
+    """`--rows "1"` o `--rows "1,3,5"` -> {1} / {1,3,5}. `None` (default) =
+    las 12 filas. Usado para la corrida de verificación de una sola fila
+    antes de lanzar la matriz completa."""
+    if value is None:
+        return None
+    return {int(piece.strip()) for piece in value.split(",") if piece.strip()}
+
+
 def run_campaign(args: argparse.Namespace) -> int:
     api = args.api.rstrip("/")
     try:
@@ -359,11 +393,16 @@ def run_campaign(args: argparse.Namespace) -> int:
         print(f"Sin manifest congelado sobre un release aprobado: {approved}", file=sys.stderr)
         return UNAVAILABLE
 
+    selected = _parse_rows(args.rows)
+    rows_to_run = [row for row in MATRIX if selected is None or row.index in selected]
+    if selected is not None:
+        print(f"Verificación: solo fila(s) {sorted(selected)} de 12 (--rows)", flush=True)
+
     results = [
         _run_one(
             api, args.tracking_uri, manifest, releases, row, timeout=args.timeout, poll=args.poll
         )
-        for row in MATRIX
+        for row in rows_to_run
     ]
     evidence = {"manifest": manifest, "results": results, "summary": summarize(results)}
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
@@ -428,6 +467,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--timeout", type=float, default=3600)
     run.add_argument("--poll", type=float, default=5)
     run.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))
+    run.add_argument(
+        "--rows",
+        default=None,
+        help="filas a ejecutar, ej. '1' o '1,3,5' (default: las 12 de la matriz)",
+    )
 
     audit = sub.add_parser("audit", help="re-audita una evidencia ya escrita, sin red")
     audit.add_argument("--evidence", type=Path, default=Path("reports/campaign_p3.json"))

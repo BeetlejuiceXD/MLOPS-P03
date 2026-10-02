@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 
 from campaign.matrix import MATRIX, to_training_config_kwargs
-from campaign.run import MISMATCH, VERIFIED, main, summarize
+from campaign.run import MISMATCH, VERIFIED, _parse_rows, main, summarize
 from training.config import TrainingConfig
 
 
@@ -222,6 +222,58 @@ def test_multiple_valid_attempts_with_missing_start_time_are_not_resolved_by_run
     assert any("start_time" in p for p in row_1["problems"])
 
 
+def test_multiple_valid_attempts_with_empty_string_start_time_are_not_resolved_by_run_id():
+    # start_time="" (cadena vacia, no None) debe tratarse igual que ausente:
+    # no se puede elegir representante sin inventar el orden.
+    a = _ok(1, run_id="run-aaa", start_time="")
+    b = _ok(1, run_id="run-bbb", start_time="")
+    results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("start_time" in p for p in row_1["problems"])
+
+
+def test_multiple_valid_attempts_with_wrong_type_start_time_are_not_resolved_by_run_id():
+    a = _ok(1, run_id="run-aaa", start_time=[1, 2, 3])
+    b = _ok(1, run_id="run-bbb", start_time=1_000_000)
+    results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("start_time" in p for p in row_1["problems"])
+
+
+def test_multiple_valid_attempts_with_non_numeric_string_start_time_are_not_resolved_by_run_id():
+    a = _ok(1, run_id="run-aaa", start_time="no-es-un-numero")
+    b = _ok(1, run_id="run-bbb", start_time=1_000_000)
+    results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is False
+    assert any("start_time" in p for p in row_1["problems"])
+
+
+def test_a_numeric_string_start_time_is_accepted_as_valid():
+    # "1000000" (string numerico) si es interpretable -> valido, no se trata
+    # como invalido.
+    a = _ok(1, run_id="run-earlier", start_time="1000000")
+    b = _ok(1, run_id="run-later", start_time=2_000_000)
+    results = [b, a] + [_ok(row.index, run_id=f"run-{row.index}") for row in MATRIX[1:10]]
+
+    summary = summarize(results)
+
+    row_1 = next(r for r in summary["rows"] if r["row"] == 1)
+    assert row_1["valid"] is True
+    assert row_1["run_id"] == "run-earlier"
+
+
 def test_retry_selection_skips_invalid_attempts_and_picks_the_only_valid_one():
     broken = _failed(1, ["checkpoint no recuperable"])
     good = _ok(1, run_id="run-good")
@@ -426,3 +478,18 @@ def test_main_audit_returns_verified_exit_code_when_minimum_met(tmp_path):
     exit_code = main(["audit", "--evidence", str(evidence_path)])
 
     assert exit_code == VERIFIED
+
+
+# --- --rows: corrida de verificación de una sola fila antes de la matriz completa -
+
+
+def test_parse_rows_default_none_means_all_twelve():
+    assert _parse_rows(None) is None
+
+
+def test_parse_rows_single_value():
+    assert _parse_rows("1") == {1}
+
+
+def test_parse_rows_multiple_values_with_spaces():
+    assert _parse_rows("1, 3,5") == {1, 3, 5}
