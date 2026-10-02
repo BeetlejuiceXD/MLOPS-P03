@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { PageHeader } from "@/pipeline/components/PageHeader";
-import { useExperimentRuns } from "../api";
+import { useExperimentRuns, useSelection } from "../api";
 import { FetchBoundary } from "../components/FetchBoundary";
 import { StatePanel } from "../components/StatePanel";
-import type { ExcludedRun, ExperimentRun } from "../contracts";
+import type { ExcludedRun, ExperimentRun, SelectionState } from "../contracts";
 import {
   ALL,
   campaignCounts,
@@ -15,7 +15,9 @@ import {
 } from "../experiments";
 import { CompareRuns } from "../experiments/CompareRuns";
 import { RunDetail } from "../experiments/RunDetail";
+import { SelectionPanel } from "../experiments/SelectionPanel";
 import { dateTime, percent, shortHash } from "../format";
+import { campaignRows, selectionCrossCheck } from "../selection";
 
 const selectClass =
   "rounded-lg border border-border bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40";
@@ -28,6 +30,7 @@ const selectClass =
  */
 export function ExperimentsPage() {
   const runs = useExperimentRuns();
+  const selection = useSelection();
   const [filters, setFilters] = useState<RunFilters>(EMPTY_FILTERS);
   const [compared, setCompared] = useState<string[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -50,6 +53,7 @@ export function ExperimentsPage() {
           className="rounded-lg border border-border px-3 py-1.5 text-sm text-ink hover:bg-surface"
           onClick={() => {
             runs.reload();
+            selection.reload();
             setRefreshKey((key) => key + 1);
           }}
         >
@@ -59,7 +63,11 @@ export function ExperimentsPage() {
       <FetchBoundary results={[runs]}>
         {(data) => {
           const counts = campaignCounts(data);
-          const shown = filterRuns(data.runs, filters);
+          const marks = selectionMarks(
+            data.runs,
+            selection.status === "success" ? selection.data : null
+          );
+          const shown = filterRuns(data.runs, filters, marks.accepted);
           const selected = compared
             .map((id) => data.runs.find((run) => run.run_id === id))
             .filter((run): run is ExperimentRun => run !== undefined);
@@ -76,6 +84,8 @@ export function ExperimentsPage() {
                 </span>
               </section>
 
+              <SelectionPanel selection={selection} runs={data.runs} />
+
               {data.runs.length === 0 ? (
                 <StatePanel
                   variant="empty"
@@ -89,7 +99,12 @@ export function ExperimentsPage() {
                 </StatePanel>
               ) : (
                 <>
-                  <Filters runs={data.runs} filters={filters} onChange={setFilters} />
+                  <Filters
+                    runs={data.runs}
+                    filters={filters}
+                    onChange={setFilters}
+                    withCampaign={marks.accepted.size > 0}
+                  />
                   <p data-testid="experiments-shown" className="text-xs text-ink-muted">
                     Mostrando {shown.length} de {data.runs.length} runs de training
                   </p>
@@ -106,6 +121,7 @@ export function ExperimentsPage() {
                       compared={compared}
                       onToggleCompare={toggleCompare}
                       onShowDetail={setDetailId}
+                      marks={marks}
                     />
                   )}
                 </>
@@ -132,10 +148,12 @@ function Filters({
   runs,
   filters,
   onChange,
+  withCampaign,
 }: Readonly<{
   runs: readonly ExperimentRun[];
   filters: RunFilters;
   onChange: (filters: RunFilters) => void;
+  withCampaign: boolean;
 }>) {
   const options = filterOptions(runs);
   const select = (
@@ -162,6 +180,8 @@ function Filters({
   );
   return (
     <section aria-label="Filtros" className="flex flex-wrap items-end gap-4">
+      {withCampaign &&
+        select("campaign", "Campaña", ["accepted"], { accepted: "Campaña aceptada" })}
       {select("status", "Estado", options.status)}
       {select("eligibility", "Elegibilidad", ["eligible", "not_eligible"] as EligibilityFilter[], {
         eligible: "Elegibles",
@@ -187,11 +207,13 @@ function RunsTable({
   compared,
   onToggleCompare,
   onShowDetail,
+  marks,
 }: Readonly<{
   runs: readonly ExperimentRun[];
   compared: readonly string[];
   onToggleCompare: (runId: string) => void;
   onShowDetail: (runId: string) => void;
+  marks: SelectionMarks;
 }>) {
   return (
     <div data-testid="p3-content" className="overflow-x-auto rounded-2xl border border-border">
@@ -245,6 +267,7 @@ function RunsTable({
                     </span>
                   </span>
                 )}
+                <SelectionBadges runId={run.run_id} marks={marks} />
               </td>
               <td className="px-3 py-2">{run.params.seed}</td>
               <td className="px-3 py-2">{run.params.trainable_layers}</td>
@@ -319,5 +342,54 @@ function ExcludedRuns({ excluded }: Readonly<{ excluded: readonly ExcludedRun[] 
         </tbody>
       </table>
     </section>
+  );
+}
+
+type SelectionMarks = {
+  accepted: ReadonlySet<string>;
+  rows: ReadonlyMap<string, number>;
+  candidateId: string | null;
+  candidateLabel: string;
+};
+
+const NO_MARKS: SelectionMarks = {
+  accepted: new Set(),
+  rows: new Map(),
+  candidateId: null,
+  candidateLabel: "",
+};
+
+/**
+ * D05-03 — Marcas que vienen tal cual de la selección (filas aceptadas y candidato). Si el
+ * cotejo con MLflow encuentra discrepancias, no se marca nada como aceptado.
+ */
+function selectionMarks(
+  runs: readonly ExperimentRun[],
+  selection: SelectionState | null
+): SelectionMarks {
+  if (selection === null || selection.candidate === null) return NO_MARKS;
+  if (selectionCrossCheck(runs, selection).problems.length > 0) return NO_MARKS;
+  const rows = campaignRows(selection);
+  return {
+    accepted: new Set(rows.keys()),
+    rows,
+    candidateId: selection.candidate.run_id,
+    candidateLabel:
+      selection.status === "closed" ? "Candidato seleccionado" : "Candidato propuesto",
+  };
+}
+
+function SelectionBadges({ runId, marks }: Readonly<{ runId: string; marks: SelectionMarks }>) {
+  const row = marks.rows.get(runId);
+  if (row === undefined) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      <span className="rounded-full bg-surface px-2 py-0.5 font-mono">Fila {row}</span>
+      {runId === marks.candidateId && (
+        <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">
+          {marks.candidateLabel}
+        </span>
+      )}
+    </span>
   );
 }

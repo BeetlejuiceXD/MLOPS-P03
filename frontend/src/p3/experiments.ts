@@ -6,8 +6,10 @@
 import { type ExperimentRun, trainingConfigSchema } from "./contracts";
 
 export type EligibilityFilter = "all" | "eligible" | "not_eligible";
+export type CampaignFilter = "all" | "accepted";
 export interface RunFilters {
   status: string;
+  campaign: CampaignFilter;
   eligibility: EligibilityFilter;
   seed: string;
   trainable_layers: string;
@@ -17,6 +19,7 @@ export interface RunFilters {
 export const ALL = "all";
 export const EMPTY_FILTERS: RunFilters = {
   status: ALL,
+  campaign: ALL,
   eligibility: ALL,
   seed: ALL,
   trainable_layers: ALL,
@@ -32,9 +35,18 @@ const PARAM_FILTERS: readonly ParamFilter[] = [
   "learning_rate",
 ];
 
-export function filterRuns(runs: readonly ExperimentRun[], filters: RunFilters): ExperimentRun[] {
+/**
+ * `accepted`: run_ids de la campaña aceptada según la selección (D05-03); el filtro
+ * "Campaña aceptada" no recalcula nada, solo usa esa lista.
+ */
+export function filterRuns(
+  runs: readonly ExperimentRun[],
+  filters: RunFilters,
+  accepted: ReadonlySet<string> = new Set()
+): ExperimentRun[] {
   return runs.filter((run) => {
     if (filters.status !== ALL && run.status !== filters.status) return false;
+    if (filters.campaign === "accepted" && !accepted.has(run.run_id)) return false;
     if (filters.eligibility === "eligible" && !run.campaign_eligible) return false;
     if (filters.eligibility === "not_eligible" && run.campaign_eligible) return false;
     return PARAM_FILTERS.every(

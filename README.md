@@ -1587,3 +1587,32 @@ la campaña y la selección por validation son de D04-03/D04-04.
   lista vacía.
 
 La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
+
+## D05-03 — Campaña aceptada y candidato en Experiments (preparación)
+
+Experiments lee la selección de D04-04/D05-02 (`GET /api/selection`, contrato
+`selection_state`) junto a los runs de MLflow. **No ordena ni elige nada.** El ranking, las
+filas de campaña y el candidato son los que entrega la API.
+
+- **Panel "Selección por validation":**
+  - `open`: "Todavía no hay candidato propuesto".
+  - `candidate`: muestra el run_id, la fila OFAT y las métricas de validation del mejor
+    checkpoint. Dice **"Propuesta pendiente de cierre (D05-08)"**: no es un cierre formal.
+  - `closed`: "MODEL SELECTION CLOSED" con la fecha.
+  - En los tres casos muestra "Filas de campaña comparables: N (mínimo 10)".
+- **Cotejo selección ↔ MLflow** (`frontend/src/p3/selection.ts`):
+  - El candidato y cada fila aceptada deben aparecer en Experiments y ser elegibles.
+  - `best_epoch`, `val_accuracy`, `val_macro_f1` y `val_loss` deben ser iguales a los de MLflow.
+  - Si algo no coincide, el panel lo dice con el motivo y no presenta la aceptación ni marca
+    filas.
+- **Tabla:** cada run aceptado lleva su badge "Fila N", y el candidato "Candidato propuesto"
+  o "Candidato seleccionado". El filtro **Campaña → Campaña aceptada** deja solo esas filas.
+  El training fuera de la matriz, los auxiliares y los excluidos no llevan badge ni cuentan.
+- **Fallos:**
+  - Si `/api/selection` falla (p. ej. 503 mientras D05-02 no integra el adaptador de runs),
+    el motivo sale en el panel y los runs siguen visibles.
+  - **Actualizar** recarga runs y selección.
+- Sin métricas de test: el contrato rechaza un ranking con `test_*`.
+
+Para **cerrar #86** falta la lista aceptada, el candidato y los hashes de D05-02 (Ale). Los
+fixtures solo prueban el render y el cotejo, no acreditan la campaña.

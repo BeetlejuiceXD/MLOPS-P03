@@ -10,6 +10,7 @@ import {
   manifestSummarySchema,
   modelsResponseSchema,
   releasesResponseSchema,
+  selectionStateSchema,
   trainingJobListSchema,
 } from "./contracts";
 
@@ -26,3 +27,6 @@ export const useExperimentRun = (runId: string) =>
   useValidatedFetch(`/experiments/runs/${runId}`, experimentRunDetailSchema, WITH_REASON);
 export const useEvaluation = () => useValidatedFetch("/evaluation", evaluationResponseSchema);
 export const useModels = () => useValidatedFetch("/models", modelsResponseSchema);
+// D05-03: estado de la selección (D04-04/D05-02); el 503 trae el motivo.
+export const useSelection = () =>
+  useValidatedFetch("/selection", selectionStateSchema, WITH_REASON);
