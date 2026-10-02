@@ -10,10 +10,10 @@ la CNN, los pesos, la transformación de evaluación y el `class_map` salen del 
 from inference_engine import InferenceEngine
 
 engine = InferenceEngine.from_package("smoke-package", expected_checkpoint_sha256="0c6b…563b")
-engine.identity()            # {"model": {...}, "classes": ["cat", "dog"], "image_size": 224}
+engine.identity()  # {"model": {...}, "classes": ["cat", "dog"], "image_size": 224}
 prediction = engine.predict(image_bytes)
-prediction.contract()        # {"predicted_class", "probabilities", "model"}
-prediction.input_sha256      # trazabilidad de la entrada
+prediction.contract()  # {"predicted_class", "probabilities", "model"}
+prediction.input_sha256  # trazabilidad de la entrada
 engine.load("otro-paquete")  # D06-04: misma instancia, misma lógica de predicción
 ```
 
