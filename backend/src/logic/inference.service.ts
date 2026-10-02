@@ -147,8 +147,10 @@ export function createInferenceService(deps: {
       id = await repo.insert(record);
     } catch (error) {
       if (record.storage_key) await images.deleteInput(record.storage_key).catch(() => undefined);
+      // El detalle (consulta y parámetros) va al log del servidor, no a la respuesta.
+      console.error('[inference] insert de p3_inference falló:', error);
       throw new ServiceUnavailableError(
-        `No se pudo guardar la inferencia: ${error instanceof Error ? error.message : error}`,
+        'No se pudo guardar la inferencia: la base de datos no está disponible. No se guardó nada.',
       );
     }
     return toResult({ ...record, id }, null);
@@ -347,10 +349,9 @@ export function createInferenceService(deps: {
           const winner = await repo.findQueueItem(id);
           if (winner) return { item: toQueueItem(winner, stored), created: false };
         }
+        console.error('[inference] insert de p3_annotation_queue falló:', error);
         throw new ServiceUnavailableError(
-          `No se pudo guardar el elemento de la cola de anotación: ${
-            error instanceof Error ? error.message : error
-          }`,
+          'No se pudo guardar el elemento de la cola de anotación: la base de datos no está disponible. No se guardó nada.',
         );
       }
     },
