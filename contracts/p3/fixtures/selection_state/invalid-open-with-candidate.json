@@ -1,0 +1,36 @@
+{
+  "contract": "selection_state",
+  "valid": false,
+  "why": "open no tiene candidato",
+  "payload": {
+    "status": "open",
+    "candidate": {
+      "run_id": "11111111111111111111111111111111",
+      "campaign_row": 1,
+      "start_time": "2026-10-02T11:00:00.000Z",
+      "best_epoch": 7,
+      "val_accuracy": 0.93,
+      "val_macro_f1": 0.929,
+      "val_loss": 0.16
+    },
+    "ranking": [
+      {
+        "run_id": "11111111111111111111111111111111",
+        "campaign_row": 1,
+        "start_time": "2026-10-02T11:00:00.000Z",
+        "best_epoch": 7,
+        "val_accuracy": 0.93,
+        "val_macro_f1": 0.929,
+        "val_loss": 0.16
+      }
+    ],
+    "excluded": [],
+    "campaign_rows": [],
+    "min_comparable_runs": 10,
+    "ready_to_close": false,
+    "reference": null,
+    "outcome_hash": null,
+    "proposed_at": null,
+    "closed_at": null
+  }
+}

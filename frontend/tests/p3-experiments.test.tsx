@@ -251,6 +251,9 @@ describe("página Experiments con datos de la API", () => {
     expect(detail).toHaveTextContent(FINISHED.run_id);
     expect(detail).toHaveTextContent(FINISHED.tags.manifest_hash);
     expect(detail).toHaveTextContent(FINISHED.tags.git_commit);
+    expect(within(detail).getByTestId("detail-job")).toHaveTextContent(
+      new RegExp(`^${FINISHED.tags.job_id}$`)
+    );
     expect(detail).toHaveTextContent(`Mejor época: ${FINISHED.summary?.best_epoch}`);
 
     const curves = within(detail).getByTestId("curve-table");

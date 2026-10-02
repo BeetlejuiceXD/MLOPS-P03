@@ -454,6 +454,76 @@ export const experimentRunDetailSchema = z.strictObject({
 export type ExperimentRunDetail = z.infer<typeof experimentRunDetailSchema>;
 
 // ---------------------------------------------------------------------------
+// D05-03: estado de la selección (`GET /api/selection`, D04-04/D05-02). Solo validation:
+// el ranking y el candidato los calcula el backend; el portal los muestra, no los recalcula.
+// ---------------------------------------------------------------------------
+const rankedRunSchema = z.strictObject({
+  run_id: mlflowRunIdSchema,
+  campaign_row: z.number().int().min(1).max(12),
+  start_time: timestampSchema,
+  best_epoch: positiveInt,
+  val_accuracy: unitInterval,
+  val_macro_f1: unitInterval,
+  val_loss: z.number().finite().nonnegative(),
+});
+export type RankedRun = z.infer<typeof rankedRunSchema>;
+
+export const selectionStateSchema = z
+  .strictObject({
+    status: z.enum(["open", "candidate", "closed"]),
+    candidate: rankedRunSchema.nullable(),
+    ranking: z.array(rankedRunSchema),
+    excluded: z.array(
+      z.strictObject({
+        run_id: mlflowRunIdSchema.nullable(),
+        reason: z.enum([
+          "invalid_contract",
+          "not_finished",
+          "outside_campaign_matrix",
+          "manifest_mismatch",
+          "release_mismatch",
+          "provenance_inconsistent",
+          "duplicate_campaign_row",
+        ]),
+        detail: z.string(),
+      })
+    ),
+    campaign_rows: z.array(z.number().int().min(1).max(12)),
+    min_comparable_runs: positiveInt,
+    ready_to_close: z.boolean(),
+    reference: z
+      .strictObject({
+        dataset_version: datasetVersionSchema,
+        manifest_hash: sha256Schema,
+        dvc_release_hash: sha256Schema,
+      })
+      .nullable(),
+    outcome_hash: sha256Schema.nullable(),
+    proposed_at: timestampSchema.nullable(),
+    closed_at: timestampSchema.nullable(),
+  })
+  .superRefine((state, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if (state.status === "open" && (state.candidate !== null || state.ranking.length > 0)) {
+      issue("candidate", "Una selección abierta no tiene candidato ni ranking");
+    }
+    if (state.status !== "open" && (state.candidate === null || state.proposed_at === null)) {
+      issue("candidate", "candidate/closed exigen candidato y proposed_at");
+    }
+    if ((state.status === "closed") !== (state.closed_at !== null)) {
+      issue("closed_at", "closed ⇔ closed_at");
+    }
+    if (state.candidate !== null && state.ranking[0]?.run_id !== state.candidate.run_id) {
+      issue("candidate", "El candidato es el primero del ranking");
+    }
+    if (state.ready_to_close && state.campaign_rows.length < state.min_comparable_runs) {
+      issue("ready_to_close", "ready_to_close exige al menos min_comparable_runs filas");
+    }
+  });
+export type SelectionState = z.infer<typeof selectionStateSchema>;
+
+// ---------------------------------------------------------------------------
 // Evaluation: bloqueada hasta MODEL SELECTION CLOSED (#33, custodia: Ale).
 // ---------------------------------------------------------------------------
 const evaluationBlockedSchema = z.strictObject({
@@ -786,6 +856,7 @@ export const P3_CONTRACTS = {
   job_logs: jobLogsSchema,
   experiment_runs_response: experimentRunsResponseSchema,
   experiment_run_detail: experimentRunDetailSchema,
+  selection_state: selectionStateSchema,
   evaluation_response: evaluationResponseSchema,
   evaluation_predictions: evaluationPredictionsSchema,
   models_response: modelsResponseSchema,
@@ -808,6 +879,7 @@ export const P3_ENDPOINTS = {
   listRuns: "GET /api/experiments/runs",
   getRun: "GET /api/experiments/runs/:runId",
   getRunArtifact: "GET /api/experiments/runs/:runId/artifacts/*path",
+  getSelection: "GET /api/selection",
   getEvaluation: "GET /api/evaluation",
   exportEvaluationPredictions: "GET /api/evaluation/predictions",
   listModels: "GET /api/models",
