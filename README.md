@@ -1587,3 +1587,33 @@ la campaña y la selección por validation son de D04-03/D04-04.
   lista vacía.
 
 La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
+
+## D05-06 — Models con el registro de modelos (preparación)
+
+Models lee el registro de D04-06 (`p3_model_registry` + bucket `MODEL_S3_BUCKET` con
+versioning). No hay otro registry ni otro adaptador.
+
+| Ruta | Qué sirve |
+|---|---|
+| `GET /api/models` | Solo el namespace `official` (contrato `models_response`). Una prueba local nunca aparece aquí. |
+| `GET /api/models/local-test` | Registro `local_test` (MinIO): semver, run, bucket/key, VersionId, SHA-256, tamaño, estado y motivo de fallo. |
+| `GET /api/models/local-test/<semver>` | La versión y su integridad comprobada en ese momento (head + get por VersionId). No cambia el registro. |
+| `GET /api/models/local-test/<semver>/object` | Los bytes de esa versión exacta, solo si su SHA-256 sigue siendo el registrado (si no, 409). Objeto ausente → 404 `object_missing`; storage caído → 503. |
+
+En el portal, `Models` muestra arriba las versiones official y abajo, rotuladas como
+**pruebas locales (no es una publicación en AWS)**, las `local_test`, con **Comprobar**
+(integridad) y **Descargar** (versión exacta).
+
+Para registrar un paquete en `local_test`, dentro del contenedor del backend:
+
+```bash
+docker compose cp <paquete>/model.pt backend:/tmp/model.pt
+docker compose exec backend node dist/cli/register-local-test-model.js \
+  --file /tmp/model.pt --semver 0.0.1 --run-id <run_id> \
+  --manifest-hash <manifest_hash> --release v0.1.1 --release-hash <dvc_release_hash>
+```
+
+Imprime la evidencia (bucket/key/VersionId/SHA-256/tamaño/estado y la relectura por
+VersionId) y sale con 0 solo si la versión quedó `published`. El semver es inmutable: repetirlo
+falla. El paquete smoke real y su loader son de D05-01; la publicación `official` en AWS es de
+D06-03.
