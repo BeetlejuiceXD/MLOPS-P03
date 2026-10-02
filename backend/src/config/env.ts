@@ -32,6 +32,13 @@ const envSchema = z.object({
 
   MINIO_BUCKET: z.string().min(3),
 
+  // D04-06: bucket de modelos (versioning obligatorio). Local/CI = MinIO; en AWS lo crea
+  // Terraform con su prefijo models/p3-cnn-classifier/<semver>/ (D06-03).
+  MODEL_S3_BUCKET: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'nombre de bucket S3')
+    .default('p3-models-local'),
+
   // D04-01: servidor MLflow que lee el portal (Compose: http://mlflow:5000).
   MLFLOW_TRACKING_URI: z.string().url().default('http://localhost:5000'),
 

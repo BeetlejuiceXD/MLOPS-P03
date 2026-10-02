@@ -198,6 +198,7 @@ def build_evaluation(
         raise EvaluationRefusedError("invalid_prediction", str(error)) from error
 
     evaluation = report.to_ready_response(
+        namespace=namespace,
         candidate_run_id=selection.candidate_run_id,
         closed_at=iso_utc(closed_at),
         manifest_hash=selection.manifest_hash,

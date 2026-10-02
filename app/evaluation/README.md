@@ -29,6 +29,7 @@ report.per_class  # (ClassMetrics(cat), ClassMetrics(dog))
 report.meets_acceptance()  # accuracy >= 0.85 con conteos enteros
 
 response = report.to_ready_response(
+    namespace=...,  # "official" (D06-01) o "synthetic" (recorridos de prueba); visible en la UI
     candidate_run_id=...,  # run_id de MLflow del candidato cerrado (D05-02)
     closed_at=...,  # ISO 8601 con zona: momento de MODEL SELECTION CLOSED
     manifest_hash=...,  # manifest congelado (D03-01)

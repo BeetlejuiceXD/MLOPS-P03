@@ -329,12 +329,30 @@ class EvaluationBlocked(ContractModel):
     detail: str
 
 
+# D05-05: `synthetic` = recorridos de prueba; nunca se presenta como evaluación oficial.
+# `local_test` es del registro de modelos (D04-06), no un namespace de Evaluation.
+EvaluationNamespace = Literal["official", "synthetic"]
+
+
+class EvaluationPending(ContractModel):
+    """D05-05: selección cerrada sin evaluación guardada (resultado ausente, no un fallo).
+    Solo la identidad de la selección cerrada; nada del test."""
+
+    state: Literal["pending"]
+    namespace: EvaluationNamespace
+    reason: Literal["evaluation_missing"]
+    selection: EvaluationSelection
+    manifest_hash: Sha256Hex
+    detail: str
+
+
 def _exactly_frozen_classes(classes: list[str]) -> bool:
     return len(classes) == len(MANIFEST_CLASSES) and set(classes) == set(MANIFEST_CLASSES)
 
 
 class EvaluationReady(ContractModel):
     state: Literal["ready"]
+    namespace: EvaluationNamespace
     selection: EvaluationSelection
     manifest_hash: Sha256Hex
     evaluated_at: IsoTimestamp
@@ -405,9 +423,11 @@ class EvaluationReady(ContractModel):
         return self
 
 
-EvaluationResponse = Annotated[EvaluationBlocked | EvaluationReady, Field(discriminator="state")]
-EVALUATION_RESPONSE: TypeAdapter[EvaluationBlocked | EvaluationReady] = TypeAdapter(
-    EvaluationResponse
+EvaluationResponse = Annotated[
+    EvaluationBlocked | EvaluationPending | EvaluationReady, Field(discriminator="state")
+]
+EVALUATION_RESPONSE: TypeAdapter[EvaluationBlocked | EvaluationPending | EvaluationReady] = (
+    TypeAdapter(EvaluationResponse)
 )
 
 

@@ -15,8 +15,8 @@ Escenarios:
   2. Selección cerrada (sintética) → predicciones de otro run (`not_selected_candidate`)
      o sin un crop de la partición (`crop_ids_not_test_split`): rechazadas, nada escrito.
   3. Corrida sintética válida → una sola fila `synthetic` en MariaDB.
-  4. Aislamiento: GET /evaluation y /evaluation/predictions → 404 (no hay oficial; la
-     sintética no se sirve como oficial).
+  4. Aislamiento (D05-05): GET /evaluation → 200 `pending` del namespace official (cerrada,
+     sin resultado; la sintética no se sirve como oficial) y /evaluation/predictions → 404.
 
 Deja la fila sintética y la selección cerrada para `backend/tests/evaluation.mariadb.test.ts`,
 que la lee con el repositorio real y limpia al final. Sale con 1 al primer fallo.
@@ -161,8 +161,11 @@ def main() -> None:
         check(result.get("refused") == "model_selection_open", f"{namespace}: bloqueado")
     check(namespaces() == [], "selección abierta: p3_evaluation sigue vacía")
     status, body = http("/evaluation")
+    print(f"    respuesta: {json.dumps(body, ensure_ascii=False)}")
     check(status == 200 and body.get("state") == "blocked", "GET /evaluation → blocked")
-    status, _ = http("/evaluation/predictions")
+    # Acceso directo prematuro a resultados del test: rechazado por la API, no solo por la UI.
+    status, body = http("/evaluation/predictions")
+    print(f"    respuesta: {json.dumps(body, ensure_ascii=False)}")
     check(status == 409, "GET /evaluation/predictions → 409 antes del cierre")
 
     # 2. Cierre sintético; datos incompatibles rechazados.
@@ -183,8 +186,16 @@ def main() -> None:
     check(namespaces() == ["synthetic"], "una sola fila, namespace synthetic")
 
     # 4. Aislamiento: la API oficial no la sirve.
-    status, _ = http("/evaluation")
-    check(status == 404, "GET /evaluation → 404 (la sintética no es oficial)")
+    status, body = http("/evaluation")
+    print(f"    respuesta: {json.dumps(body, ensure_ascii=False)}")
+    check(
+        status == 200
+        and body.get("state") == "pending"
+        and body.get("namespace") == "official"
+        and "metrics" not in body
+        and "confusion_matrix" not in body,
+        "GET /evaluation → 200 pending official, sin resultados (la sintética no es oficial)",
+    )
     status, _ = http("/evaluation/predictions?format=csv")
     check(status == 404, "GET /evaluation/predictions → 404")
     print("Recorrido de evaluación sintético completo.")

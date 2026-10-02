@@ -1587,3 +1587,28 @@ la campaña y la selección por validation son de D04-03/D04-04.
   lista vacía.
 
 La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
+
+## D05-01 — Paquete smoke y loader autocontenido
+
+`app/model_package/` empaqueta el checkpoint real de un run de training para recargarlo
+fuera del entrenamiento, sin memoria ni estado del trainer. El detalle está en
+`app/model_package/README.md`.
+
+- **Formato `p3-model-package` 1.0.0 (`kind: smoke`):**
+  - Contiene los pesos de origen tal cual, la config de D01-04, el `class_map`, el
+    preprocessing, las dependencias, la salida de referencia y la tarjeta smoke.
+  - Trae un inventario con el SHA-256 y el tamaño de cada archivo.
+  - El campo `source` liga el paquete a su origen: `run_id`, `checkpoint/model.pt`,
+    `checkpoint_sha256`, `best_epoch` y el manifest/release.
+- **Loader:** valida inventario, hashes, dependencias, arquitectura, `class_map` y
+  preprocessing **antes** de instanciar la CNN. Cualquier discrepancia es `PackageError`
+  y no hay fallback.
+- **Interfaz:** `identity()` y `predict()` para D05-04 y D06-02/D06-04.
+- **Sin métricas oficiales de test:** el frozen test y la model card oficial son de D06-02.
+  `format_version` no es el semver del modelo.
+
+```bash
+# dentro del contenedor trainer-worker
+python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 --out /tmp/smoke-package
+python -m model_package predict --package /tmp/smoke-package   # proceso limpio
+```

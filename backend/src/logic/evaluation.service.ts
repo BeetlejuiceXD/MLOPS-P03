@@ -5,7 +5,8 @@
  * D03-05) en `p3_evaluation`; aquí solo se LEE, siempre detrás de las guardas de D04-04:
  *
  * - `evaluation()`: `blocked` mientras no exista MODEL SELECTION CLOSED; cerrada, la
- *   evaluación `ready` del namespace del servicio, o 404 si todavía no existe.
+ *   evaluación `ready` del namespace del servicio, o `pending` (D05-05) si todavía no
+ *   existe: resultado ausente, distinto del bloqueo y de un fallo (503).
  * - `predictions()`: 409 antes del cierre (no se lee nada), 404 sin evaluación.
  *
  * Antes de servir, lo guardado se contrasta con el cierre persistido y entre sí: mismo
@@ -50,6 +51,32 @@ export interface EvaluationService {
 }
 
 type ReadyEvaluation = Extract<EvaluationResponse, { state: 'ready' }>;
+type PendingEvaluation = Extract<EvaluationResponse, { state: 'pending' }>;
+
+function missingDetail(namespace: EvaluationNamespace): string {
+  return namespace === 'official'
+    ? 'La selección está cerrada, pero la evaluación oficial del frozen test aún no existe.'
+    : `No hay evaluación guardada en el namespace ${namespace}.`;
+}
+
+/** D05-05 — Cerrada sin resultado: identidad de la selección cerrada, nada del test. */
+function pendingEvaluation(
+  closed: ClosedSelection,
+  namespace: EvaluationNamespace,
+): PendingEvaluation {
+  return {
+    state: 'pending',
+    namespace,
+    reason: 'evaluation_missing',
+    selection: {
+      candidate_run_id: closed.candidate_run_id,
+      metric: 'val_accuracy',
+      closed_at: closed.closed_at,
+    },
+    manifest_hash: closed.manifest_hash,
+    detail: missingDetail(namespace),
+  };
+}
 
 /** Igual que `frozen_test_split_hash` (Python): sha256 del JSON de los crop_id ordenados. */
 export function testSplitHash(cropIds: readonly number[]): string {
@@ -109,6 +136,10 @@ function coherenceProblems(
 ): string[] {
   const problems: string[] = [];
   const sameInstant = (a: string, b: string) => Date.parse(a) === Date.parse(b);
+  // D05-05: una evaluación de prueba nunca se sirve con otro namespace (p. ej. oficial).
+  if (evaluation.namespace !== namespace) {
+    problems.push(`la evaluación declara namespace ${evaluation.namespace}, no ${namespace}`);
+  }
   if (predictions.namespace !== namespace) {
     problems.push(`la exportación declara namespace ${predictions.namespace}, no ${namespace}`);
   }
@@ -150,20 +181,14 @@ export function createEvaluationService(
   guard: EvaluationGuard,
   namespace: EvaluationNamespace,
 ): EvaluationService {
-  async function load(): Promise<{
-    evaluation: ReadyEvaluation;
-    predictions: EvaluationPredictions;
-  }> {
+  async function load(): Promise<
+    | { evaluation: ReadyEvaluation; predictions: EvaluationPredictions }
+    | { evaluation: PendingEvaluation; predictions: null }
+  > {
     // Primero la guarda: antes del cierre no se lee ningún resultado del test.
     const closed = await guard.requireClosed();
     const stored = await repo.read(namespace);
-    if (!stored) {
-      throw new NotFoundError(
-        namespace === 'official'
-          ? 'La selección está cerrada, pero la evaluación oficial del frozen test aún no existe.'
-          : `No hay evaluación guardada en el namespace ${namespace}.`,
-      );
-    }
+    if (!stored) return { evaluation: pendingEvaluation(closed, namespace), predictions: null };
     const evaluation = evaluationResponseSchema.safeParse(stored.evaluation);
     if (!evaluation.success || evaluation.data.state !== 'ready') {
       throw new ServiceUnavailableError(
@@ -191,7 +216,9 @@ export function createEvaluationService(
     },
 
     async predictions() {
-      return (await load()).predictions;
+      const { predictions } = await load();
+      if (!predictions) throw new NotFoundError(missingDetail(namespace));
+      return predictions;
     },
   };
 }

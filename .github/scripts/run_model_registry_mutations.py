@@ -1,7 +1,7 @@
-"""Mutation testing de D04-04 (#73): selección por validation, estado y guardas del test.
+"""Mutation testing de D04-06 (#75): registro de modelos y adaptador del bucket de modelos.
 
 Trabaja en una COPIA AISLADA: copia a un directorio temporal `backend/src`, el test
-`backend/tests/model-selection.test.ts`, `package.json`, `tsconfig.json` y los fixtures
+`backend/tests/model-registry.test.ts`, `package.json`, `tsconfig.json` y los fixtures
 de `contracts/p3/fixtures`; `node_modules` se enlaza (junction en Windows, symlink en
 Linux), no se copia ni se modifica. El árbol de trabajo del repo nunca se toca.
 
@@ -21,8 +21,8 @@ Resultado por mutante:
 
 La base sin mutantes debe estar en verde. Sale con 0 solo si todos quedan KILLED.
 
-Uso (desde la raíz del repo, con `npm ci` hecho en backend/; ~3-5 min):
-    python .github/scripts/run_model_selection_mutations.py
+Uso (desde la raíz del repo, con `npm ci` hecho en backend/; ~2-4 min):
+    python .github/scripts/run_model_registry_mutations.py
 """
 
 from __future__ import annotations
@@ -38,10 +38,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 BACKEND = REPO / "backend"
-SELECTION = "src/logic/model-selection.ts"
-SERVICE = "src/logic/model-selection.service.ts"
-ROUTES = "src/ui/model-selection.routes.ts"
-TEST = "tests/model-selection.test.ts"
+RULES = "src/logic/model-registry.ts"
+SERVICE = "src/logic/model-registry.service.ts"
+STORAGE = "src/data/storage/model-object.storage.ts"
+TEST = "tests/model-registry.test.ts"
 
 
 @dataclass(frozen=True)
@@ -54,223 +54,256 @@ class Mutant:
 
 
 MUTANTS = [
-    # --- Ranking -----------------------------------------------------------------------
+    # --- Reglas puras ---------------------------------------------------------------------
     Mutant(
-        "S01",
-        "menor val_accuracy primero",
-        SELECTION,
-        "at4(b.val_accuracy) - at4(a.val_accuracy) ||",
-        "at4(a.val_accuracy) - at4(b.val_accuracy) ||",
+        "R01",
+        "clave fuera del prefijo del semver",
+        RULES,
+        "return `models/${P3_EXPERIMENT}/${semver}/${MODEL_OBJECT_NAME}`;",
+        "return `models/${P3_EXPERIMENT}/${MODEL_OBJECT_NAME}`;",
     ),
     Mutant(
-        "S02",
-        "val_accuracy sin igualdad a 4 decimales",
-        SELECTION,
-        "at4(b.val_accuracy) - at4(a.val_accuracy) ||",
-        "b.val_accuracy - a.val_accuracy ||",
+        "R02",
+        "semver comparado como texto",
+        RULES,
+        "const diff = (pa[i] ?? 0) - (pb[i] ?? 0);",
+        "const diff = String(pa[i]).localeCompare(String(pb[i]));",
     ),
     Mutant(
-        "S03",
-        "sin desempate por macro-F1",
-        SELECTION,
-        "at4(b.val_macro_f1) - at4(a.val_macro_f1) ||",
-        "",
+        "R03",
+        "published_at como Date en vez de ISO",
+        RULES,
+        "entry.published_at === null ? null : entry.published_at.toISOString()",
+        "entry.published_at === null ? null : (entry.published_at as unknown as string)",
     ),
+    # --- register -------------------------------------------------------------------------
     Mutant(
-        "S04",
-        "macro-F1 sin igualdad a 4 decimales",
-        SELECTION,
-        "at4(b.val_macro_f1) - at4(a.val_macro_f1) ||",
-        "b.val_macro_f1 - a.val_macro_f1 ||",
-    ),
-    Mutant(
-        "S05",
-        "gana la MAYOR val_loss",
-        SELECTION,
-        "at4(a.val_loss) - at4(b.val_loss) ||",
-        "at4(b.val_loss) - at4(a.val_loss) ||",
-    ),
-    Mutant(
-        "S06",
-        "val_loss sin igualdad a 4 decimales",
-        SELECTION,
-        "at4(a.val_loss) - at4(b.val_loss) ||",
-        "a.val_loss - b.val_loss ||",
-    ),
-    Mutant(
-        "S07",
-        "gana el MAYOR run_id",
-        SELECTION,
-        "    compareText(a.run_id, b.run_id)\n  );",
-        "    compareText(b.run_id, a.run_id)\n  );",
-    ),
-    Mutant(
-        "S08",
-        "accuracy de la última época en vez del mejor checkpoint",
-        SELECTION,
-        "val_accuracy: run.summary.best_val_accuracy,",
-        "val_accuracy: run.history[run.history.length - 1]?.val_accuracy ?? 0,",
-    ),
-    # --- Elegibilidad --------------------------------------------------------------------
-    Mutant(
-        "S09",
-        "acepta runs no FINISHED con resumen",
-        SELECTION,
-        "if (run.status !== 'FINISHED' || run.summary === null) {",
-        "if (run.summary === null) {",
-    ),
-    Mutant(
-        "S10",
-        "la fila de la matriz ignora la seed",
-        SELECTION,
-        "keys.every((key) => entry.config[key] === params[key]),",
-        "keys.every((key) => key === 'seed' || entry.config[key] === params[key]),",
-    ),
-    Mutant(
-        "S11",
-        "la fila de la matriz ignora ejes no barridos (patience)",
-        SELECTION,
-        "keys.every((key) => entry.config[key] === params[key]),",
-        "keys.every((key) => key === 'patience' || entry.config[key] === params[key]),",
-    ),
-    Mutant(
-        "S12",
-        "sin comprobar el manifest congelado",
-        SELECTION,
-        "if (tags.manifest_hash !== reference.manifest_hash) {",
+        "G01",
+        "register sin validar el contrato",
+        SERVICE,
+        "if (!contract.success) {",
         "if (false) {",
     ),
     Mutant(
-        "S13",
-        "release comprobado sin dvc_release_hash",
-        SELECTION,
-        "tags.dvc_release !== reference.dataset_version ||\n"
-        "    tags.dvc_release_hash !== reference.dvc_release_hash",
-        "tags.dvc_release !== reference.dataset_version",
-    ),
-    Mutant(
-        "S14",
-        "sin comprobar sha256(images:annotations)",
-        SELECTION,
-        "if (tags.dvc_release_hash !== expectedHash) {",
+        "G02",
+        "register sin validar size_bytes",
+        SERVICE,
+        "if (!sizeSchema.safeParse(input.size_bytes).success) {",
         "if (false) {",
     ),
     Mutant(
-        "S15",
-        "fila repetida: cuenta la mejor, no la más temprana",
-        SELECTION,
-        "Date.parse(a.start_time) - Date.parse(b.start_time) || compareText(a.run_id, b.run_id),",
-        "compareRanked(a, b),",
+        "G03",
+        "semver duplicado no es conflicto",
+        SERVICE,
+        "if (!(await repo.insertDraft(entry))) {",
+        "if (!(await repo.insertDraft(entry)) && false) {",
     ),
     Mutant(
-        "S16",
-        "fila repetida: cuentan todas las corridas",
-        SELECTION,
-        "if (first) ranking.push(first);",
-        "ranking.push(...candidates);",
+        "G04",
+        "bucket fijo en vez de MODEL_S3_BUCKET",
+        SERVICE,
+        "s3_bucket: store.bucket,",
+        "s3_bucket: 'p3-models',",
+    ),
+    # --- upload ---------------------------------------------------------------------------
+    Mutant(
+        "U01",
+        "upload acepta versiones no draft",
+        SERVICE,
+        "    async upload(semver, body) {\n      const entry = await load(semver);\n      requireDraft(entry);",
+        "    async upload(semver, body) {\n      const entry = await load(semver);",
     ),
     Mutant(
-        "S17",
-        "cierre exige MÁS de 10 filas",
-        SELECTION,
-        "ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS,",
-        "ready_to_close: campaignRows.length > MIN_COMPARABLE_RUNS,",
+        "U02",
+        "upload reemplaza un VersionId ya registrado",
+        SERVICE,
+        "if (entry.version_id !== null) {\n        throw new ConflictError(`La versión ${semver} ya se subió",
+        "if (false) {\n        throw new ConflictError(`La versión ${semver} ya se subió",
     ),
     Mutant(
-        "S18",
-        "run_id repetido se ignora",
-        SELECTION,
-        "if (seen.has(id)) throw new ValidationError(`run_id repetido en la fuente: ${id}`);",
-        "if (seen.has(id)) continue;",
+        "U03",
+        "upload sin comprobar el tamaño",
+        SERVICE,
+        "if (body.length !== entry.size_bytes) {",
+        "if (false) {",
     ),
-    # --- Estado y guardas ----------------------------------------------------------------
+    Mutant(
+        "U04",
+        "upload sin comprobar el SHA-256",
+        SERVICE,
+        "if (actual !== entry.sha256) {\n        return fail(entry, {",
+        "if (false) {\n        return fail(entry, {",
+    ),
+    Mutant(
+        "U05",
+        "sin VersionId no falla",
+        SERVICE,
+        "if (versionId === null) {\n        return fail(entry, {",
+        "if (false) {\n        return fail(entry, {",
+    ),
+    Mutant(
+        "U06",
+        "metadato sha256 con el hash calculado en vez del registrado",
+        SERVICE,
+        "store.put(entry.s3_key, body, entry.sha256)",
+        "store.put(entry.s3_key, body, sha256Hex(Buffer.from('')))",
+    ),
+    # --- verify / inspect -----------------------------------------------------------------
     Mutant(
         "V01",
-        "propose no se niega de entrada tras el cierre",
+        "objeto ausente en head no falla",
         SERVICE,
-        "if ((await repo.read()).status === 'closed') {\n"
-        "        throw new ConflictError('La selección ya está cerrada: no se vuelve a seleccionar.');",
-        "if (false) {\n"
-        "        throw new ConflictError('La selección ya está cerrada: no se vuelve a seleccionar.');",
+        "if (head === null) return { reason: 'object_missing', detail: `No existe ${where}` };",
+        "if (head === null) return null;",
     ),
     Mutant(
         "V02",
-        "propose guarda aunque no haya candidato",
+        "VersionId de head sin comprobar",
         SERVICE,
-        "if (outcome.candidate === null) {",
+        "if (head.versionId !== versionId) {",
         "if (false) {",
     ),
     Mutant(
         "V03",
-        "close no exige el run_id del candidato",
+        "tamaño guardado sin comprobar",
         SERVICE,
-        "if (proposed.candidate.run_id !== runId.data) {",
+        "if (head.size !== entry.size_bytes) {",
         "if (false) {",
     ),
     Mutant(
         "V04",
-        "close no exige 10 filas comparables",
+        "metadato sha256 sin comprobar",
         SERVICE,
-        "if (!proposed.ready_to_close) {",
+        "if (head.sha256 !== entry.sha256) {",
         "if (false) {",
     ),
     Mutant(
         "V05",
-        "close no detecta que la campaña cambió",
+        "get sin objeto no falla",
         SERVICE,
-        "if (current.outcome_hash !== proposed.outcome_hash) {",
-        "if (false) {",
+        "if (body === null) return { reason: 'object_missing', detail: `GET de ${where} sin objeto` };",
+        "if (body === null) return null;",
     ),
     Mutant(
         "V06",
-        "close sin validar el formato del run_id",
+        "SHA-256 del contenido sin comprobar",
         SERVICE,
-        "if (!runId.success) {",
-        "if (false) {",
+        "if (actual !== entry.sha256) {\n      return {",
+        "if (false) {\n      return {",
     ),
     Mutant(
         "V07",
-        "close ignora el resultado de la escritura condicional",
+        "fallo detectado pero se publica igual",
         SERVICE,
-        "if (!(await repo.close(proposed.outcome_hash, clock()))) {",
-        "if ((await repo.close(proposed.outcome_hash, clock())) && false) {",
+        "if (failure) return fail(entry, failure);",
+        "if (failure) void 0;",
     ),
     Mutant(
         "V08",
-        "propose acepta un manifest no congelado",
+        "verify sin objeto subido",
         SERVICE,
-        "if (!parsed.data.frozen) {",
-        "if (false) {",
+        "if (versionId === null) {\n        throw new ConflictError(`La versión ${semver} todavía no tiene objeto subido`);",
+        "if (versionId === null && false) {\n        throw new ConflictError(`La versión ${semver} todavía no tiene objeto subido`);",
     ),
     Mutant(
         "V09",
-        "requireClosed acepta un candidato preparatorio",
+        "publicación concurrente ignorada",
         SERVICE,
-        "if (status !== 'closed') {",
-        "if (status === 'open') {",
+        "if (!(await repo.markPublished(namespace, semver, versionId, now()))) {",
+        "if (!(await repo.markPublished(namespace, semver, versionId, now())) && false) {",
     ),
     Mutant(
         "V10",
-        "Evaluation se desbloquea con un candidato preparatorio",
+        "verify acepta versiones ya published/failed",
         SERVICE,
-        "if ((await repo.read()).status === 'closed') return null;",
-        "if ((await repo.read()).status !== 'open') return null;",
-    ),
-    # --- API ----------------------------------------------------------------------------
-    Mutant(
-        "R01",
-        # Desde D04-05 GET /evaluation vive en evaluation.service.ts (antes en ROUTES).
-        "GET /evaluation ignora el bloqueo antes del cierre",
-        "src/logic/evaluation.service.ts",
-        "if (blocked) return blocked;",
-        "if (blocked) void blocked;",
+        "    async verify(semver) {\n      const entry = await load(semver);\n      requireDraft(entry);",
+        "    async verify(semver) {\n      const entry = await load(semver);",
     ),
     Mutant(
-        "R02",
-        "POST /selection/close lee otro campo del body",
-        ROUTES,
-        "?.candidate_run_id),",
-        "?.run_id),",
+        "V11",
+        "error del storage se trata como objeto ausente",
+        SERVICE,
+        "throw new ServiceUnavailableError(`Storage de modelos no disponible: ${detail}`);",
+        "return null as T;",
+    ),
+    # --- audit / list ---------------------------------------------------------------------
+    Mutant(
+        "A01",
+        "audit sobre versiones no publicadas",
+        SERVICE,
+        "if (entry.status !== 'published' || entry.version_id === null) {",
+        "if (entry.version_id === null) {",
+    ),
+    Mutant(
+        "A02",
+        "audit siempre ok",
+        SERVICE,
+        "return failure ? { ok: false, ...failure } : { ok: true };",
+        "return { ok: true };",
+    ),
+    Mutant(
+        "L01",
+        "list sin ordenar por semver",
+        SERVICE,
+        "rows.sort((a, b) => compareSemver(a.semver, b.semver));",
+        "",
+    ),
+    # --- Adaptador MinIO ------------------------------------------------------------------
+    Mutant(
+        "M01",
+        "put sin metadato sha256",
+        STORAGE,
+        "'X-Amz-Meta-Sha256': sha256,",
+        "",
+    ),
+    Mutant(
+        "M02",
+        "head sin VersionId (lee la última versión)",
+        STORAGE,
+        "client.statObject(bucket, key, { versionId })",
+        "client.statObject(bucket, key, {})",
+    ),
+    Mutant(
+        "M03",
+        "get sin VersionId (lee la última versión)",
+        STORAGE,
+        "client.getObject(bucket, key, { versionId })",
+        "client.getObject(bucket, key, {})",
+    ),
+    Mutant(
+        "M04",
+        "cualquier error se trata como objeto ausente",
+        STORAGE,
+        "if (isMissing(error)) return null;",
+        "return null;",
+    ),
+    Mutant(
+        "M05",
+        "NoSuchVersion no cuenta como ausente",
+        STORAGE,
+        "const MISSING = new Set(['NotFound', 'NoSuchKey', 'NoSuchVersion']);",
+        "const MISSING = new Set(['NotFound', 'NoSuchKey']);",
+    ),
+    Mutant(
+        "M06",
+        "get devuelve solo el primer fragmento",
+        STORAGE,
+        "for await (const chunk of stream) chunks.push(Buffer.from(chunk));",
+        "for await (const chunk of stream) {\n          chunks.push(Buffer.from(chunk));\n          break;\n        }",
+    ),
+    Mutant(
+        "M07",
+        "bucket sin versioning aceptado",
+        STORAGE,
+        "if (config?.Status !== 'Enabled') {",
+        "if (false) {",
+    ),
+    Mutant(
+        "M08",
+        "bucket local sin activar versioning",
+        STORAGE,
+        "await client.setBucketVersioning(bucket, { Status: 'Enabled' });",
+        "",
     ),
 ]
 

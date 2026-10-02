@@ -9,6 +9,7 @@ import {
   json,
   mysqlEnum,
   mysqlTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -329,3 +330,35 @@ export const p3Evaluation = mysqlTable('p3_evaluation', {
 });
 
 export type P3EvaluationRow = typeof p3Evaluation.$inferSelect;
+
+/**
+ * D04-06 — Registro de versiones del modelo (contrato `model_version`) y de su objeto en
+ * el bucket de modelos. `local_test` = roundtrips de prueba contra MinIO; `official` =
+ * publicación real (D06-03), la única que servirá `GET /api/models`. El semver es
+ * inmutable dentro de su namespace; `published` exige VersionId y objeto verificado
+ * (tamaño + SHA-256) y `failed` guarda el motivo. Las transiciones son condicionales.
+ */
+export const p3ModelRegistry = mysqlTable(
+  'p3_model_registry',
+  {
+    namespace: mysqlEnum('namespace', ['official', 'local_test']).notNull(),
+    semver: varchar('semver', { length: 32 }).notNull(),
+    mlflowRunId: char('mlflow_run_id', { length: 32 }).notNull(),
+    manifestHash: char('manifest_hash', { length: 64 }).notNull(),
+    dvcRelease: varchar('dvc_release', { length: 32 }).notNull(),
+    dvcReleaseHash: char('dvc_release_hash', { length: 64 }).notNull(),
+    s3Bucket: varchar('s3_bucket', { length: 63 }).notNull(),
+    s3Key: varchar('s3_key', { length: 512 }).notNull(),
+    versionId: varchar('version_id', { length: 1024 }),
+    sha256: char('sha256', { length: 64 }).notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number', unsigned: true }).notNull(),
+    status: mysqlEnum('status', ['draft', 'published', 'failed']).notNull(),
+    failureReason: varchar('failure_reason', { length: 32 }),
+    failureDetail: text('failure_detail'),
+    publishedAt: timestamp('published_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.namespace, table.semver] })],
+);
+
+export type P3ModelRegistryRow = typeof p3ModelRegistry.$inferSelect;

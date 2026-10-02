@@ -711,7 +711,9 @@ describe('API de selección y bloqueo de Evaluation', () => {
     expect((await call('POST', '/selection/candidate')).status).toBe(409);
     // Cerrada, Evaluation ya no está bloqueada, pero la evaluación oficial aún no existe (D06-01).
     const evaluation = await call('GET', '/evaluation');
-    expect(evaluation.status).toBe(404);
+    expect(evaluation.status).toBe(200);
+    // D05-05: cerrada y sin evaluación oficial = `pending` (resultado ausente), sin resultados.
+    expect(evaluationResponseSchema.parse(await evaluation.json()).state).toBe('pending');
   });
 
   it('sin el adaptador de runs (D04-01) proponer responde 503 con el motivo, sin escribir', async () => {
