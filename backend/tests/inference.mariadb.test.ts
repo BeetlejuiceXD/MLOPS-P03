@@ -1,6 +1,6 @@
 /**
  * D05-07 — Persistencia REAL de inferencias y cola de anotación en MariaDB (migración 0009:
- * `p3_inference`, `p3_annotation_queue`). Escribe con el repositorio del backend y relee
+ * `p3_inference`, `p3_annotation_queue`; D06-06 agrega el objeto S3 en la migración 0010). Escribe con el repositorio del backend y relee
  * desde OTRA conexión (equivalente a reiniciar el backend). Un mismo `inference_id` no puede
  * tener dos elementos en la cola. Solo corre con `P3_INFERENCE_MARIADB_TEST=1` y
  * `DATABASE_URL` hacia una base desechable con las migraciones aplicadas (job de CI
@@ -20,6 +20,20 @@ const SMOKE = {
   model_version: null,
   mlflow_run_id: 'c46e4c3ab2bb4ee18c37571adbb65d92',
   checkpoint_sha256: 'e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97',
+  s3_object: null,
+};
+/** D06-06 (preparación): identidad official SINTÉTICA, solo para probar la persistencia. */
+const OFFICIAL = {
+  ...SMOKE,
+  source: 'official' as const,
+  package_id: 'p3-cnn-classifier-1.0.0',
+  model_version: '1.0.0',
+  s3_object: {
+    s3_bucket: 'mlops-p3-models-sintetico',
+    s3_key: 'models/p3-cnn-classifier/1.0.0/model.pt',
+    version_id: 'sintetico-3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY',
+    sha256: 'd'.repeat(64),
+  },
 };
 
 describe.skipIf(!enabled)('p3_inference y p3_annotation_queue en MariaDB', () => {
@@ -198,6 +212,70 @@ describe.skipIf(!enabled)('p3_inference y p3_annotation_queue en MariaDB', () =>
         await pool.query('DELETE FROM p3_inference WHERE id = ?', [inferenceId]);
       }
       await pool.query('DELETE FROM images WHERE storage_key LIKE ?', [`${storageKey}%`]);
+    }
+  });
+
+  it('D06-06: la identidad official (bucket/key/VersionId/SHA) se guarda y se relee igual tras reconectar', async () => {
+    const { pool } = await import('../src/data/db/client.js');
+    const { mariaDbInferenceRepository: repo } = await import(
+      '../src/logic/inference.repository.js'
+    );
+    const mysql = (await import('mysql2/promise')).default;
+    const createdAt = new Date('2026-10-02T17:00:00.000Z');
+    const ids: number[] = [];
+    try {
+      for (const model of [OFFICIAL, SMOKE]) {
+        ids.push(
+          await repo.insert({
+            created_at: createdAt,
+            input: {
+              kind: 'upload',
+              filename: 'sintetica-official.png',
+              mime_type: 'image/png',
+              size_bytes: 1234,
+              width: 32,
+              height: 32,
+              sha256: 'e'.repeat(64),
+            },
+            storage_key: null,
+            predicted_class: 'dog',
+            probabilities: { cat: 0.0587, dog: 0.9413 },
+            model,
+          }),
+        );
+      }
+      const other = await mysql.createConnection(process.env.DATABASE_URL as string);
+      try {
+        const [rows] = await other.query(
+          'SELECT model_source, model_version, s3_bucket, s3_key, s3_version_id, s3_sha256 ' +
+            'FROM p3_inference WHERE id IN (?, ?) ORDER BY id',
+          ids,
+        );
+        expect(rows).toEqual([
+          {
+            model_source: 'official',
+            model_version: '1.0.0',
+            s3_bucket: OFFICIAL.s3_object.s3_bucket,
+            s3_key: OFFICIAL.s3_object.s3_key,
+            s3_version_id: OFFICIAL.s3_object.version_id,
+            s3_sha256: OFFICIAL.s3_object.sha256,
+          },
+          {
+            model_source: 'smoke',
+            model_version: null,
+            s3_bucket: null,
+            s3_key: null,
+            s3_version_id: null,
+            s3_sha256: null,
+          },
+        ]);
+      } finally {
+        await other.end();
+      }
+      expect((await repo.find(ids[0] as number))?.model).toEqual(OFFICIAL);
+      expect((await repo.find(ids[1] as number))?.model).toEqual(SMOKE);
+    } finally {
+      for (const id of ids) await pool.query('DELETE FROM p3_inference WHERE id = ?', [id]);
     }
   });
 });

@@ -1,13 +1,13 @@
 {
   "contract": "inference_engine",
-  "valid": true,
-  "why": "Motor de D05-04 con el paquete smoke cargado",
+  "valid": false,
+  "why": "Motor que dice servir official sin objeto AWS: el portal no lo acepta (sin fallback local)",
   "payload": {
     "model": {
-      "source": "smoke",
-      "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+      "source": "official",
+      "package_id": "p3-cnn-classifier-1.0.0",
       "format_version": "1.0.0",
-      "model_version": null,
+      "model_version": "1.0.0",
       "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
       "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
       "s3_object": null

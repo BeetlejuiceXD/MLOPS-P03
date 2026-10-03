@@ -1,24 +1,8 @@
 {
-  "contract": "inference_result",
+  "contract": "inference_engine",
   "valid": true,
-  "why": "Modelo official (D06-06): semver y objeto AWS (bucket/key/VersionId/SHA) con el que se recargó",
+  "why": "Motor con el modelo official recargado de AWS: identidad con objeto S3",
   "payload": {
-    "inference_id": 1,
-    "created_at": "2026-10-02T15:00:00.000Z",
-    "input": {
-      "kind": "upload",
-      "filename": "gato.jpg",
-      "mime_type": "image/jpeg",
-      "size_bytes": 48213,
-      "width": 640,
-      "height": 480,
-      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    },
-    "predicted_class": "dog",
-    "probabilities": {
-      "cat": 0.0587,
-      "dog": 0.9413
-    },
     "model": {
       "source": "official",
       "package_id": "p3-cnn-classifier-1.0.0",
@@ -33,6 +17,10 @@
         "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     },
-    "annotation_queue_item_id": null
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "image_size": 224
   }
 }

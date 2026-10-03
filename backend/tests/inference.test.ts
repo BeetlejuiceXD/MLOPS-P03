@@ -50,6 +50,25 @@ const SMOKE = {
   model_version: null,
   mlflow_run_id: 'c46e4c3ab2bb4ee18c37571adbb65d92',
   checkpoint_sha256: 'e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97',
+  s3_object: null,
+};
+/**
+ * D06-06 (preparación): identidad SINTÉTICA de un modelo official recargado de AWS. Solo
+ * prueba que la forma viaja y se conserva; no es el modelo seleccionado ni un objeto real.
+ */
+const OFFICIAL = {
+  source: 'official' as const,
+  package_id: 'p3-cnn-classifier-1.0.0',
+  format_version: '1.0.0',
+  model_version: '1.0.0',
+  mlflow_run_id: 'c46e4c3ab2bb4ee18c37571adbb65d92',
+  checkpoint_sha256: 'e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97',
+  s3_object: {
+    s3_bucket: 'mlops-p3-models-sintetico',
+    s3_key: 'models/p3-cnn-classifier/1.0.0/model.pt',
+    version_id: 'sintetico-3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY',
+    sha256: 'd'.repeat(64),
+  },
 };
 const NOW = new Date('2026-10-02T15:00:00.000Z');
 const MAX_BYTES = 200_000;
@@ -62,9 +81,11 @@ const png = (width: number, height: number, rgb: [number, number, number] = [200
 class FakeEngine implements InferenceEngine {
   calls: { bytes: Buffer; mimeType: string }[] = [];
   mode: 'ok' | 'down' | 'reject' | 'bad-response' = 'ok';
+  /** Identidad que reporta el motor (smoke hoy; official con D06-06). */
+  model: EnginePrediction['model'] = SMOKE;
   async identity(): Promise<EngineIdentity> {
     if (this.mode === 'down') throw new EngineUnavailableError('connect ECONNREFUSED motor:8100');
-    return { model: SMOKE, classes: ['cat', 'dog'], image_size: 224 };
+    return { model: this.model, classes: ['cat', 'dog'], image_size: 224 };
   }
   async predict(bytes: Buffer, mimeType: string): Promise<EnginePrediction> {
     this.calls.push({ bytes, mimeType });
@@ -72,9 +93,13 @@ class FakeEngine implements InferenceEngine {
     if (this.mode === 'reject')
       throw new EngineRejectedInputError('imagen ilegible para el modelo');
     if (this.mode === 'bad-response') {
-      return { predicted_class: 'cat', probabilities: { cat: 0.1, dog: 0.9 }, model: SMOKE };
+      return { predicted_class: 'cat', probabilities: { cat: 0.1, dog: 0.9 }, model: this.model };
     }
-    return { predicted_class: 'dog', probabilities: { cat: 0.0587, dog: 0.9413 }, model: SMOKE };
+    return {
+      predicted_class: 'dog',
+      probabilities: { cat: 0.0587, dog: 0.9413 },
+      model: this.model,
+    };
   }
 }
 
@@ -539,5 +564,70 @@ describe('POST /inference/:id/annotation-queue', () => {
       await (await fetch(`${base}/inference/annotation-queue`)).json(),
     );
     expect(body.items.map((item) => item.inference_id)).toEqual([1]);
+  });
+});
+
+describe('D06-06 (preparación): identidad del modelo official recargado de AWS', () => {
+  it('GET /inference/engine devuelve run, checkpoint, semver y el objeto S3 (bucket/key/VersionId/SHA)', async () => {
+    engine.model = OFFICIAL;
+    const body = inferenceEngineSchema.parse(await (await fetch(`${base}/inference/engine`)).json());
+    expect(body.model).toEqual(OFFICIAL);
+  });
+
+  it('archivo y crop guardan la identidad completa y se releen igual (GET tras recargar)', async () => {
+    engine.model = OFFICIAL;
+    await portalImageWithBox();
+    const upload = inferenceResultSchema.parse(
+      await (await postFile(await png(32, 32), 'image/png')).json(),
+    );
+    const crop = inferenceResultSchema.parse(await (await postCrop(7)).json());
+    for (const created of [upload, crop]) {
+      expect(created.model).toEqual(OFFICIAL);
+      const stored = repo.inferences.find((row) => row.id === created.inference_id);
+      expect(stored?.model).toEqual(OFFICIAL);
+      const again = inferenceResultSchema.parse(
+        await (await fetch(`${base}/inference/${created.inference_id}`)).json(),
+      );
+      expect(again.model).toEqual(OFFICIAL);
+    }
+    const list = inferenceListSchema.parse(await (await fetch(`${base}/inference`)).json());
+    expect(list.inferences.map((item) => item.model.s3_object)).toEqual([
+      OFFICIAL.s3_object,
+      OFFICIAL.s3_object,
+    ]);
+  });
+
+  it('el elemento de la cola conserva la misma identidad AWS y sigue siendo sugerencia, no etiqueta', async () => {
+    engine.model = OFFICIAL;
+    await postFile(await png(30, 20), 'image/png');
+    const item = annotationQueueItemSchema.parse(await (await enqueue(1)).json());
+    expect(item.model).toEqual(OFFICIAL);
+    expect(item.human_label).toBeNull();
+    expect(item.suggestion.source).toBe('model');
+    const queue = annotationQueueResponseSchema.parse(
+      await (await fetch(`${base}/inference/annotation-queue`)).json(),
+    );
+    expect(queue.items[0]?.model.s3_object).toEqual(OFFICIAL.s3_object);
+  });
+
+  it.each([
+    ['sin objeto S3', { ...OFFICIAL, s3_object: null }],
+    ['sin VersionId', { ...OFFICIAL, s3_object: { ...OFFICIAL.s3_object, version_id: '' } }],
+    [
+      'key de otro semver',
+      {
+        ...OFFICIAL,
+        s3_object: { ...OFFICIAL.s3_object, s3_key: 'models/p3-cnn-classifier/0.9.0/model.pt' },
+      },
+    ],
+    ['smoke con objeto S3', { ...SMOKE, s3_object: OFFICIAL.s3_object }],
+  ])('motor con identidad inválida (%s) → 503, sin guardar nada ni caer a otro modelo', async (_n, model) => {
+    engine.model = model as EnginePrediction['model'];
+    expect((await fetch(`${base}/inference/engine`)).status).toBe(503);
+    const res = await postFile(await png(16, 16), 'image/png');
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/no cumple el contrato/);
+    expect(repo.inferences).toHaveLength(0);
+    expect(images.objects.size).toBe(0);
   });
 });
