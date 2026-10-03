@@ -89,7 +89,7 @@ class FakeMlflow:
             }
             self.artifacts[run_id] = {"checkpoint/model.pt"}
             self.jobs[job["id"]] = {"id": job["id"], "mlflow_run_id": run_id}
-            
+
     # --- interfaz que usa verify.verify ------------------------------------------
     def mlflow_get(self, path, params):
         if path.endswith("/experiments/get-by-name"):
