@@ -41,6 +41,7 @@ CANDIDATE_ROW = 3
 CANDIDATE_JOB = 7
 CANDIDATE_CHECKPOINT_SHA256 = "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b"
 CHECKPOINT_PATH = "checkpoint/model.pt"
+EXPECTED_JOB_COUNT = 16
 
 # Curvas por época que registra el trainer (tracking/short_run.py, EPOCH_METRIC_FIELDS).
 HISTORY_METRICS = ("train_loss", "train_accuracy", "val_loss", "val_accuracy", "val_macro_f1")
@@ -269,6 +270,47 @@ def _check_attempt(http, run: dict, attempt: Attempt, problems: list[str]) -> No
     if CHECKPOINT_PATH not in files:
         problems.append(f"{tag}: falta el artefacto {CHECKPOINT_PATH}")
 
+def _check_training_jobs(http, contract: Contract, problems: list[str]) -> str:
+    """Los `training_jobs` ORIGINALES (tabla `image_repo.training_jobs`) deben
+    existir en el stack verificado y coincidir, job por job, con el run_id que
+    el contrato espera — no basta con que el run exista en MLflow, tiene que
+    estar correctamente referenciado desde el job que lo originó."""
+    try:
+        jobs = http.api_get("/training/jobs").get("jobs", [])
+    except Exception as error:
+        problems.append(f"GET /training/jobs falló: {error}")
+        return "TRAINING_JOBS: no se pudo consultar"
+
+    by_id = {int(j["id"]): j for j in jobs if isinstance(j, dict) and "id" in j}
+    if len(by_id) != EXPECTED_JOB_COUNT:
+        problems.append(f"training_jobs: {len(by_id)} jobs, se esperaban {EXPECTED_JOB_COUNT}")
+
+    job1_run = (by_id.get(ROW1_REPRESENTATIVE_JOB) or {}).get("mlflow_run_id")
+    if job1_run != ROW1_REPRESENTATIVE_RUN:
+        problems.append(
+            f"training_jobs: job {ROW1_REPRESENTATIVE_JOB} -> {job1_run!r}, "
+            f"se esperaba {ROW1_REPRESENTATIVE_RUN!r}"
+        )
+
+    job7_run = (by_id.get(CANDIDATE_JOB) or {}).get("mlflow_run_id")
+    if job7_run != CANDIDATE_RUN:
+        problems.append(
+            f"training_jobs: job {CANDIDATE_JOB} -> {job7_run!r}, se esperaba {CANDIDATE_RUN!r}"
+        )
+
+    for run_id, attempt in contract.attempts.items():
+        actual_run_id = (by_id.get(attempt.job_id) or {}).get("mlflow_run_id")
+        if actual_run_id != run_id:
+            problems.append(
+                f"training_jobs: job {attempt.job_id} -> run {actual_run_id}, pero el contrato dice "
+                f"{run_id}"
+            )
+
+    return (
+        f"TRAINING_JOBS: {len(by_id)}/{EXPECTED_JOB_COUNT} jobs, "
+        f"job{ROW1_REPRESENTATIVE_JOB}->{job1_run}, job{CANDIDATE_JOB}->{job7_run}"
+    )
+
 
 def verify(http, evidence: dict) -> tuple[list[str], list[str]]:
     """Devuelve (líneas de reporte, problemas). Sin problemas ⇒ PASS."""
@@ -341,7 +383,7 @@ def verify(http, evidence: dict) -> tuple[list[str], list[str]]:
             problems.append(
                 f"candidato: SHA-256 de los bytes {digest} != {CANDIDATE_CHECKPOINT_SHA256}"
             )
-
+    lines.append(_check_training_jobs(http, contract, problems))
     try:
         selection = http.api_get("/selection")
     except Exception as error:

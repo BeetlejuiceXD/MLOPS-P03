@@ -29,7 +29,7 @@ guard = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = guard
 SPEC.loader.exec_module(guard)
 
-SNAPSHOT_ID = "69d4ef746b4b93db1eb3834e85a55d92.dir"
+SNAPSHOT_ID = "67ccb30fc1e855c234fb0a90df44f5aa.dir"
 PRODUCER = "mlops-p03"
 PROJECT = "mlops-p03-restore"
 MARK = {guard.MARKER_LABEL: guard.MARKER_VALUE, guard.SNAPSHOT_LABEL: SNAPSHOT_ID}
@@ -249,6 +249,7 @@ def make_snapshot(path: Path) -> Path:
     for name, body in (
         ("db/mlflow.sql", "CREATE DATABASE mlflow;\n"),
         ("db/image_repo_p3_model_selection.sql", "-- p3_model_selection\n"),
+        ("db/image_repo_training_jobs.sql", "-- training_jobs\n"),
     ):
         (path / name).write_text(body, encoding="utf-8")
         files[name] = {"sha256": hashlib.sha256(body.encode()).hexdigest()}
