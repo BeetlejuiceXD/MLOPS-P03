@@ -9,7 +9,8 @@
       "format_version": "1.0.0",
       "model_version": null,
       "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
-      "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97"
+      "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
+      "s3_object": null
     },
     "classes": [
       "dog",

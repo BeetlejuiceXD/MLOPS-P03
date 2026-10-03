@@ -283,3 +283,55 @@ describe("historial persistido", () => {
     );
   });
 });
+
+describe("D06-06 (preparación): identidad AWS del modelo official", () => {
+  type S3Object = { s3_bucket: string; s3_key: string; version_id: string; sha256: string };
+  const OFFICIAL_ENGINE = fixturePayload("inference_engine", "valid-official") as {
+    model: { model_version: string; s3_object: S3Object };
+  };
+  const OFFICIAL_RESULT = fixturePayload("inference_result", "valid-official") as {
+    model: { s3_object: S3Object };
+  };
+  const S3 = OFFICIAL_ENGINE.model.s3_object;
+
+  it("smoke: dice que no viene de AWS (sin bucket ni VersionId)", async () => {
+    mockApi(BASE);
+    renderInference();
+    const engine = await screen.findByTestId("inference-engine");
+    expect(within(engine).getByTestId("identity-s3")).toHaveTextContent(
+      "Sin objeto AWS: paquete local smoke"
+    );
+  });
+
+  it("official: muestra semver, bucket, key, VersionId y SHA del objeto, sin aviso de smoke", async () => {
+    mockApi({ ...BASE, "GET /api/inference/engine": () => ({ body: OFFICIAL_ENGINE }) });
+    renderInference();
+    const engine = await screen.findByTestId("inference-engine");
+    expect(engine).toHaveTextContent(`official ${OFFICIAL_ENGINE.model.model_version}`);
+    const s3 = within(engine).getByTestId("identity-s3");
+    for (const value of [S3.s3_bucket, S3.s3_key, S3.version_id, S3.sha256]) {
+      expect(s3).toHaveTextContent(value);
+    }
+    expect(engine).not.toHaveTextContent("Paquete smoke");
+  });
+
+  it("el resultado y el historial conservan el VersionId del objeto que respondió", async () => {
+    mockApi({
+      ...BASE,
+      "GET /api/inference/engine": () => ({ body: OFFICIAL_ENGINE }),
+      "POST /api/inference": () => ({ status: 201, body: OFFICIAL_RESULT }),
+      "GET /api/inference": () => ({ body: { inferences: [OFFICIAL_RESULT] } }),
+    });
+    renderInference();
+    await screen.findByTestId("inference-engine");
+    chooseFile(file("perro.png", "image/png"));
+    fireEvent.click(screen.getByRole("button", { name: "Predecir" }));
+    const result = await screen.findByTestId("inference-result");
+    expect(within(result).getByTestId("identity-s3")).toHaveTextContent(
+      OFFICIAL_RESULT.model.s3_object.version_id
+    );
+    expect(result).toHaveTextContent("Sugerencia del modelo (official 1.0.0)");
+    const row = await screen.findByTestId("inference-row-1");
+    expect(row).toHaveTextContent(OFFICIAL_RESULT.model.s3_object.version_id);
+  });
+});

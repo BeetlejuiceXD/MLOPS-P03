@@ -105,6 +105,8 @@ def test_identity_has_the_d05_07_engine_shape(engine, package_a):
             "model_version": None,
             "mlflow_run_id": RUN_A,
             "checkpoint_sha256": _sha_of(package_a),
+            # D06-06: un paquete local (smoke) nunca trae objeto S3; official lo exige.
+            "s3_object": None,
         },
         "classes": ["cat", "dog"],
         "image_size": CONFIG.image_size,

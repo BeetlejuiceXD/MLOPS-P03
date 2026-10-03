@@ -1,14 +1,14 @@
 {
   "contract": "annotation_queue_item",
-  "valid": false,
-  "why": "Enviar a anotación nunca crea una etiqueta humana",
+  "valid": true,
+  "why": "Elemento de la cola de una predicción official: conserva bucket/key/VersionId/SHA",
   "payload": {
     "queue_item_id": 3,
     "inference_id": 1,
     "image_id": 42,
     "annotation_id": null,
     "status": "pending",
-    "human_label": "dog",
+    "human_label": null,
     "suggestion": {
       "source": "model",
       "predicted_class": "dog",
@@ -18,13 +18,18 @@
       }
     },
     "model": {
-      "source": "smoke",
-      "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+      "source": "official",
+      "package_id": "p3-cnn-classifier-1.0.0",
       "format_version": "1.0.0",
-      "model_version": null,
+      "model_version": "1.0.0",
       "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
       "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97",
-      "s3_object": null
+      "s3_object": {
+        "s3_bucket": "mlops-p3-models-sintetico",
+        "s3_key": "models/p3-cnn-classifier/1.0.0/model.pt",
+        "version_id": "sintetico-3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
     },
     "created_at": "2026-10-02T15:01:00.000Z"
   }
