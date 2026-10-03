@@ -121,8 +121,16 @@ def build_smoke_package(
     experiment: str,
     expected_sha256: str | None = None,
     created_at: str | None = None,
+    kind: str = "smoke",
+    card: dict | None = None,
 ) -> PackageManifest:
-    """`expected_sha256` es el tag `checkpoint_sha256` del run, si se conoce."""
+    """`expected_sha256` es el tag `checkpoint_sha256` del run, si se conoce.
+
+    `kind`/`card` son para D06-02 (`model_package.official.build_official_package`,
+    que es quien debe usarlos — no se llaman aquí directo): permiten reutilizar toda
+    esta validación/ensamblado para el paquete final (`kind="official"`), con su
+    propio contenido de tarjeta, sin duplicar la lógica. Sin argumentos, el
+    comportamiento es exactamente el de antes (paquete smoke)."""
     checkpoint, out = Path(checkpoint), Path(out)
     if out.exists():
         raise PackageError(f"{out} ya existe: un paquete no se sobrescribe")
@@ -173,14 +181,14 @@ def build_smoke_package(
             PREPROCESSING_FILE: preprocessing_descriptor(config),
             DEPENDENCIES_FILE: _dependencies(checkpoint),
             REFERENCE_FILE: _reference_output(stage / WEIGHTS_FILE, config),
-            CARD_FILE: _smoke_card(run_id, source.best_epoch),
+            CARD_FILE: card if card is not None else _smoke_card(run_id, source.best_epoch),
         }
         for name, content in documents.items():
             (stage / name).write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
         manifest = PackageManifest(
             format=FORMAT_NAME,
             format_version=FORMAT_VERSION,
-            kind="smoke",
+            kind=kind,
             package_id=package_id(run_id),
             created_at=created_at or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             source=source,
