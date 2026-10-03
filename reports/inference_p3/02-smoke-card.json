@@ -1,0 +1,8 @@
+{
+  "kind": "smoke",
+  "model": "p3-cnn-classifier",
+  "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+  "best_epoch": 7,
+  "official_test_metrics": null,
+  "statement": "Paquete smoke para probar la recarga fuera del entrenamiento. No hay m\u00e9tricas oficiales de test: el frozen test, el package final y la model card oficial son de D06-02."
+}

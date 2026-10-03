@@ -1,0 +1,37 @@
+{
+  "contract": "inference_result",
+  "valid": true,
+  "why": "Crop de una anotación del portal, ya enviado a la cola",
+  "payload": {
+    "inference_id": 2,
+    "created_at": "2026-10-02T15:00:00.000Z",
+    "input": {
+      "kind": "crop",
+      "image_id": 42,
+      "annotation_id": 7,
+      "bbox": [
+        10.0,
+        20.0,
+        120.0,
+        90.0
+      ],
+      "width": 120,
+      "height": 90,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "predicted_class": "cat",
+    "probabilities": {
+      "cat": 0.7,
+      "dog": 0.3
+    },
+    "model": {
+      "source": "smoke",
+      "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+      "format_version": "1.0.0",
+      "model_version": null,
+      "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+      "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97"
+    },
+    "annotation_queue_item_id": 5
+  }
+}

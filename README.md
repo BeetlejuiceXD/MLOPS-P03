@@ -1672,6 +1672,70 @@ python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:500
 python -m model_package predict --package /tmp/smoke-package   # proceso limpio
 ```
 
+## D05-07 — Inference con motor y cola de anotación
+
+`http://localhost:8080/ml/inference` clasifica una imagen con el modelo que sirve el
+**motor de inferencia de D05-04**. La clase la calcula el motor, nunca el portal: la API
+le pasa los bytes y guarda lo que responde con la **identidad del modelo**.
+
+- **Entrada:**
+  - **Archivo nuevo:** multipart `image`, con la misma validación que el upload del portal
+    (JPEG, PNG o WebP, hasta 5 MiB y contenido verificado con sharp).
+  - **Crop del portal:** se elige una anotación de una imagen del portal; la API recorta la
+    caja de la imagen original y manda ese recorte al motor.
+- **Resultado:** clase, probabilidades e identidad: `source` (smoke u official),
+  `package_id`, `format_version`, `mlflow_run_id` y `checkpoint_sha256`. Un paquete smoke
+  no tiene `model_version`, porque el semver lo asigna D06-02. La página lo rotula como
+  "Sugerencia del modelo (smoke), no es una etiqueta validada".
+- **Persistencia:** cada inferencia se guarda en `p3_inference` (migración 0009) y queda
+  consultable después de recargar o reiniciar (`GET /api/inference` y `GET /api/inference/:id`).
+- **Cola de anotación** (`POST /api/inference/:id/annotation-queue`):
+  - Archivo nuevo: crea la imagen en el portal con estado `pending`, así entra en la cola
+    de anotación existente.
+  - Crop: referencia la imagen y la anotación originales, sin tocar su estado.
+  - Nunca crea anotaciones ni etiquetas humanas: el elemento nace `pending` con
+    `human_label: null`, y la predicción viaja como `suggestion` del modelo.
+  - Un reintento devuelve el mismo elemento (índice único por inferencia).
+- **Errores:**
+
+  | Caso | Respuesta |
+  |---|---|
+  | Tipo, tamaño o contenido inválido | 400 o 413 |
+  | Caja fuera de la imagen | 400 |
+  | Anotación inexistente | 404 |
+  | Motor ausente o sin modelo | 503 con el motivo |
+  | Respuesta del motor fuera de contrato | 503 |
+  | Fallo de MariaDB | 503 |
+
+  En ninguno se guarda nada a medias ni aparece una anotación.
+
+### Motor (D05-04) y punto de sustitución (D06-06)
+
+El backend llama al motor en `INFERENCE_ENGINE_URL` (`backend/src/logic/inference-engine.ts`):
+
+| Ruta del motor | Responde |
+|---|---|
+| `GET /identity` | `inference_engine`: identidad del paquete cargado y clases `cat`, `dog` |
+| `POST /predict` | Recibe los bytes de la imagen (`Content-Type: image/*`) y responde `inference_engine_prediction`. Un 4xx = imagen rechazada; un 5xx = modelo o servicio no disponible |
+
+En compose, el motor es el servicio `inference-engine` (perfil `inference`) y el backend
+lo llama por defecto en `http://inference-engine:8090`. Sin el perfil (o sin paquete),
+Inference responde 503 con el motivo. D06-06 solo cambia la fuente (otra URL o el paquete
+official recargado de AWS, con `source: "official"` y semver): el resto del portal no cambia.
+
+Para levantarlo con un paquete smoke real (D05-01) construido desde un run de MLflow:
+
+```bash
+docker compose run --rm --no-deps -v "$PWD/data:/out" app \
+  python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 \
+  --out /out/inference-package          # queda fuera de Git (data/.gitignore)
+docker compose --profile inference up -d inference-engine backend frontend
+curl http://localhost:8080/api/inference/engine   # identidad smoke del paquete
+```
+
+Los tests de la API usan un motor de **fixture** (validación y persistencia); el
+recorrido con el motor real se acredita en `reports/inference_p3/`.
+
 ## D05-04 — Motor de inferencia con el paquete smoke
 
 `app/inference_engine/` carga un paquete de D05-01 y clasifica imágenes. El detalle está en

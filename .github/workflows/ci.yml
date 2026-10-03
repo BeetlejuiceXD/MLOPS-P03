@@ -274,6 +274,14 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npx vitest run tests/model-selection.mariadb.test.ts
+      - name: Inferencias y cola de anotación persistentes en MariaDB real (D05-07)
+        # Migración 0009 aplicada por el backend de arriba: guarda una inferencia con su
+        # identidad, la encola una sola vez y la relee desde otra conexión. Datos sintéticos.
+        working-directory: backend
+        env:
+          P3_INFERENCE_MARIADB_TEST: "1"
+          DATABASE_URL: mysql://root:${{ env.MARIADB_ROOT_PASSWORD }}@127.0.0.1:3306/image_repo
+        run: npx vitest run tests/inference.mariadb.test.ts
       - name: Evaluación sintética productor Python → MariaDB → API (D04-05)
         # Migración 0007. El productor corre en la imagen de trainer-worker contra la
         # MariaDB real; guardas, rechazos y aislamiento del namespace sintético vía API.

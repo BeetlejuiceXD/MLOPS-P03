@@ -147,12 +147,17 @@ describe("estados bloqueados", () => {
     expect(screen.queryByText(/accuracy/i)).not.toBeInTheDocument();
   });
 
-  it("Inference sin versión publicada", async () => {
-    mockApi({ "/api/models": ok("models_response", "valid-only-draft") });
+  it("Inference sin motor de inferencia: el motivo, sin predecir", async () => {
+    mockApi({
+      "/api/inference/engine": {
+        status: 503,
+        body: { error: "motor de inferencia (D05-04) no disponible: sin paquete cargado" },
+      },
+      "/api/inference": { body: { inferences: [] } },
+    });
     renderAt("/ml/inference");
-    expect(await screen.findByTestId("p3-state-blocked")).toHaveTextContent(
-      "No hay ninguna versión publicada"
-    );
+    expect(await screen.findByText(/sin paquete cargado/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Predecir" })).toBeDisabled();
   });
 });
 
@@ -235,12 +240,16 @@ describe("contenido con datos válidos", () => {
     expect(within(content).getByText("draft")).toBeInTheDocument();
   });
 
-  it("Inference ofrece solo versiones publicadas", async () => {
-    mockApi({ "/api/models": ok("models_response", "valid-published-and-draft") });
+  it("Inference usa el paquete que sirve el motor (sin elegir versión en la página)", async () => {
+    mockApi({
+      "/api/inference/engine": ok("inference_engine", "valid-smoke"),
+      "/api/inference": { body: { inferences: [] } },
+    });
     renderAt("/ml/inference");
-    const select = await screen.findByLabelText("Versión del modelo");
-    const options = within(select).getAllByRole("option").map((option) => option.textContent);
-    expect(options).toEqual(["1.0.0"]);
+    expect(await screen.findByTestId("inference-engine")).toHaveTextContent(
+      "p3-cnn-classifier-smoke-c46e4c3ab2bb"
+    );
+    expect(screen.queryByLabelText("Versión del modelo")).not.toBeInTheDocument();
   });
 
   it("Training muestra los jobs persistidos", async () => {

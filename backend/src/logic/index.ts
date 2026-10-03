@@ -62,6 +62,7 @@ export type {
 export { searchImages } from './image-search.service.js';
 export { setImageStatus } from './image-status.service.js';
 export { deleteImage, uploadImage } from './image-upload.service.js';
+export { createPortalInferenceService } from './inference.wiring.js';
 export { createMlflowReader } from './mlflow-reader.js';
 // Selección por validation y bloqueo del test (D04-04)
 export { mariaDbModelSelectionRepository } from './model-selection.repository.js';

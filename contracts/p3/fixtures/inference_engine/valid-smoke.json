@@ -1,0 +1,20 @@
+{
+  "contract": "inference_engine",
+  "valid": true,
+  "why": "Motor de D05-04 con el paquete smoke cargado",
+  "payload": {
+    "model": {
+      "source": "smoke",
+      "package_id": "p3-cnn-classifier-smoke-c46e4c3ab2bb",
+      "format_version": "1.0.0",
+      "model_version": null,
+      "mlflow_run_id": "c46e4c3ab2bb4ee18c37571adbb65d92",
+      "checkpoint_sha256": "e93de23e2cf9e72e8efa97bde1e9fb2083402d15a422705dab80ffd11bbd5b97"
+    },
+    "classes": [
+      "cat",
+      "dog"
+    ],
+    "image_size": 224
+  }
+}
