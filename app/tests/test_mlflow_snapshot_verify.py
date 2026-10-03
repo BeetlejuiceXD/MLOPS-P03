@@ -37,6 +37,7 @@ class FakeMlflow:
     def __init__(self, evidence: dict, page_size: int = 5):
         self.page_size = page_size
         self.runs: dict[str, dict] = {}
+        self.jobs: dict[int, dict] = {}
         self.history: dict[tuple[str, str], list[dict]] = {}
         self.artifacts: dict[str, set[str]] = {}
         self.candidate_digest = (verify.CANDIDATE_CHECKPOINT_SHA256, 45_000_000)
@@ -87,7 +88,8 @@ class FakeMlflow:
                 },
             }
             self.artifacts[run_id] = {"checkpoint/model.pt"}
-
+            self.jobs[job["id"]] = {"id": job["id"], "mlflow_run_id": run_id}
+            
     # --- interfaz que usa verify.verify ------------------------------------------
     def mlflow_get(self, path, params):
         if path.endswith("/experiments/get-by-name"):
@@ -125,6 +127,8 @@ class FakeMlflow:
         return self.candidate_digest
 
     def api_get(self, path):
+        if path == "/training/jobs":
+            return {"jobs": list(self.jobs.values())}
         assert path == "/selection"
         return self.selection
 
