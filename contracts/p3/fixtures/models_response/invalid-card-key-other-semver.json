@@ -1,7 +1,7 @@
 {
   "contract": "models_response",
   "valid": false,
-  "why": "sha256 hex en minúsculas de 64 caracteres",
+  "why": "La tarjeta vive junto al modelo: models/p3-cnn-classifier/<semver>/model_card.json",
   "payload": {
     "models": [
       {
@@ -13,11 +13,11 @@
         "s3_bucket": "mlops-p2-prod-models-example",
         "s3_key": "models/p3-cnn-classifier/1.0.0/model.pt",
         "version_id": "3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY",
-        "sha256": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "status": "published",
         "published_at": "2026-09-29T18:00:00Z",
         "model_card": {
-          "s3_key": "models/p3-cnn-classifier/1.0.0/model_card.json",
+          "s3_key": "models/p3-cnn-classifier/9.9.9/model_card.json",
           "version_id": "aB3.cardVersionId-01",
           "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "size_bytes": 2048,

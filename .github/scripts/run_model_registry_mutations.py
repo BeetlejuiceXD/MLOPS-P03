@@ -59,8 +59,8 @@ MUTANTS = [
         "R01",
         "clave fuera del prefijo del semver",
         RULES,
-        "return `models/${P3_EXPERIMENT}/${semver}/${MODEL_OBJECT_NAME}`;",
-        "return `models/${P3_EXPERIMENT}/${MODEL_OBJECT_NAME}`;",
+        "return `models/${P3_EXPERIMENT}/${semver}/${objectName}`;",
+        "return `models/${P3_EXPERIMENT}/${objectName}`;",
     ),
     Mutant(
         "R02",

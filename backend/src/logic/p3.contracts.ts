@@ -712,6 +712,17 @@ export const modelVersionSchema = z
     sha256: sha256Schema,
     status: z.enum(['draft', 'published', 'failed']),
     published_at: timestampSchema.nullable(),
+    // D06-03: tarjeta del modelo junto al modelo (`<semver>/model_card.json`), verificada
+    // por su propio VersionId. La publicación official la exige antes de subir el modelo.
+    model_card: z
+      .strictObject({
+        s3_key: z.string().min(1),
+        version_id: z.string().min(1).nullable(),
+        sha256: sha256Schema,
+        size_bytes: positiveInt,
+        status: z.enum(['draft', 'published', 'failed']),
+      })
+      .optional(),
   })
   .superRefine((model, ctx) => {
     const issue = (path: string, message: string) =>
@@ -728,6 +739,18 @@ export const modelVersionSchema = z
     if (model.status !== 'published' && model.published_at !== null) {
       issue('published_at', 'Solo una versión publicada tiene published_at');
     }
+    const card = model.model_card;
+    if (card !== undefined) {
+      if (card.s3_key !== `models/${P3_EXPERIMENT}/${model.semver}/model_card.json`) {
+        issue('model_card', `La tarjeta va en models/${P3_EXPERIMENT}/<semver>/model_card.json`);
+      }
+      if (card.status === 'published' && card.version_id === null) {
+        issue('model_card', 'Una tarjeta publicada tiene VersionId');
+      }
+      if (model.status === 'published' && card.status !== 'published') {
+        issue('model_card', 'Un modelo publicado tiene su tarjeta verificada');
+      }
+    }
   });
 export type ModelVersion = z.infer<typeof modelVersionSchema>;
 
@@ -741,6 +764,7 @@ const registryFailureReasons = [
   'object_missing',
   'version_id_missing',
   'version_mismatch',
+  'model_card_failed',
 ] as const;
 export const localTestModelSchema = z
   .strictObject({

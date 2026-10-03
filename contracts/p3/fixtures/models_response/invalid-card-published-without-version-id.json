@@ -1,24 +1,24 @@
 {
   "contract": "models_response",
   "valid": false,
-  "why": "sha256 hex en minúsculas de 64 caracteres",
+  "why": "Una tarjeta publicada tiene su VersionId (se verificó por versión exacta)",
   "payload": {
     "models": [
       {
-        "semver": "1.0.0",
+        "semver": "1.2.0",
         "mlflow_run_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "manifest_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "dvc_release": "v0.1.1",
         "dvc_release_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "s3_bucket": "mlops-p2-prod-models-example",
-        "s3_key": "models/p3-cnn-classifier/1.0.0/model.pt",
-        "version_id": "3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY",
-        "sha256": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "status": "published",
-        "published_at": "2026-09-29T18:00:00Z",
+        "s3_key": "models/p3-cnn-classifier/1.2.0/model.pt",
+        "version_id": null,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "draft",
+        "published_at": null,
         "model_card": {
-          "s3_key": "models/p3-cnn-classifier/1.0.0/model_card.json",
-          "version_id": "aB3.cardVersionId-01",
+          "s3_key": "models/p3-cnn-classifier/1.2.0/model_card.json",
+          "version_id": null,
           "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "size_bytes": 2048,
           "status": "published"

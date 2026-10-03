@@ -32,7 +32,7 @@ import {
   localTestModelDetailSchema,
   localTestModelSchema,
   localTestModelsResponseSchema,
-  type modelsResponseSchema,
+  modelsResponseSchema,
 } from './p3.contracts.js';
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
@@ -64,9 +64,11 @@ function toLocalTestModel(entry: RegistryEntry): LocalTestModel {
 export function createModelsPortalService(deps: {
   repo: ModelRegistryRepository;
   store: ModelObjectStore;
+  /** D06-03: tarjetas de las versiones (`p3_model_card`); official las muestra con su modelo. */
+  cardRepo?: ModelRegistryRepository;
   now?: () => Date;
 }): ModelsPortalService {
-  const { repo, store } = deps;
+  const { repo, store, cardRepo } = deps;
   const now = deps.now ?? (() => new Date());
   const official = createModelRegistryService({ repo, store, namespace: 'official', now });
   const localTest = createModelRegistryService({ repo, store, namespace: 'local_test', now });
@@ -79,7 +81,16 @@ export function createModelsPortalService(deps: {
   }
 
   return {
-    official: () => official.list(),
+    /** Lo que sirve GET /api/models: solo `official`, cada versión con su tarjeta si existe. */
+    async official() {
+      if (!cardRepo) return official.list();
+      const [rows, cards] = await Promise.all([repo.list('official'), cardRepo.list('official')]);
+      const cardBySemver = new Map(cards.map((card) => [card.semver, card]));
+      rows.sort((a, b) => compareSemver(a.semver, b.semver));
+      return modelsResponseSchema.parse({
+        models: rows.map((row) => toModelVersion(row, cardBySemver.get(row.semver) ?? null)),
+      });
+    },
 
     async localTest() {
       const rows = await repo.list('local_test');

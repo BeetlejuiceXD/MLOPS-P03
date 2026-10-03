@@ -364,6 +364,36 @@ export const p3ModelRegistry = mysqlTable(
 export type P3ModelRegistryRow = typeof p3ModelRegistry.$inferSelect;
 
 /**
+ * D06-03 — Tarjeta del modelo de cada versión (`models/p3-cnn-classifier/<semver>/
+ * model_card.json`). Misma forma y transiciones que `p3_model_registry`: una versión
+ * official solo se publica si su tarjeta quedó verificada por VersionId.
+ */
+export const p3ModelCard = mysqlTable(
+  'p3_model_card',
+  {
+    namespace: mysqlEnum('namespace', ['official', 'local_test']).notNull(),
+    semver: varchar('semver', { length: 32 }).notNull(),
+    mlflowRunId: char('mlflow_run_id', { length: 32 }).notNull(),
+    manifestHash: char('manifest_hash', { length: 64 }).notNull(),
+    dvcRelease: varchar('dvc_release', { length: 32 }).notNull(),
+    dvcReleaseHash: char('dvc_release_hash', { length: 64 }).notNull(),
+    s3Bucket: varchar('s3_bucket', { length: 63 }).notNull(),
+    s3Key: varchar('s3_key', { length: 512 }).notNull(),
+    versionId: varchar('version_id', { length: 1024 }),
+    sha256: char('sha256', { length: 64 }).notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number', unsigned: true }).notNull(),
+    status: mysqlEnum('status', ['draft', 'published', 'failed']).notNull(),
+    failureReason: varchar('failure_reason', { length: 32 }),
+    failureDetail: text('failure_detail'),
+    publishedAt: timestamp('published_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.namespace, table.semver] })],
+);
+
+export type P3ModelCardRow = typeof p3ModelCard.$inferSelect;
+
+/**
  * D05-07 — Inferencias del portal. Cada fila guarda la entrada (archivo nuevo, con su clave
  * en MinIO, o crop de una anotación), la predicción que dio el motor y la identidad del
  * modelo que la produjo (smoke de D05-01 hoy; official con D06-06). No es una anotación.

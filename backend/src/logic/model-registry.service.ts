@@ -28,6 +28,7 @@ import {
 } from './errors.js';
 import {
   compareSemver,
+  MODEL_OBJECT_NAME,
   modelObjectKey,
   type RegistryEntry,
   type RegistryFailureReason,
@@ -107,6 +108,11 @@ export interface ModelRegistryService {
   upload(semver: string, body: Buffer): Promise<RegistryOutcome>;
   verify(semver: string): Promise<RegistryOutcome>;
   audit(semver: string): Promise<AuditResult>;
+  /**
+   * D06-03: deja `failed` un borrador que no debe publicarse por una causa externa (p. ej.
+   * su tarjeta no se verificó). No toca el storage.
+   */
+  reject(semver: string, reason: RegistryFailureReason, detail: string): Promise<RegistryOutcome>;
   list(): Promise<ModelsResponse>;
 }
 
@@ -118,9 +124,12 @@ export function createModelRegistryService(deps: {
   repo: ModelRegistryRepository;
   store: ModelObjectStore;
   namespace: RegistryNamespace;
+  /** Objeto de la versión: `model.pt` (por defecto) o `model_card.json` (D06-03). */
+  objectName?: string;
   now?: () => Date;
 }): ModelRegistryService {
   const { repo, store, namespace } = deps;
+  const objectName = deps.objectName ?? MODEL_OBJECT_NAME;
   const now = deps.now ?? (() => new Date());
 
   /** Un fallo del storage no es evidencia de nada: 503 y el registro no cambia. */
@@ -201,7 +210,7 @@ export function createModelRegistryService(deps: {
         dvc_release: input.dvc_release,
         dvc_release_hash: input.dvc_release_hash,
         s3_bucket: store.bucket,
-        s3_key: modelObjectKey(input.semver),
+        s3_key: modelObjectKey(input.semver, objectName),
         version_id: null,
         sha256: input.sha256,
         size_bytes: input.size_bytes,
@@ -281,10 +290,16 @@ export function createModelRegistryService(deps: {
       return failure ? { ok: false, ...failure } : { ok: true };
     },
 
+    async reject(semver, reason, detail) {
+      const entry = await load(semver);
+      requireDraft(entry);
+      return fail(entry, { reason, detail });
+    },
+
     async list() {
       const rows = await repo.list(namespace);
       rows.sort((a, b) => compareSemver(a.semver, b.semver));
-      return modelsResponseSchema.parse({ models: rows.map(toModelVersion) });
+      return modelsResponseSchema.parse({ models: rows.map((row) => toModelVersion(row)) });
     },
   };
 }
