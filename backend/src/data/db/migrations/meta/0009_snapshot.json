@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "d6e3771d-ce16-43f9-9954-58000484da80",
+  "id": "261e8945-8b3a-4a2d-8023-f6cfd34b2e21",
   "prevId": "ba3628f6-951c-4035-9585-aa39f4cedf67",
   "tables": {
     "annotations": {
@@ -327,6 +327,101 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "p3_annotation_queue": {
+      "name": "p3_annotation_queue",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "inference_id": {
+          "name": "inference_id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "image_id": {
+          "name": "image_id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "annotation_id": {
+          "name": "annotation_id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('pending')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "p3_annotation_queue_inference_unique": {
+          "name": "p3_annotation_queue_inference_unique",
+          "columns": [
+            "inference_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "p3_annotation_queue_inference_id_p3_inference_id_fk": {
+          "name": "p3_annotation_queue_inference_id_p3_inference_id_fk",
+          "tableFrom": "p3_annotation_queue",
+          "tableTo": "p3_inference",
+          "columnsFrom": [
+            "inference_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "p3_annotation_queue_image_id_images_id_fk": {
+          "name": "p3_annotation_queue_image_id_images_id_fk",
+          "tableFrom": "p3_annotation_queue",
+          "tableTo": "images",
+          "columnsFrom": [
+            "image_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "p3_annotation_queue_id": {
+          "name": "p3_annotation_queue_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "p3_evaluation": {
       "name": "p3_evaluation",
       "columns": {
@@ -387,21 +482,84 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "p3_model_card": {
-      "name": "p3_model_card",
+    "p3_inference": {
+      "name": "p3_inference",
       "columns": {
-        "namespace": {
-          "name": "namespace",
-          "type": "enum('official','local_test')",
+        "id": {
+          "name": "id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "input_kind": {
+          "name": "input_kind",
+          "type": "enum('upload','crop')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "semver": {
-          "name": "semver",
+        "input": {
+          "name": "input",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input_sha256": {
+          "name": "input_sha256",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "predicted_class": {
+          "name": "predicted_class",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "probabilities": {
+          "name": "probabilities",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model_source": {
+          "name": "model_source",
+          "type": "enum('smoke','official')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "format_version": {
+          "name": "format_version",
           "type": "varchar(32)",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "mlflow_run_id": {
@@ -411,88 +569,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "manifest_hash": {
-          "name": "manifest_hash",
+        "checkpoint_sha256": {
+          "name": "checkpoint_sha256",
           "type": "char(64)",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "dvc_release": {
-          "name": "dvc_release",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "dvc_release_hash": {
-          "name": "dvc_release_hash",
-          "type": "char(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "s3_bucket": {
-          "name": "s3_bucket",
-          "type": "varchar(63)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "s3_key": {
-          "name": "s3_key",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "version_id": {
-          "name": "version_id",
-          "type": "varchar(1024)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sha256": {
-          "name": "sha256",
-          "type": "char(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "bigint unsigned",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "enum('draft','published','failed')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "failure_reason": {
-          "name": "failure_reason",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "failure_detail": {
-          "name": "failure_detail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp(3)",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -500,18 +581,24 @@
           "type": "timestamp(3)",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
+          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "p3_inference_created_at_idx": {
+          "name": "p3_inference_created_at_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "p3_model_card_namespace_semver_pk": {
-          "name": "p3_model_card_namespace_semver_pk",
+        "p3_inference_id": {
+          "name": "p3_inference_id",
           "columns": [
-            "namespace",
-            "semver"
+            "id"
           ]
         }
       },

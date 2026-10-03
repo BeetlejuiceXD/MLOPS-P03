@@ -1,7 +1,8 @@
 """Mutation testing de D04-04 (#73): selección por validation, estado y guardas del test.
 
 Trabaja en una COPIA AISLADA: copia a un directorio temporal `backend/src`, el test
-`backend/tests/model-selection.test.ts`, `package.json`, `tsconfig.json` y los fixtures
+`backend/tests/model-selection.test.ts` con su helper `tests/selection-runs.ts`,
+`package.json`, `tsconfig.json` y los fixtures
 de `contracts/p3/fixtures`; `node_modules` se enlaza (junction en Windows, symlink en
 Linux), no se copia ni se modifica. El árbol de trabajo del repo nunca se toca.
 
@@ -42,6 +43,7 @@ SELECTION = "src/logic/model-selection.ts"
 SERVICE = "src/logic/model-selection.service.ts"
 ROUTES = "src/ui/model-selection.routes.ts"
 TEST = "tests/model-selection.test.ts"
+HELPER = "tests/selection-runs.ts"  # runs y jobs sintéticos compartidos (D05-02)
 
 
 @dataclass(frozen=True)
@@ -173,8 +175,9 @@ MUTANTS = [
         "S17",
         "cierre exige MÁS de 10 filas",
         SELECTION,
-        "ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS,",
-        "ready_to_close: campaignRows.length > MIN_COMPARABLE_RUNS,",
+        # D05-02: además exige que no haya intentos de la matriz en curso.
+        "ready_to_close: campaignRows.length >= MIN_COMPARABLE_RUNS && pending === 0,",
+        "ready_to_close: campaignRows.length > MIN_COMPARABLE_RUNS && pending === 0,",
     ),
     Mutant(
         "S18",
@@ -218,7 +221,8 @@ MUTANTS = [
         "V05",
         "close no detecta que la campaña cambió",
         SERVICE,
-        "if (current.outcome_hash !== proposed.outcome_hash) {",
+        # D05-02: el recálculo sale de un snapshot compartido con el expediente.
+        "if (outcomeOf(snap).outcome_hash !== proposed.outcome_hash) {",
         "if (false) {",
     ),
     Mutant(
@@ -298,7 +302,8 @@ def build_isolated_copy(root: Path) -> Path:
     backend = root / "backend"
     shutil.copytree(BACKEND / "src", backend / "src")
     (backend / "tests").mkdir(parents=True)
-    shutil.copy2(BACKEND / TEST, backend / TEST)
+    for name in (TEST, HELPER):
+        shutil.copy2(BACKEND / name, backend / name)
     for name in ("package.json", "tsconfig.json"):
         shutil.copy2(BACKEND / name, backend / name)
     shutil.copytree(

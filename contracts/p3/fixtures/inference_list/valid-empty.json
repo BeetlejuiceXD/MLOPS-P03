@@ -1,0 +1,8 @@
+{
+  "contract": "inference_list",
+  "valid": true,
+  "why": "Sin inferencias todavía",
+  "payload": {
+    "inferences": []
+  }
+}

@@ -8,6 +8,8 @@ import { sendError } from './http-errors.js';
  * - `GET /selection`: estado persistido (open | candidate | closed) con ranking y excluidos.
  * - `POST /selection/candidate`: recalcula y guarda el candidato preparatorio.
  * - `POST /selection/close` `{ candidate_run_id }`: MODEL SELECTION CLOSED (definitivo).
+ * - `GET /selection/campaign` (D05-02): expediente de campaña por fila (intentos, roles,
+ *   conciliación, ranking e identidad del candidato). Solo lectura: nunca escribe.
  *
  * `GET /evaluation` y la exportación por muestra viven en `evaluation.routes.ts` (D04-05),
  * detrás de `requireClosed` / `blockedEvaluation` de este mismo servicio.
@@ -28,6 +30,11 @@ export function createModelSelectionRouter(service: ModelSelectionService): expr
   router.get(
     '/selection',
     handle(() => service.state(), 'No se pudo leer el estado de la selección.'),
+  );
+
+  router.get(
+    '/selection/campaign',
+    handle(() => service.campaign(), 'No se pudo armar el expediente de campaña.'),
   );
 
   router.post(

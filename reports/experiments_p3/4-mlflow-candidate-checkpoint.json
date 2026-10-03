@@ -1,0 +1,30 @@
+{
+  "root_uri": "mlflow-artifacts:/1/2d56233c886142b7824e1551b90e8327/artifacts",
+  "files": [
+    {
+      "path": "checkpoint/class_map.json",
+      "is_dir": false,
+      "file_size": 26
+    },
+    {
+      "path": "checkpoint/environment.json",
+      "is_dir": false,
+      "file_size": 52
+    },
+    {
+      "path": "checkpoint/model.pt",
+      "is_dir": false,
+      "file_size": 44781003
+    },
+    {
+      "path": "checkpoint/sources.json",
+      "is_dir": false,
+      "file_size": 359
+    },
+    {
+      "path": "checkpoint/training_config.json",
+      "is_dir": false,
+      "file_size": 342
+    }
+  ]
+}

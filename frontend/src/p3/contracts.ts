@@ -454,6 +454,76 @@ export const experimentRunDetailSchema = z.strictObject({
 export type ExperimentRunDetail = z.infer<typeof experimentRunDetailSchema>;
 
 // ---------------------------------------------------------------------------
+// D05-03: estado de la selección (`GET /api/selection`, D04-04/D05-02). Solo validation:
+// el ranking y el candidato los calcula el backend; el portal los muestra, no los recalcula.
+// ---------------------------------------------------------------------------
+const rankedRunSchema = z.strictObject({
+  run_id: mlflowRunIdSchema,
+  campaign_row: z.number().int().min(1).max(12),
+  start_time: timestampSchema,
+  best_epoch: positiveInt,
+  val_accuracy: unitInterval,
+  val_macro_f1: unitInterval,
+  val_loss: z.number().finite().nonnegative(),
+});
+export type RankedRun = z.infer<typeof rankedRunSchema>;
+
+export const selectionStateSchema = z
+  .strictObject({
+    status: z.enum(["open", "candidate", "closed"]),
+    candidate: rankedRunSchema.nullable(),
+    ranking: z.array(rankedRunSchema),
+    excluded: z.array(
+      z.strictObject({
+        run_id: mlflowRunIdSchema.nullable(),
+        reason: z.enum([
+          "invalid_contract",
+          "not_finished",
+          "outside_campaign_matrix",
+          "manifest_mismatch",
+          "release_mismatch",
+          "provenance_inconsistent",
+          "duplicate_campaign_row",
+        ]),
+        detail: z.string(),
+      })
+    ),
+    campaign_rows: z.array(z.number().int().min(1).max(12)),
+    min_comparable_runs: positiveInt,
+    ready_to_close: z.boolean(),
+    reference: z
+      .strictObject({
+        dataset_version: datasetVersionSchema,
+        manifest_hash: sha256Schema,
+        dvc_release_hash: sha256Schema,
+      })
+      .nullable(),
+    outcome_hash: sha256Schema.nullable(),
+    proposed_at: timestampSchema.nullable(),
+    closed_at: timestampSchema.nullable(),
+  })
+  .superRefine((state, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if (state.status === "open" && (state.candidate !== null || state.ranking.length > 0)) {
+      issue("candidate", "Una selección abierta no tiene candidato ni ranking");
+    }
+    if (state.status !== "open" && (state.candidate === null || state.proposed_at === null)) {
+      issue("candidate", "candidate/closed exigen candidato y proposed_at");
+    }
+    if ((state.status === "closed") !== (state.closed_at !== null)) {
+      issue("closed_at", "closed ⇔ closed_at");
+    }
+    if (state.candidate !== null && state.ranking[0]?.run_id !== state.candidate.run_id) {
+      issue("candidate", "El candidato es el primero del ranking");
+    }
+    if (state.ready_to_close && state.campaign_rows.length < state.min_comparable_runs) {
+      issue("ready_to_close", "ready_to_close exige al menos min_comparable_runs filas");
+    }
+  });
+export type SelectionState = z.infer<typeof selectionStateSchema>;
+
+// ---------------------------------------------------------------------------
 // Evaluation: bloqueada hasta MODEL SELECTION CLOSED (#33, custodia: Ale).
 // ---------------------------------------------------------------------------
 const evaluationBlockedSchema = z.strictObject({
@@ -766,36 +836,126 @@ export const localTestModelDetailSchema = z
 export type LocalTestModelDetail = z.infer<typeof localTestModelDetailSchema>;
 
 // ---------------------------------------------------------------------------
-// Inferencia y cola de anotación.
+// Inferencia y cola de anotación (D05-07). Cada predicción lleva la identidad del modelo
+// que la produjo: hoy el paquete smoke de D05-01 servido por el motor de D05-04 (sin
+// semver de modelo); con D06-06, el modelo official recargado (con semver). La clase la
+// calcula el motor, nunca el portal.
 // ---------------------------------------------------------------------------
+export const inferenceModelIdentitySchema = z
+  .strictObject({
+    source: z.enum(["smoke", "official"]),
+    package_id: z.string().min(1),
+    format_version: modelSemverSchema,
+    model_version: modelSemverSchema.nullable(),
+    mlflow_run_id: mlflowRunIdSchema,
+    checkpoint_sha256: sha256Schema,
+  })
+  .refine((model) => (model.source === "smoke") === (model.model_version === null), {
+    message: "smoke no tiene semver de modelo (lo asigna D06-02); official siempre lo tiene",
+    path: ["model_version"],
+  });
+export type InferenceModelIdentity = z.infer<typeof inferenceModelIdentitySchema>;
+
+const probabilitiesSchema = z.record(classSchema, unitInterval);
+
+/** Probabilidades que suman ~1 y clase = argmax (misma regla para motor y API). */
+function checkPrediction(
+  prediction: { predicted_class: string; probabilities: Record<string, number> },
+  ctx: z.RefinementCtx
+) {
+  const values = Object.values(prediction.probabilities);
+  const sum = values.reduce((total, p) => total + p, 0);
+  if (!close(sum, 1, PROBABILITY_SUM_TOLERANCE)) {
+    ctx.addIssue({ code: "custom", path: ["probabilities"], message: "Deben sumar ~1" });
+  }
+  if (prediction.probabilities[prediction.predicted_class] !== Math.max(...values)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["predicted_class"],
+      message: "predicted_class debe ser el argmax de probabilities",
+    });
+  }
+}
+
+/** Entrada de la inferencia: archivo nuevo (como el upload del portal) o crop de una anotación. */
+export const inferenceInputSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("upload"),
+    filename: z.string().min(1),
+    mime_type: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    size_bytes: positiveInt,
+    width: positiveInt,
+    height: positiveInt,
+    sha256: sha256Schema,
+  }),
+  z.strictObject({
+    kind: z.literal("crop"),
+    image_id: positiveInt,
+    annotation_id: positiveInt,
+    bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+    width: positiveInt,
+    height: positiveInt,
+    sha256: sha256Schema,
+  }),
+]);
+export type InferenceInput = z.infer<typeof inferenceInputSchema>;
+
+/** Lo que responde el motor (D05-04) a una imagen: `POST {INFERENCE_ENGINE_URL}/predict`. */
+export const inferenceEnginePredictionSchema = z
+  .strictObject({
+    predicted_class: classSchema,
+    probabilities: probabilitiesSchema,
+    model: inferenceModelIdentitySchema,
+  })
+  .superRefine(checkPrediction);
+
+/** Identidad del motor: `GET {INFERENCE_ENGINE_URL}/identity` y `GET /api/inference/engine`. */
+export const inferenceEngineSchema = z.strictObject({
+  model: inferenceModelIdentitySchema,
+  classes: z.tuple([z.literal("cat"), z.literal("dog")]),
+  image_size: positiveInt,
+});
+
 export const inferenceResultSchema = z
   .strictObject({
     inference_id: positiveInt,
-    model_version: modelSemverSchema,
-    predicted_class: classSchema,
-    probabilities: z.record(classSchema, unitInterval),
     created_at: timestampSchema,
+    input: inferenceInputSchema,
+    predicted_class: classSchema,
+    probabilities: probabilitiesSchema,
+    model: inferenceModelIdentitySchema,
+    annotation_queue_item_id: positiveInt.nullable(),
   })
-  .superRefine((result, ctx) => {
-    const values = Object.values(result.probabilities);
-    const sum = values.reduce((total, p) => total + p, 0);
-    if (!close(sum, 1, PROBABILITY_SUM_TOLERANCE)) {
-      ctx.addIssue({ code: "custom", path: ["probabilities"], message: "Deben sumar ~1" });
-    }
-    const top = Math.max(...values);
-    if (result.probabilities[result.predicted_class] !== top) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["predicted_class"],
-        message: "predicted_class debe ser el argmax de probabilities",
-      });
-    }
-  });
+  .superRefine(checkPrediction);
+export type InferenceResult = z.infer<typeof inferenceResultSchema>;
 
+export const inferenceListSchema = z.strictObject({ inferences: z.array(inferenceResultSchema) });
+
+/**
+ * Elemento de la cola de anotación: la imagen (o la anotación del crop) queda pendiente de
+ * revisión humana. La predicción viaja como sugerencia del modelo; nunca como etiqueta.
+ */
 export const annotationQueueItemSchema = z.strictObject({
+  queue_item_id: positiveInt,
   inference_id: positiveInt,
   image_id: positiveInt,
+  annotation_id: positiveInt.nullable(),
   status: z.literal("pending"),
+  human_label: z.null(),
+  suggestion: z
+    .strictObject({
+      source: z.literal("model"),
+      predicted_class: classSchema,
+      probabilities: probabilitiesSchema,
+    })
+    .superRefine(checkPrediction),
+  model: inferenceModelIdentitySchema,
+  created_at: timestampSchema,
+});
+export type AnnotationQueueItem = z.infer<typeof annotationQueueItemSchema>;
+
+export const annotationQueueResponseSchema = z.strictObject({
+  items: z.array(annotationQueueItemSchema),
 });
 
 export const apiErrorSchema = z.strictObject({ error: z.string().min(1) });
@@ -810,13 +970,18 @@ export const P3_CONTRACTS = {
   job_logs: jobLogsSchema,
   experiment_runs_response: experimentRunsResponseSchema,
   experiment_run_detail: experimentRunDetailSchema,
+  selection_state: selectionStateSchema,
   evaluation_response: evaluationResponseSchema,
   evaluation_predictions: evaluationPredictionsSchema,
   models_response: modelsResponseSchema,
   local_test_models_response: localTestModelsResponseSchema,
   local_test_model_detail: localTestModelDetailSchema,
+  inference_engine: inferenceEngineSchema,
+  inference_engine_prediction: inferenceEnginePredictionSchema,
   inference_result: inferenceResultSchema,
+  inference_list: inferenceListSchema,
   annotation_queue_item: annotationQueueItemSchema,
+  annotation_queue_response: annotationQueueResponseSchema,
   api_error: apiErrorSchema,
 } as const;
 
@@ -832,6 +997,7 @@ export const P3_ENDPOINTS = {
   listRuns: "GET /api/experiments/runs",
   getRun: "GET /api/experiments/runs/:runId",
   getRunArtifact: "GET /api/experiments/runs/:runId/artifacts/*path",
+  getSelection: "GET /api/selection",
   getEvaluation: "GET /api/evaluation",
   exportEvaluationPredictions: "GET /api/evaluation/predictions",
   listModels: "GET /api/models",
@@ -839,6 +1005,10 @@ export const P3_ENDPOINTS = {
   getLocalTestModel: "GET /api/models/local-test/:semver",
   getLocalTestModelObject: "GET /api/models/local-test/:semver/object",
   publishModel: "POST /api/models/:semver/publish",
+  getInferenceEngine: "GET /api/inference/engine",
   runInference: "POST /api/inference",
+  listInferences: "GET /api/inference",
+  getInference: "GET /api/inference/:id",
   sendToAnnotationQueue: "POST /api/inference/:id/annotation-queue",
+  listAnnotationQueue: "GET /api/inference/annotation-queue",
 } as const;

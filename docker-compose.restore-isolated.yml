@@ -1,0 +1,42 @@
+# Override de puertos para el stack de restore AISLADO de #104.
+# Nunca se usa junto al stack productor con el mismo nombre de proyecto.
+# Mismo build/entorno que docker-compose.yml — solo cambian los puertos de
+# host, para poder correr ambos stacks (productor + restore) en la misma
+# máquina al mismo tiempo sin chocar.
+#
+# IMPORTANTE: Docker Compose CONCATENA listas entre archivos (-f base -f
+# override), no las reemplaza. `!override` fuerza el reemplazo completo de
+# la lista en vez de concatenarla (a diferencia de `!reset`, que solo la
+# limpia a vacío sin permitir asignar un valor nuevo).
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.restore-isolated.yml \
+#     -p mlops-p03-restore up -d --wait mariadb minio
+
+services:
+  mariadb:
+    ports: !override
+      - "3307:3306"
+  minio:
+    ports: !override
+      - "9010:9000"
+      - "9011:9001"
+  mlflow:
+    ports: !override
+      - "5001:5000"
+  backend:
+    ports: !override
+      - "3101:3100"
+# Marca del restore (#104): los volúmenes del proyecto aislado se crean con estas
+# etiquetas. restore_guard.py solo permite un segundo restore sobre volúmenes que
+# las lleven con el mismo snapshot (md5 de data/mlflow_snapshot.dvc). Sin
+# P3_RESTORE_SNAPSHOT_ID (lo exporta restore.sh) esta configuración no resuelve.
+x-restore-marker: &restore-marker
+  labels:
+    org.p3.restore.marker: mlflow-snapshot-restore
+    org.p3.restore.snapshot: ${P3_RESTORE_SNAPSHOT_ID:?Ejecuta scripts/mlflow-snapshot/restore.sh}
+
+volumes:
+  mariadb_data: *restore-marker
+  minio_data: *restore-marker
+  torch_cache: *restore-marker

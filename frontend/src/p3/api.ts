@@ -7,10 +7,13 @@ import {
   evaluationResponseSchema,
   experimentRunDetailSchema,
   experimentRunsResponseSchema,
+  inferenceEngineSchema,
+  inferenceListSchema,
   localTestModelsResponseSchema,
   manifestSummarySchema,
   modelsResponseSchema,
   releasesResponseSchema,
+  selectionStateSchema,
   trainingJobListSchema,
 } from "./contracts";
 
@@ -29,6 +32,14 @@ export const useExperimentRun = (runId: string) =>
 export const useEvaluation = () =>
   useValidatedFetch("/evaluation", evaluationResponseSchema, WITH_REASON);
 export const useModels = () => useValidatedFetch("/models", modelsResponseSchema);
+// D05-03: estado de la selección (D04-04/D05-02); el 503 trae el motivo.
+export const useSelection = () =>
+  useValidatedFetch("/selection", selectionStateSchema, WITH_REASON);
 // D05-06: registro local_test (MinIO) de D04-06, aparte de la lista official.
 export const useLocalTestModels = () =>
   useValidatedFetch("/models/local-test", localTestModelsResponseSchema, WITH_REASON);
+// D05-07: identidad del motor de inferencia (503 con el motivo si no está) e historial.
+export const useInferenceEngine = () =>
+  useValidatedFetch("/inference/engine", inferenceEngineSchema, WITH_REASON);
+export const useInferences = () =>
+  useValidatedFetch("/inference", inferenceListSchema, WITH_REASON);

@@ -111,7 +111,7 @@ P3_MODEL_REGISTRY_PHASE=check npx vitest run tests/model-registry.minio.test.ts
   ese valor va en `MODEL_S3_BUCKET`.
 - **Tarjeta del modelo:** segundo objeto de la versión,
   `models/p3-cnn-classifier/<semver>/model_card.json`, con su propia fila en
-  `p3_model_card` (migración 0009) y la misma máquina de estados (`objectName` del
+  `p3_model_card` (migración 0010) y la misma máquina de estados (`objectName` del
   servicio). `GET /api/models` devuelve cada versión official con su `model_card`.
 - **`official-publication.service.ts`:**
   1. Lee la seguridad del bucket (`inspectModelBucket`): versioning `Enabled`, SSE

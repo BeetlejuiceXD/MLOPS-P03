@@ -392,3 +392,56 @@ export const p3ModelCard = mysqlTable(
 );
 
 export type P3ModelCardRow = typeof p3ModelCard.$inferSelect;
+
+/**
+ * D05-07 — Inferencias del portal. Cada fila guarda la entrada (archivo nuevo, con su clave
+ * en MinIO, o crop de una anotación), la predicción que dio el motor y la identidad del
+ * modelo que la produjo (smoke de D05-01 hoy; official con D06-06). No es una anotación.
+ */
+export const p3Inference = mysqlTable(
+  'p3_inference',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    inputKind: mysqlEnum('input_kind', ['upload', 'crop']).notNull(),
+    input: json('input').notNull(),
+    inputSha256: char('input_sha256', { length: 64 }).notNull(),
+    storageKey: varchar('storage_key', { length: 512 }),
+    predictedClass: varchar('predicted_class', { length: 16 }).notNull(),
+    probabilities: json('probabilities').notNull(),
+    modelSource: mysqlEnum('model_source', ['smoke', 'official']).notNull(),
+    packageId: varchar('package_id', { length: 128 }).notNull(),
+    formatVersion: varchar('format_version', { length: 32 }).notNull(),
+    modelVersion: varchar('model_version', { length: 32 }),
+    mlflowRunId: char('mlflow_run_id', { length: 32 }).notNull(),
+    checkpointSha256: char('checkpoint_sha256', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull(),
+  },
+  (table) => [index('p3_inference_created_at_idx').on(table.createdAt)],
+);
+
+export type P3InferenceRow = typeof p3Inference.$inferSelect;
+
+/**
+ * D05-07 — Cola de anotación de Inference: una inferencia enviada a revisión humana. Un
+ * `inference_id` tiene a lo sumo un elemento (índice único: un reintento no duplica). La
+ * imagen es la del portal (nueva para un archivo, la original para un crop); nunca se crea
+ * una anotación ni una etiqueta humana desde aquí.
+ */
+export const p3AnnotationQueue = mysqlTable(
+  'p3_annotation_queue',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    inferenceId: bigint('inference_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => p3Inference.id, { onDelete: 'restrict' }),
+    imageId: bigint('image_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => images.id, { onDelete: 'cascade' }),
+    annotationId: bigint('annotation_id', { mode: 'number', unsigned: true }),
+    status: mysqlEnum('status', ['pending']).notNull().default('pending'),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull(),
+  },
+  (table) => [uniqueIndex('p3_annotation_queue_inference_unique').on(table.inferenceId)],
+);
+
+export type P3AnnotationQueueRow = typeof p3AnnotationQueue.$inferSelect;

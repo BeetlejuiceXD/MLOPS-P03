@@ -1,0 +1,24 @@
+{
+  "contract": "inference_result",
+  "valid": false,
+  "why": "Cada predicción lleva la identidad del modelo (run, paquete, checkpoint)",
+  "payload": {
+    "inference_id": 1,
+    "created_at": "2026-10-02T15:00:00.000Z",
+    "input": {
+      "kind": "upload",
+      "filename": "gato.jpg",
+      "mime_type": "image/jpeg",
+      "size_bytes": 48213,
+      "width": 640,
+      "height": 480,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "predicted_class": "dog",
+    "probabilities": {
+      "cat": 0.0587,
+      "dog": 0.9413
+    },
+    "annotation_queue_item_id": null
+  }
+}

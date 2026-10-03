@@ -1588,6 +1588,35 @@ la campaña y la selección por validation son de D04-03/D04-04.
 
 La aceptación del conjunto de diez runs de campaña en Experiments es de D05-03.
 
+## D05-03 — Campaña aceptada y candidato en Experiments (preparación)
+
+Experiments lee la selección de D04-04/D05-02 (`GET /api/selection`, contrato
+`selection_state`) junto a los runs de MLflow. **No ordena ni elige nada.** El ranking, las
+filas de campaña y el candidato son los que entrega la API.
+
+- **Panel "Selección por validation":**
+  - `open`: "Todavía no hay candidato propuesto".
+  - `candidate`: muestra el run_id, la fila OFAT y las métricas de validation del mejor
+    checkpoint. Dice **"Propuesta pendiente de cierre (D05-08)"**: no es un cierre formal.
+  - `closed`: "MODEL SELECTION CLOSED" con la fecha.
+  - En los tres casos muestra "Filas de campaña comparables: N (mínimo 10)".
+- **Cotejo selección ↔ MLflow** (`frontend/src/p3/selection.ts`):
+  - El candidato y cada fila aceptada deben aparecer en Experiments y ser elegibles.
+  - `best_epoch`, `val_accuracy`, `val_macro_f1` y `val_loss` deben ser iguales a los de MLflow.
+  - Si algo no coincide, el panel lo dice con el motivo y no presenta la aceptación ni marca
+    filas.
+- **Tabla:** cada run aceptado lleva su badge "Fila N", y el candidato "Candidato propuesto"
+  o "Candidato seleccionado". El filtro **Campaña → Campaña aceptada** deja solo esas filas.
+  El training fuera de la matriz, los auxiliares y los excluidos no llevan badge ni cuentan.
+- **Fallos:**
+  - Si `/api/selection` falla (p. ej. 503 mientras D05-02 no integra el adaptador de runs),
+    el motivo sale en el panel y los runs siguen visibles.
+  - **Actualizar** recarga runs y selección.
+- Sin métricas de test: el contrato rechaza un ranking con `test_*`.
+
+Para **cerrar #86** falta la lista aceptada, el candidato y los hashes de D05-02 (Ale). Los
+fixtures solo prueban el render y el cotejo, no acreditan la campaña.
+
 ## D05-06 — Models con el registro de modelos (preparación)
 
 Models lee el registro de D04-06 (`p3_model_registry` + bucket `MODEL_S3_BUCKET` con
@@ -1672,3 +1701,92 @@ Para **cerrar #94** falta:
 - el paquete y la tarjeta finales de D06-02.
 
 Los tests usan bytes de fixture y un cliente S3 simulado: no son evidencia de AWS (5.2).
+
+## D05-07 — Inference con motor y cola de anotación
+
+`http://localhost:8080/ml/inference` clasifica una imagen con el modelo que sirve el
+**motor de inferencia de D05-04**. La clase la calcula el motor, nunca el portal: la API
+le pasa los bytes y guarda lo que responde con la **identidad del modelo**.
+
+- **Entrada:**
+  - **Archivo nuevo:** multipart `image`, con la misma validación que el upload del portal
+    (JPEG, PNG o WebP, hasta 5 MiB y contenido verificado con sharp).
+  - **Crop del portal:** se elige una anotación de una imagen del portal; la API recorta la
+    caja de la imagen original y manda ese recorte al motor.
+- **Resultado:** clase, probabilidades e identidad: `source` (smoke u official),
+  `package_id`, `format_version`, `mlflow_run_id` y `checkpoint_sha256`. Un paquete smoke
+  no tiene `model_version`, porque el semver lo asigna D06-02. La página lo rotula como
+  "Sugerencia del modelo (smoke), no es una etiqueta validada".
+- **Persistencia:** cada inferencia se guarda en `p3_inference` (migración 0009) y queda
+  consultable después de recargar o reiniciar (`GET /api/inference` y `GET /api/inference/:id`).
+- **Cola de anotación** (`POST /api/inference/:id/annotation-queue`):
+  - Archivo nuevo: crea la imagen en el portal con estado `pending`, así entra en la cola
+    de anotación existente.
+  - Crop: referencia la imagen y la anotación originales, sin tocar su estado.
+  - Nunca crea anotaciones ni etiquetas humanas: el elemento nace `pending` con
+    `human_label: null`, y la predicción viaja como `suggestion` del modelo.
+  - Un reintento devuelve el mismo elemento (índice único por inferencia).
+- **Errores:**
+
+  | Caso | Respuesta |
+  |---|---|
+  | Tipo, tamaño o contenido inválido | 400 o 413 |
+  | Caja fuera de la imagen | 400 |
+  | Anotación inexistente | 404 |
+  | Motor ausente o sin modelo | 503 con el motivo |
+  | Respuesta del motor fuera de contrato | 503 |
+  | Fallo de MariaDB | 503 |
+
+  En ninguno se guarda nada a medias ni aparece una anotación.
+
+### Motor (D05-04) y punto de sustitución (D06-06)
+
+El backend llama al motor en `INFERENCE_ENGINE_URL` (`backend/src/logic/inference-engine.ts`):
+
+| Ruta del motor | Responde |
+|---|---|
+| `GET /identity` | `inference_engine`: identidad del paquete cargado y clases `cat`, `dog` |
+| `POST /predict` | Recibe los bytes de la imagen (`Content-Type: image/*`) y responde `inference_engine_prediction`. Un 4xx = imagen rechazada; un 5xx = modelo o servicio no disponible |
+
+En compose, el motor es el servicio `inference-engine` (perfil `inference`) y el backend
+lo llama por defecto en `http://inference-engine:8090`. Sin el perfil (o sin paquete),
+Inference responde 503 con el motivo. D06-06 solo cambia la fuente (otra URL o el paquete
+official recargado de AWS, con `source: "official"` y semver): el resto del portal no cambia.
+
+Para levantarlo con un paquete smoke real (D05-01) construido desde un run de MLflow:
+
+```bash
+docker compose run --rm --no-deps -v "$PWD/data:/out" app \
+  python -m model_package build --run-id <run_id> --tracking-uri http://mlflow:5000 \
+  --out /out/inference-package          # queda fuera de Git (data/.gitignore)
+docker compose --profile inference up -d inference-engine backend frontend
+curl http://localhost:8080/api/inference/engine   # identidad smoke del paquete
+```
+
+Los tests de la API usan un motor de **fixture** (validación y persistencia); el
+recorrido con el motor real se acredita en `reports/inference_p3/`.
+
+## D05-04 — Motor de inferencia con el paquete smoke
+
+`app/inference_engine/` carga un paquete de D05-01 y clasifica imágenes. El detalle está en
+`app/inference_engine/README.md`.
+
+- **Carga:** usa `load_package` de D05-01, así que la transformación, el `class_map` y la
+  config salen del paquete y no de los defaults del portal. Antes de aceptar imágenes,
+  coteja la salida de referencia del paquete y, si se le pasa, el `checkpoint_sha256`
+  esperado.
+- **Predicción:** devuelve la clase, las probabilidades en el orden del `class_map` y la
+  identidad del paquete (`package_id`, `mlflow_run_id`, `checkpoint_sha256`). La
+  identidad sale del mismo paquete que predijo. No guarda etiquetas humanas.
+- **Errores:** distingue imagen rechazada, paquete rechazado e inferencia incoherente.
+  Ninguno de los tres emite predicción.
+- **HTTP para D05-07:** `GET /identity` y `POST /predict`, con el contrato de
+  `INFERENCE_ENGINE_URL`.
+
+```bash
+# proceso limpio: carga, predice y escribe JSON
+python -m inference_engine predict --package ./smoke-package --image gato.jpg \
+  --expected-sha256 <checkpoint_sha256>
+# servicio para el portal (INFERENCE_ENGINE_URL=http://<host>:8090)
+python -m inference_engine serve --package ./smoke-package --port 8090
+```
