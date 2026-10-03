@@ -560,7 +560,18 @@ def main(argv: list[str] | None = None) -> int:
     except EvaluationRefusedError as error:
         print(f"Rechazado — {error.reason}: {error.detail}", file=sys.stderr)
         return 2
-    print(json.dumps({"evidence": str(result.evidence_dir), **result.audit["target"]}, indent=2))
+    audit = result.audit
+    summary = {
+        "evidence": str(result.evidence_dir),
+        "accuracy": audit["accuracy"],
+        "macro_f1": audit["macro_f1"],
+        "correct": audit["correct"],
+        "n_test": audit["n_test"],
+        "target_accuracy": audit["target"]["accuracy"],
+        "met": audit["target"]["met"],
+        "audit_matches": audit["matches"],
+    }
+    print(json.dumps(summary, indent=2))
     return 0
 
 
