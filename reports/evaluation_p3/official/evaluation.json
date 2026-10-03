@@ -1,0 +1,53 @@
+{
+  "state": "ready",
+  "namespace": "official",
+  "selection": {
+    "candidate_run_id": "2d56233c886142b7824e1551b90e8327",
+    "metric": "val_accuracy",
+    "closed_at": "2026-10-03T05:01:59.553Z"
+  },
+  "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+  "evaluated_at": "2026-10-03T05:43:10.106Z",
+  "n_test": 67,
+  "classes": [
+    "cat",
+    "dog"
+  ],
+  "confusion_matrix": {
+    "labels": [
+      "cat",
+      "dog"
+    ],
+    "rows": [
+      [
+        34,
+        0
+      ],
+      [
+        9,
+        24
+      ]
+    ]
+  },
+  "metrics": {
+    "accuracy": 0.8656716417910447,
+    "macro_f1": 0.8626110731373888,
+    "per_class": [
+      {
+        "class_name": "cat",
+        "precision": 0.7906976744186046,
+        "recall": 1.0,
+        "f1": 0.8831168831168831,
+        "support": 34
+      },
+      {
+        "class_name": "dog",
+        "precision": 1.0,
+        "recall": 0.7272727272727273,
+        "f1": 0.8421052631578947,
+        "support": 33
+      }
+    ]
+  },
+  "majority_baseline_accuracy": 0.5074626865671642
+}

@@ -1,0 +1,70 @@
+{
+  "matches": true,
+  "checks": {
+    "ids_sorted_and_unique": true,
+    "n_test": true,
+    "same_candidate": true,
+    "same_evaluated_at": true,
+    "evaluated_after_close": true,
+    "confusion_matrix": true,
+    "accuracy": true,
+    "macro_f1": true,
+    "per_class": true,
+    "majority_baseline": true,
+    "predicted_is_argmax": true
+  },
+  "n_test": 67,
+  "correct": 58,
+  "accuracy": 0.8656716417910447,
+  "macro_f1": 0.8626110731373888,
+  "confusion_matrix": {
+    "labels": [
+      "cat",
+      "dog"
+    ],
+    "rows": [
+      [
+        34,
+        0
+      ],
+      [
+        9,
+        24
+      ]
+    ]
+  },
+  "per_class": [
+    {
+      "class_name": "cat",
+      "precision": 0.7906976744186046,
+      "recall": 1.0,
+      "f1": 0.8831168831168831,
+      "support": 34
+    },
+    {
+      "class_name": "dog",
+      "precision": 1.0,
+      "recall": 0.7272727272727273,
+      "f1": 0.8421052631578947,
+      "support": 33
+    }
+  ],
+  "majority_baseline_accuracy": 0.5074626865671642,
+  "target": {
+    "accuracy": 0.85,
+    "correct": 58,
+    "n_test": 67,
+    "met": true
+  },
+  "error_crop_ids": [
+    191,
+    340,
+    407,
+    410,
+    411,
+    470,
+    471,
+    472,
+    473
+  ]
+}

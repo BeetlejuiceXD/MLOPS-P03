@@ -1,0 +1,14 @@
+{
+  "started_at": "2026-10-03T05:43:06.761Z",
+  "namespace": "official",
+  "commit": "ef4225593f59fcee17635d7d99f298994b51dd2a",
+  "act": {
+    "candidate_run_id": "2d56233c886142b7824e1551b90e8327",
+    "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b",
+    "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+    "test_split_hash": "66068afd57c1d5827a633b321fee0c039db730f05196237464b35e80614f7ea0",
+    "outcome_hash": "16b13f546767fef06beb92afe9853a5b14c201fb321788f00f1f4b40d280b8a7"
+  },
+  "package_dir": "/Users/EstebanSanchez/Desktop/integracion_servicios_AA/MLOPS-P03/.d06-01-package",
+  "manifest_path": "/Users/EstebanSanchez/Desktop/integracion_servicios_AA/MLOPS-P03/data/p3/manifest.json"
+}

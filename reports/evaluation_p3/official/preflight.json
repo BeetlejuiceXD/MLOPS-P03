@@ -1,0 +1,28 @@
+{
+  "selection": {
+    "status": "closed",
+    "candidate_run_id": "2d56233c886142b7824e1551b90e8327",
+    "campaign_row": 3,
+    "best_epoch": 5,
+    "closed_at": "2026-10-03T05:01:59.553Z",
+    "outcome_hash": "16b13f546767fef06beb92afe9853a5b14c201fb321788f00f1f4b40d280b8a7"
+  },
+  "package": {
+    "package_id": "p3-cnn-classifier-smoke-2d56233c8861",
+    "mlflow_run_id": "2d56233c886142b7824e1551b90e8327",
+    "checkpoint_sha256": "0c6b589bdd8ba639ed6890386db5bdd20555adc3452df7e9657c2b4a4b9d563b",
+    "best_epoch": 5,
+    "class_map": {
+      "cat": 0,
+      "dog": 1
+    }
+  },
+  "manifest": {
+    "manifest_version": "p3-v0.1.1-s42",
+    "manifest_hash": "0c03c3951554b5dbf096c37468f0fb5f04e9c62c033604acabf366fb11375c43",
+    "dataset_version": "v0.1.1",
+    "dvc_release_hash": "2e7029bd794da00c9962263bd42f4e4fa94bba25e2350e4cf934505e98f937e8",
+    "test_split_hash": "66068afd57c1d5827a633b321fee0c039db730f05196237464b35e80614f7ea0",
+    "n_test": 67
+  }
+}
