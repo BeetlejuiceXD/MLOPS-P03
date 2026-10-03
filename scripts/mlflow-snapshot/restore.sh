@@ -33,7 +33,7 @@ fi
 P3_RESTORE_SNAPSHOT_ID="$(sed -n 's/^- md5: *//p' data/mlflow_snapshot.dvc | head -n 1)"
 export P3_RESTORE_SNAPSHOT_ID
 
-echo "==> [0/6] Guarda fail-closed (solo lectura): proyecto '$PROJECT', snapshot $P3_RESTORE_SNAPSHOT_ID"
+echo "==> [0/8] Guarda fail-closed (solo lectura): proyecto '$PROJECT', snapshot $P3_RESTORE_SNAPSHOT_ID"
 "$PYTHON" scripts/mlflow-snapshot/restore_guard.py \
   --project "$PROJECT" --repo "$REPO_ROOT" \
   --snapshot-dir "$SNAPSHOT_DIR" --snapshot-id "$P3_RESTORE_SNAPSHOT_ID" --docker "$DOCKER"
@@ -42,24 +42,31 @@ COMPOSE="$DOCKER compose -f docker-compose.yml -f docker-compose.restore-isolate
 
 echo "==> Proyecto aislado: $PROJECT (puertos: mariadb 3307, minio 9010/9011, mlflow 5001, backend 3101)"
 
-echo "==> [1/6] Levantando mariadb + minio aislados (volúmenes propios y marcados)"
+echo "==> [1/8] Levantando mariadb + minio aislados (volúmenes propios y marcados)"
 $COMPOSE up -d --wait mariadb minio
 
-echo "==> [2/6] Levantando backend aislado (crea el esquema de image_repo vía migraciones)"
+echo "==> [2/8] Levantando backend aislado (crea el esquema de image_repo vía migraciones)"
 $COMPOSE up -d --build --wait backend
 
-echo "==> [3/6] Importando dump de 'mlflow' (crea la base desde cero)"
+echo "==> [3/8] Importando dump de 'mlflow' (crea la base desde cero)"
 $COMPOSE exec -T mariadb mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" \
   < "$SNAPSHOT_DIR/db/mlflow.sql"
 
-echo "==> [4/6] Importando image_repo.p3_model_selection sobre el esquema ya creado por backend"
+echo "==> [4/8] Importando image_repo.p3_model_selection sobre el esquema ya creado por backend"
 $COMPOSE exec -T mariadb mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" image_repo \
   < "$SNAPSHOT_DIR/db/image_repo_p3_model_selection.sql"
 
-echo "==> [5/6] Levantando mlflow aislado (la base ya existe, no hay migración nueva que correr)"
+echo "==> [5/8] Importando image_repo.training_jobs (los jobs ORIGINALES de la campaña)"
+$COMPOSE exec -T mariadb mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" image_repo \
+  < "$SNAPSHOT_DIR/db/image_repo_training_jobs.sql"
+
+echo "==> [6/8] Levantando mlflow aislado (la base ya existe, no hay migración nueva que correr)"
 $COMPOSE up -d --build --wait mlflow
 
-echo "==> [6/6] Restaurando artifacts a MinIO aislado"
+echo "==> [7/8] Levantando trainer-worker aislado (necesario para /selection/campaign: publica el manifest)"
+$COMPOSE up -d --build --wait trainer-worker
+
+echo "==> [8/8] Restaurando artifacts a MinIO aislado"
 $COMPOSE exec minio mc alias set restore-dst http://localhost:9000 \
   "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
 $COMPOSE exec minio mc mb --ignore-existing restore-dst/mlflow-artifacts
@@ -73,3 +80,4 @@ echo "==> Restore completo en el proyecto '$PROJECT'."
 echo "    MLflow aislado: http://localhost:5001"
 echo "    Backend aislado: http://localhost:3101"
 echo "    Verifica con: python3 scripts/mlflow-snapshot/verify.py --api http://localhost:3101 --tracking-uri http://localhost:5001"
+

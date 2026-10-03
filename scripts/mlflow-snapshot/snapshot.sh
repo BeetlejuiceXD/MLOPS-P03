@@ -6,10 +6,11 @@
 # tocan los datos de origen. No usa docker compose down -v en ningún
 # momento, ni antes, ni después.
 #
-# Alcance exacto (congelado en #104):
+# Alcance exacto (congelado en #104, ampliado para incluir los
+# training_jobs originales a pedido del PM):
 #   - dump COMPLETO de la base `mlflow`
-#   - dump de SOLO la tabla `image_repo.p3_model_selection`
-#     (nunca `image_repo` completa)
+#   - dump de SOLO las tablas `image_repo.p3_model_selection` e
+#     `image_repo.training_jobs` (nunca `image_repo` completa)
 #   - espejo 1:1 del bucket MinIO `mlflow-artifacts`
 #
 # Uso: ./scripts/mlflow-snapshot/snapshot.sh [directorio_salida]
@@ -33,17 +34,22 @@ mkdir -p "$OUT_DIR/db" "$OUT_DIR/artifacts"
 echo "==> Confirmando que el stack productor está sano (no se toca su estado)"
 docker compose ps mariadb minio mlflow
 
-echo "==> [1/3] Dump completo de la base 'mlflow' (incluye CREATE DATABASE)"
+echo "==> [1/4] Dump completo de la base 'mlflow' (incluye CREATE DATABASE)"
 docker compose exec -T mariadb mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" \
   --databases mlflow --single-transaction --routines --triggers \
   > "$OUT_DIR/db/mlflow.sql"
 
-echo "==> [2/3] Dump de SOLO image_repo.p3_model_selection (nunca la base completa)"
+echo "==> [2/4] Dump de SOLO image_repo.p3_model_selection (nunca la base completa)"
 docker compose exec -T mariadb mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" \
   --single-transaction image_repo p3_model_selection \
   > "$OUT_DIR/db/image_repo_p3_model_selection.sql"
 
-echo "==> [3/3] Espejo 1:1 del bucket mlflow-artifacts"
+echo "==> [3/4] Dump de SOLO image_repo.training_jobs (nunca la base completa)"
+docker compose exec -T mariadb mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" \
+  --single-transaction image_repo training_jobs \
+  > "$OUT_DIR/db/image_repo_training_jobs.sql"
+
+echo "==> [4/4] Espejo 1:1 del bucket mlflow-artifacts"
 docker compose exec minio mc alias set snapshot-src http://localhost:9000 \
   "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
 docker compose exec minio rm -rf /tmp/mlflow-artifacts-mirror
@@ -89,7 +95,7 @@ manifest = {
     "git_commit": git_commit(),
     "scope": {
         "mariadb_mlflow_db": "full",
-        "mariadb_image_repo": "p3_model_selection only",
+        "mariadb_image_repo": "p3_model_selection and training_jobs only",
         "minio_bucket": "mlflow-artifacts",
     },
     "files": {
@@ -100,6 +106,10 @@ manifest = {
         "db/image_repo_p3_model_selection.sql": {
             "sha256": sha256_file(out_dir / "db/image_repo_p3_model_selection.sql"),
             "size_bytes": (out_dir / "db/image_repo_p3_model_selection.sql").stat().st_size,
+        },
+        "db/image_repo_training_jobs.sql": {
+            "sha256": sha256_file(out_dir / "db/image_repo_training_jobs.sql"),
+            "size_bytes": (out_dir / "db/image_repo_training_jobs.sql").stat().st_size,
         },
     },
     "artifacts": {
