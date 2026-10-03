@@ -85,6 +85,16 @@ class EvaluationStore:
             manifest_hash=reference["manifest_hash"],
         )
 
+    def closed_outcome(self) -> dict[str, Any]:
+        """El `outcome` y su `outcome_hash` tal como quedaron al cerrar (D06-01 coteja el
+        acta contra ellos). Misma guarda que `closed_selection`."""
+        self.closed_selection()
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                select(p3_model_selection).where(p3_model_selection.c.id == SELECTION_ID)
+            ).one()
+        return {"outcome": _json(row.outcome), "outcome_hash": row.outcome_hash}
+
     def save(self, record: EvaluationRecord) -> None:
         """`official` se escribe una sola vez; `synthetic` reemplaza la corrida anterior."""
         values = {

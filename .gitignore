@@ -45,3 +45,6 @@ data/crops/
 __pycache__/
 /_smoke/
 reports/*.sql
+
+# D06-01: paquete del candidato construido por scripts/d06-01 (pesos, fuera de Git)
+/.d06-01-package/
