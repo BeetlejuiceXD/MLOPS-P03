@@ -97,6 +97,30 @@ def test_augmentation_never_applies_to_val_even_if_enabled(dataset):
     assert torch.equal(first, second)  # determinista: nunca augmentation en val
 
 
+def test_train_never_preprocesses_val_with_augmentation(dataset, monkeypatch):
+    """Por el camino real de `train()`, no por `_make_loader` directo: cada imagen de val
+    se preprocesa con `train=False` (sin augmentation) y las de train con `train=True`,
+    aunque la config active la augmentation."""
+    import trainer.engine as engine
+
+    calls: list[tuple[int, bool]] = []
+    real = engine.preprocess_image
+
+    def spy(image, config, *, train):
+        calls.append((id(image), train))
+        return real(image, config, train=train)
+
+    monkeypatch.setattr(engine, "preprocess_image", spy)
+    train(_config(augmentation=True), dataset)
+
+    val_ids = {id(sample.image) for sample in dataset.val}
+    train_ids = {id(sample.image) for sample in dataset.train}
+    val_flags = {flag for image_id, flag in calls if image_id in val_ids}
+    train_flags = {flag for image_id, flag in calls if image_id in train_ids}
+    assert val_flags == {False}
+    assert train_flags == {True}
+
+
 # --- Aisladas de `train()`: no dependen de early stopping ni de convergencia,
 # así que no quedan confundidas por cuántas épocas corrió cada config. ---
 
