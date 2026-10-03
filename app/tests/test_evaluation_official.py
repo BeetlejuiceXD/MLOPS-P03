@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -26,7 +27,13 @@ from sqlalchemy import create_engine, select
 
 from evaluation import official, store
 from evaluation.official import ClosingAct, TestCrop, audit_stored, run_evaluation
-from evaluation.producer import EvaluationRefusedError
+from evaluation.producer import (
+    ClosedSelection,
+    EvaluationRefusedError,
+    SamplePrediction,
+    TestPartition,
+    build_evaluation,
+)
 from evaluation.store import EvaluationStore, p3_evaluation, p3_model_selection
 from model_package import build_smoke_package, load_package
 from presentation.contracts import frozen_test_split_hash
@@ -370,6 +377,23 @@ def test_package_whose_best_epoch_is_not_the_closed_one_is_refused(engine, act, 
     _refused("package_not_candidate", lambda: _run(engine, act, package, tmp_path, Forbidden()))
 
 
+def test_package_with_an_edited_class_map_is_refused(engine, act, package, tmp_path):
+    _set_selection(engine, "closed")
+    edited = tmp_path / "edited-package"
+    shutil.copytree(package, edited)
+    (edited / "class_map.json").write_text('{"dog": 0, "cat": 1}', encoding="utf-8")
+    _refused("package_rejected", lambda: _run(engine, act, edited, tmp_path, Forbidden()))
+
+
+def test_manifest_of_another_dataset_version_than_the_close_is_refused(
+    engine, act, package, tmp_path
+):
+    outcome = json.loads(json.dumps(OUTCOME))
+    outcome["reference"]["dataset_version"] = "v0.1.0"
+    _set_selection(engine, "closed", outcome)
+    _refused("manifest_mismatch", lambda: _run(engine, act, package, tmp_path, Forbidden()))
+
+
 def test_act_test_split_hash_different_from_the_manifest_is_refused(engine, act, package, tmp_path):
     _set_selection(engine, "closed")
     _refused(
@@ -580,6 +604,66 @@ def test_audit_detects_a_stored_result_that_does_not_match_its_predictions(
     rows = tampered["evaluation"]["confusion_matrix"]["rows"]
     rows[0][0], rows[0][1] = rows[0][1], rows[0][0]
     assert audit_stored(tampered)["matches"] is False
+    tampered = json.loads(json.dumps(stored))
+    samples = tampered["predictions"]["predictions"]
+    samples[0], samples[1] = samples[1], samples[0]
+    assert audit_stored(tampered)["matches"] is False
+
+
+@pytest.mark.parametrize("correct, met", [(1699, False), (1700, True)])
+def test_audit_target_is_compared_with_counts_not_a_rounded_accuracy(correct, met):
+    """1699/2000 = 0.8495 redondea a 0.85, pero no cumple."""
+    n_test = 2000
+    ids = tuple(range(1, n_test + 1))
+    samples = [
+        SamplePrediction(
+            crop_id=i,
+            true_class="cat",
+            predicted_class="cat" if i <= correct else "dog",
+            probabilities={"cat": 0.9, "dog": 0.1} if i <= correct else {"cat": 0.2, "dog": 0.8},
+        )
+        for i in ids
+    ]
+    record = build_evaluation(
+        samples,
+        namespace="synthetic",
+        model_run_id=CANDIDATE,
+        selection=ClosedSelection(CANDIDATE, CLOSED_AT, MANIFEST_HASH),
+        partition=TestPartition(MANIFEST_HASH, frozen_test_split_hash(ids), ids),
+        evaluated_at=EVALUATED_AT,
+    )
+    audit = audit_stored(
+        {
+            "evaluation": record.evaluation.model_dump(mode="json"),
+            "predictions": record.predictions.model_dump(mode="json"),
+        }
+    )
+    assert audit["matches"] is True
+    assert audit["target"] == {"accuracy": 0.85, "correct": correct, "n_test": 2000, "met": met}
+
+
+def test_run_stops_and_keeps_the_evidence_when_the_audit_does_not_match(
+    engine, act, package, tmp_path, package_predictions, monkeypatch
+):
+    _set_selection(engine, "closed")
+
+    def mismatch(stored):
+        return {"matches": False, "checks": {"confusion_matrix": False}}
+
+    monkeypatch.setattr(official, "audit_stored", mismatch)
+    _refused(
+        "audit_mismatch",
+        lambda: _run(
+            engine,
+            act,
+            package,
+            tmp_path,
+            Loader(_crops(_labels_with_errors(package_predictions, 0))),
+        ),
+    )
+    evidence = tmp_path / "evidence"
+    assert json.loads((evidence / "audit.json").read_text(encoding="utf-8"))["matches"] is False
+    assert (evidence / "trace.jsonl").exists()
 
 
 # --- CLI ----------------------------------------------------------------------------------

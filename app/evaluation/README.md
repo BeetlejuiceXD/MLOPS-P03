@@ -150,3 +150,55 @@ consumen. Con MariaDB real (job de CI "Jobs persistentes"),
 `.github/scripts/evaluation_e2e.py` corre el productor dentro de la imagen de
 trainer-worker y `backend/tests/evaluation.mariadb.test.ts` lee esa fila con el
 repositorio real.
+
+# D06-01 — Primera y única evaluación oficial del frozen test
+
+`evaluation.official` ejecuta la evaluación `official` **una sola vez**, después del acta
+de MODEL SELECTION CLOSED (D05-08). Reutiliza lo ya acreditado: la guarda y el
+`EvaluationStore` de D04-05, el motor de métricas de D03-05, el paquete de D05-01 (cargado
+con su SHA y su salida de referencia) y las fuentes verificadas de Training (D03-03).
+
+> Las pruebas (`tests/test_evaluation_official.py`) usan un manifest **sintético** (IDs
+> 100–119 que no existen en el release), imágenes generadas y pesos de fixture. Ningún ID,
+> etiqueta ni métrica del frozen test oficial se lee antes del cierre persistido.
+
+## Orden
+
+| Paso | Qué comprueba | Si falla |
+|---|---|---|
+| 1. Cierre | `p3_model_selection` está `closed`, con candidato, manifest y `closed_at` | `model_selection_open` / `incomplete_selection` |
+| 2. Acta | run, `outcome_hash` y `manifest_hash` del acta = lo persistido | `act_mismatch` |
+| 3. Sin repetición | no existe evaluación `official`; si existe, se audita esa | `official_already_recorded` |
+| 4. Paquete | carga (el loader exige el class_map congelado), SHA del checkpoint = acta, salida de referencia, run, mejor época, manifest y release del cierre | `package_rejected` / `package_not_candidate` |
+| 5. Manifest | el versionado en DVC (md5), su hash y su `test_split_hash` recalculados, igual al cierre y al acta | `manifest_rejected` / `manifest_mismatch` / `test_split_hash_mismatch` |
+| 6. Intento | escribe `attempt.json` **antes** de abrir el test; si ya existía, no se repite | `attempt_already_started` |
+| 7. Crops | todos y solo los IDs de test, sin duplicados, clase dentro del class_map; **antes** de predecir | `crop_ids_not_test_split` / `duplicate_crop_id` / `label_outside_class_map` |
+| 8. Inferencia y guardado | una predicción por crop; `produce_evaluation` en `official` (una sola escritura) | motivos de D04-05 |
+| 9. Auditoría | relee lo guardado y recalcula con scikit-learn: matriz, accuracy, macro-F1, por clase, baseline, argmax y cronología | `audit_mismatch` |
+
+Los pasos 1–5 son el `preflight`: no leen ningún crop ni escriben nada. El umbral se compara
+con enteros (`correct·100 ≥ 85·n_test`). Un resultado por debajo del 85 % se registra igual
+y la selección no se toca.
+
+## Ejecución (una sola vez, tras el acta)
+
+```bash
+cd app
+export DATABASE_URL=...            # la MariaDB donde quedó el cierre de D05-08
+ACTA="--candidate-run-id <run> --checkpoint-sha256 <sha> --manifest-hash <hash> \
+      --test-split-hash <hash> --outcome-hash <hash>"
+uv run python -m evaluation.official preflight --package <paquete del candidato> $ACTA
+uv run python -m evaluation.official run --package <paquete del candidato> $ACTA
+```
+
+`run` deja la evidencia en `reports/evaluation_p3/official/`:
+
+- `attempt.json`: inicio, commit y acta;
+- `preflight.json`: cierre, paquete y manifest cotejados;
+- `trace.jsonl`: una línea por crop con el SHA-256 de la entrada, la verdad, la predicción y
+  las probabilidades;
+- `evaluation.json` y `predictions.json`: lo que quedó en `p3_evaluation`;
+- `audit.json`: el recálculo independiente, el umbral y los `crop_id` con error.
+
+Si la ejecución se interrumpe, `attempt.json` y la traza se conservan y el intento se
+audita; no se borra para "empezar de nuevo".
