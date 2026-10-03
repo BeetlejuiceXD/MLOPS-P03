@@ -31,6 +31,13 @@ class Mutant:
 E, M, D = "trainer/engine.py", "trainer/metrics.py", "trainer/dataset.py"
 
 MUTANTS = [
+    Mutant(
+        "augmentation tambien en el loader de val",
+        E,
+        "val_loader = _make_loader(dataset.val, config, train=False)",
+        "val_loader = _make_loader(dataset.val, config, train=True)",
+        ENGINE_TESTS,
+    ),
     # (M01 original, "> -> >=" en is_better, se quitó: el guard de arriba
     # (round(...) != round(...)) ya garantiza que esa línea solo corre con
     # valores distintos, así que ">" y ">=" son equivalentes ahí — no hay test
