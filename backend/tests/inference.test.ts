@@ -570,7 +570,9 @@ describe('POST /inference/:id/annotation-queue', () => {
 describe('D06-06 (preparación): identidad del modelo official recargado de AWS', () => {
   it('GET /inference/engine devuelve run, checkpoint, semver y el objeto S3 (bucket/key/VersionId/SHA)', async () => {
     engine.model = OFFICIAL;
-    const body = inferenceEngineSchema.parse(await (await fetch(`${base}/inference/engine`)).json());
+    const body = inferenceEngineSchema.parse(
+      await (await fetch(`${base}/inference/engine`)).json(),
+    );
     expect(body.model).toEqual(OFFICIAL);
   });
 
@@ -621,13 +623,16 @@ describe('D06-06 (preparación): identidad del modelo official recargado de AWS'
       },
     ],
     ['smoke con objeto S3', { ...SMOKE, s3_object: OFFICIAL.s3_object }],
-  ])('motor con identidad inválida (%s) → 503, sin guardar nada ni caer a otro modelo', async (_n, model) => {
-    engine.model = model as EnginePrediction['model'];
-    expect((await fetch(`${base}/inference/engine`)).status).toBe(503);
-    const res = await postFile(await png(16, 16), 'image/png');
-    expect(res.status).toBe(503);
-    expect((await res.json()).error).toMatch(/no cumple el contrato/);
-    expect(repo.inferences).toHaveLength(0);
-    expect(images.objects.size).toBe(0);
-  });
+  ])(
+    'motor con identidad inválida (%s) → 503, sin guardar nada ni caer a otro modelo',
+    async (_n, model) => {
+      engine.model = model as EnginePrediction['model'];
+      expect((await fetch(`${base}/inference/engine`)).status).toBe(503);
+      const res = await postFile(await png(16, 16), 'image/png');
+      expect(res.status).toBe(503);
+      expect((await res.json()).error).toMatch(/no cumple el contrato/);
+      expect(repo.inferences).toHaveLength(0);
+      expect(images.objects.size).toBe(0);
+    },
+  );
 });

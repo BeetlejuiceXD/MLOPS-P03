@@ -18,6 +18,33 @@ const inputClass =
 const modelLabel = (model: InferenceModelIdentity) =>
   model.source === "smoke" ? "smoke" : `official ${model.model_version}`;
 
+/** D06-06: objeto S3 del que se recargó el modelo; smoke es un paquete local. */
+function S3Identity({ model }: Readonly<{ model: InferenceModelIdentity }>) {
+  const s3 = model.s3_object;
+  if (s3 === null) {
+    return (
+      <p data-testid="identity-s3" className="text-xs text-ink-muted">
+        Sin objeto AWS: paquete local smoke.
+      </p>
+    );
+  }
+  return (
+    <dl
+      data-testid="identity-s3"
+      className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs"
+    >
+      <dt className="text-ink-muted">Bucket</dt>
+      <dd className="break-all font-mono">{s3.s3_bucket}</dd>
+      <dt className="text-ink-muted">Key</dt>
+      <dd className="break-all font-mono">{s3.s3_key}</dd>
+      <dt className="text-ink-muted">VersionId</dt>
+      <dd className="break-all font-mono">{s3.version_id}</dd>
+      <dt className="text-ink-muted">SHA-256 del objeto</dt>
+      <dd className="break-all font-mono">{s3.sha256}</dd>
+    </dl>
+  );
+}
+
 /**
  * D05-07 — Inference: el portal envía una imagen nueva o un crop (anotación) de una imagen
  * del portal a la API; el motor de D05-04 da la clase y la API guarda el resultado con la
@@ -90,6 +117,9 @@ function Identity({ model }: Readonly<{ model: InferenceModelIdentity }>) {
       <dd className="break-all font-mono">{model.checkpoint_sha256}</dd>
       <dt className="text-ink-muted">Formato</dt>
       <dd>{model.format_version}</dd>
+      <dd className="col-span-2">
+        <S3Identity model={model} />
+      </dd>
     </dl>
   );
 }
@@ -392,7 +422,14 @@ function History({ inferences }: Readonly<{ inferences: readonly InferenceResult
               <td className="px-2 py-1 font-mono">
                 {pct(item.probabilities[item.predicted_class] ?? 0)}
               </td>
-              <td className="px-2 py-1">{modelLabel(item.model)}</td>
+              <td className="px-2 py-1">
+                {modelLabel(item.model)}
+                {item.model.s3_object !== null && (
+                  <span className="block break-all font-mono text-ink-muted">
+                    VersionId {item.model.s3_object.version_id}
+                  </span>
+                )}
+              </td>
               <td className="px-2 py-1">
                 {item.annotation_queue_item_id === null
                   ? "sin enviar"

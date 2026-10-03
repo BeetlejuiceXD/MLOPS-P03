@@ -384,6 +384,11 @@ export const p3Inference = mysqlTable(
     modelVersion: varchar('model_version', { length: 32 }),
     mlflowRunId: char('mlflow_run_id', { length: 32 }).notNull(),
     checkpointSha256: char('checkpoint_sha256', { length: 64 }).notNull(),
+    // D06-06: objeto S3 del que se recargó el modelo official; NULL en smoke.
+    s3Bucket: varchar('s3_bucket', { length: 63 }),
+    s3Key: varchar('s3_key', { length: 1024 }),
+    s3VersionId: varchar('s3_version_id', { length: 1024 }),
+    s3Sha256: char('s3_sha256', { length: 64 }),
     createdAt: timestamp('created_at', { fsp: 3 }).notNull(),
   },
   (table) => [index('p3_inference_created_at_idx').on(table.createdAt)],

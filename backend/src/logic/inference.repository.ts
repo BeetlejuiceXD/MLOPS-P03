@@ -36,6 +36,15 @@ function toStored(row: P3InferenceRow): StoredInference {
       model_version: row.modelVersion,
       mlflow_run_id: row.mlflowRunId,
       checkpoint_sha256: row.checkpointSha256,
+      s3_object:
+        row.s3Bucket === null
+          ? null
+          : {
+              s3_bucket: row.s3Bucket,
+              s3_key: row.s3Key as string,
+              version_id: row.s3VersionId as string,
+              sha256: row.s3Sha256 as string,
+            },
     },
   };
 }
@@ -66,6 +75,10 @@ export const mariaDbInferenceRepository: InferenceRepository = {
       modelVersion: record.model.model_version,
       mlflowRunId: record.model.mlflow_run_id,
       checkpointSha256: record.model.checkpoint_sha256,
+      s3Bucket: record.model.s3_object?.s3_bucket ?? null,
+      s3Key: record.model.s3_object?.s3_key ?? null,
+      s3VersionId: record.model.s3_object?.version_id ?? null,
+      s3Sha256: record.model.s3_object?.sha256 ?? null,
       createdAt: record.created_at,
     }),
   async find(id) {

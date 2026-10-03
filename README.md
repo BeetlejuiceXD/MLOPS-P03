@@ -1723,6 +1723,17 @@ lo llama por defecto en `http://inference-engine:8090`. Sin el perfil (o sin paq
 Inference responde 503 con el motivo. D06-06 solo cambia la fuente (otra URL o el paquete
 official recargado de AWS, con `source: "official"` y semver): el resto del portal no cambia.
 
+**Identidad AWS por predicción (D06-06, preparación).** La identidad del modelo lleva
+`s3_object` (bucket, key, VersionId y SHA-256 del objeto del que se recargó). Un modelo
+official sin ese objeto, con la key de otro semver o un smoke que dice traerlo no cumplen
+el contrato: Inference responde 503 y no guarda nada ni cae a otro modelo. Cada fila de
+`p3_inference` lo guarda (migración 0010: `s3_bucket`, `s3_key`, `s3_version_id`,
+`s3_sha256`; NULL en smoke) y el elemento de la cola lo hereda por `inference_id`, así que
+recargar o reiniciar no pierde la identidad. El motor de D05-04 sirve hoy paquetes locales
+smoke y reporta `s3_object: null`; la página lo rotula "Sin objeto AWS: paquete local
+smoke". Las pruebas con identidad official usan datos sintéticos rotulados: el cierre de
+D06-06 necesita la recarga real de AWS de D06-04.
+
 Para levantarlo con un paquete smoke real (D05-01) construido desde un run de MLflow:
 
 ```bash

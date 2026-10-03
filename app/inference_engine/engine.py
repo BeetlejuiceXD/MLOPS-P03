@@ -72,7 +72,8 @@ class Prediction:
 
 def model_identity(package: LoadedPackage) -> dict:
     """Identidad `InferenceModelIdentity` de D05-07. Un paquete smoke no tiene semver de
-    modelo (lo asigna D06-02)."""
+    modelo (lo asigna D06-02) ni objeto S3: el paquete local nunca se presenta como el
+    official recargado de AWS (D06-06)."""
     identity = package.identity()
     return {
         "source": identity["kind"],
@@ -81,6 +82,7 @@ def model_identity(package: LoadedPackage) -> dict:
         "model_version": None,
         "mlflow_run_id": identity["mlflow_run_id"],
         "checkpoint_sha256": identity["checkpoint_sha256"],
+        "s3_object": None,
     }
 
 

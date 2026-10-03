@@ -814,9 +814,21 @@ export type LocalTestModelDetail = z.infer<typeof localTestModelDetailSchema>;
 // ---------------------------------------------------------------------------
 // Inferencia y cola de anotación (D05-07). Cada predicción lleva la identidad del modelo
 // que la produjo: hoy el paquete smoke de D05-01 servido por el motor de D05-04 (sin
-// semver de modelo); con D06-06, el modelo official recargado (con semver). La clase la
+// semver de modelo); con D06-06, el modelo official recargado de AWS (semver y objeto S3). La clase la
 // calcula el motor, nunca el portal.
 // ---------------------------------------------------------------------------
+/**
+ * D06-06 — Objeto S3 del que se recargó el modelo official (mismos nombres que
+ * `model_version`): bucket, key bajo su semver, VersionId exacto y SHA-256 del objeto.
+ */
+export const inferenceS3ObjectSchema = z.strictObject({
+  s3_bucket: z.string().min(3),
+  s3_key: z.string().min(1),
+  version_id: z.string().min(1),
+  sha256: sha256Schema,
+});
+export type InferenceS3Object = z.infer<typeof inferenceS3ObjectSchema>;
+
 export const inferenceModelIdentitySchema = z
   .strictObject({
     source: z.enum(["smoke", "official"]),
@@ -825,10 +837,27 @@ export const inferenceModelIdentitySchema = z
     model_version: modelSemverSchema.nullable(),
     mlflow_run_id: mlflowRunIdSchema,
     checkpoint_sha256: sha256Schema,
+    s3_object: inferenceS3ObjectSchema.nullable(),
   })
-  .refine((model) => (model.source === "smoke") === (model.model_version === null), {
-    message: "smoke no tiene semver de modelo (lo asigna D06-02); official siempre lo tiene",
-    path: ["model_version"],
+  .superRefine((model, ctx) => {
+    const issue = (path: string, message: string) =>
+      ctx.addIssue({ code: "custom", path: [path], message });
+    if ((model.source === "smoke") !== (model.model_version === null)) {
+      issue(
+        "model_version",
+        "smoke no tiene semver de modelo (lo asigna D06-02); official siempre lo tiene"
+      );
+    }
+    if ((model.source === "official") !== (model.s3_object !== null)) {
+      issue(
+        "s3_object",
+        "official siempre trae el objeto S3 del que se recargó (D06-04); smoke nunca"
+      );
+    }
+    const prefix = `models/${P3_EXPERIMENT}/${model.model_version}/`;
+    if (model.s3_object !== null && !model.s3_object.s3_key.startsWith(prefix)) {
+      issue("s3_object", `s3_key debe estar bajo models/${P3_EXPERIMENT}/<semver servido>/`);
+    }
   });
 export type InferenceModelIdentity = z.infer<typeof inferenceModelIdentitySchema>;
 
